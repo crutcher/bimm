@@ -1,3 +1,3 @@
 //! # `ResNet`
 
-pub mod block;
+pub mod downsample;
