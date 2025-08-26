@@ -35,15 +35,12 @@ pub trait ConvDownsampleMeta {
         &self,
         input_resolution: [usize; 2],
     ) -> [usize; 2] {
-        let [h, w] = input_resolution;
-        let stride = self.stride();
-        assert!(
-            h % self.stride() == 0 && w % self.stride() == 0,
-            "input resolution {:?} is not a multiple of the stride {:?}",
-            input_resolution,
-            stride,
-        );
-        [h / stride, w / stride]
+        unpack_shape_contract!(
+            ["height_in" = "height_out" * "stride", "width_in" = "width_out" * "stride"],
+            &input_resolution,
+            &["height_out", "width_out"],
+            &[("stride", self.stride())]
+        )
     }
 }
 
@@ -195,7 +192,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "input resolution [7, 7] is not a multiple of the stride 2")]
+    #[should_panic(expected = "7 !~ height_in=(height_out*stride)")]
     fn test_downsample_config_panic() {
         let config = ConvDownsampleConfig::new(2, 4)
             .with_stride(2);
