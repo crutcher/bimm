@@ -596,8 +596,6 @@ mod tests {
         let keep_count = drop.clone().greater_elem(1.0).int().sum().into_scalar() as usize;
         let drop_count = numel - keep_count;
         let drop_ratio = drop_count as f64 / numel as f64;
-        println!("drop_ratio: {}", drop_ratio);
-        println!("drop_prob: {}", drop_prob);
         assert!((drop_ratio - drop_prob).abs() < 0.15);
 
         let total = drop.sum().into_scalar() as f64;
@@ -695,8 +693,6 @@ mod tests {
         let keep_count = drop.clone().greater_elem(1.0).int().sum().into_scalar() as usize;
         let drop_count = numel - keep_count;
         let drop_ratio = drop_count as f64 / numel as f64;
-        println!("drop_ratio: {}", drop_ratio);
-        println!("drop_prob: {}", drop_prob);
         assert!((drop_ratio - drop_prob).abs() < 0.15);
 
         let total = drop.sum().into_scalar() as f64;
