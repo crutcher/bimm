@@ -24,11 +24,11 @@ pub trait ConvDownsampleMeta {
     ///
     /// # Arguments
     ///
-    /// - `input_resolution`: ``[height_in=height_out*stride, width_in=width_out*stride]``.
+    /// - `input_resolution`: ``[in_height=out_height*stride, in_width=out_width*stride]``.
     ///
     /// # Returns
     ///
-    /// ``[height_out, width_out]``
+    /// ``[out_height, out_width]``
     ///
     /// # Panics
     ///
@@ -97,8 +97,8 @@ impl ConvDownsampleConfig {
 
 /// Downsample layer applies a 1x1 conv to reduce the resolution (H, W) and adjust the number of channels.
 ///
-/// Maps ``[batch_size, channels_in, height_in, width_in]`` to
-/// ``[batch_size, channels_out, height_out, width_out]`` tensors.
+/// Maps ``[batch_size, in_channels, in_height, in_width]`` to
+/// ``[batch_size, out_channels, out_height, out_width]`` tensors.
 #[derive(Module, Debug)]
 pub struct ConvDownsample<B: Backend> {
     conv: Conv2d<B>,
@@ -127,26 +127,26 @@ impl<B: Backend> ConvDownsample<B> {
     ///
     /// # Arguments
     ///
-    /// - `input`: a ``[batch, channels_in, height_in=height_out*stride, width_in=width_out*stride]`` tensor.
+    /// - `input`: a ``[batch, in_channels, in_height=out_height*stride, in_width=out_width*stride]`` tensor.
     ///
     /// # Returns
     ///
-    /// A ``[batch_size, channels_out, h_out, w_out]`` tensor.
+    /// A ``[batch_size, out_channels, h_out, w_out]`` tensor.
     pub fn forward(
         &self,
         input: Tensor<B, 4>,
     ) -> Tensor<B, 4> {
-        let [batch, height_out, width_out] = unpack_shape_contract!(
+        let [batch, out_height, out_width] = unpack_shape_contract!(
             [
                 "batch",
-                "channels_in",
-                "height_in" = "height_out" * "stride",
-                "width_in" = "width_out" * "stride"
+                "in_channels",
+                "in_height" = "out_height" * "stride",
+                "in_width" = "out_width" * "stride"
             ],
             &input,
-            &["batch", "height_out", "width_out"],
+            &["batch", "out_height", "out_width"],
             &[
-                ("channels_in", self.in_channels()),
+                ("in_channels", self.in_channels()),
                 ("stride", self.stride())
             ]
         );
@@ -155,13 +155,13 @@ impl<B: Backend> ConvDownsample<B> {
         let out = self.bn.forward(out);
 
         assert_shape_contract_periodically!(
-            ["batch", "channels_out", "height_out", "width_out"],
+            ["batch", "out_channels", "out_height", "out_width"],
             &out,
             &[
                 ("batch", batch),
-                ("channels_out", self.out_channels()),
-                ("height_out", height_out),
-                ("width_out", width_out)
+                ("out_channels", self.out_channels()),
+                ("out_height", out_height),
+                ("out_width", out_width)
             ]
         );
 
@@ -189,7 +189,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "7 !~ height_in=(height_out*stride)")]
+    #[should_panic(expected = "7 !~ in_height=(out_height*stride)")]
     fn test_downsample_config_panic() {
         let config = ConvDownsampleConfig::new(2, 4).with_stride(2);
         config.output_resolution([7, 7]);
@@ -203,24 +203,24 @@ mod tests {
         let batch_size = 2;
         let in_channels = 2;
         let out_channels = 4;
-        let height_in = 8;
-        let width_in = 8;
+        let in_height = 8;
+        let in_width = 8;
 
         let downsample: ConvDownsample<B> = ConvDownsampleConfig::new(in_channels, out_channels)
             .with_stride(2)
             .init(&device);
 
-        let tensor = Tensor::ones([batch_size, in_channels, height_in, width_in], &device);
+        let tensor = Tensor::ones([batch_size, in_channels, in_height, in_width], &device);
         let out = downsample.forward(tensor);
 
         assert_shape_contract!(
-            ["batch", "channels_out", "height_out", "width_out"],
+            ["batch", "out_channels", "out_height", "out_width"],
             &out,
             &[
                 ("batch", batch_size),
-                ("channels_out", out_channels),
-                ("height_out", height_in / 2),
-                ("width_out", width_in / 2)
+                ("out_channels", out_channels),
+                ("out_height", in_height / 2),
+                ("out_width", in_width / 2)
             ]
         );
     }

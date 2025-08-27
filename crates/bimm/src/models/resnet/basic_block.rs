@@ -30,11 +30,11 @@ pub trait BasicBlockMeta {
     ///
     /// # Arguments
     ///
-    /// - `input_resolution`: ``[height_in=height_out*stride, width_in=width_out*stride]``.
+    /// - `input_resolution`: ``[in_height=out_height*stride, in_width=out_width*stride]``.
     ///
     /// # Returns
     ///
-    /// ``[height_out, width_out]``
+    /// ``[out_height, out_width]``
     ///
     /// # Panics
     ///
@@ -295,7 +295,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "7 !~ height_in=(height_out*stride)")]
+    #[should_panic(expected = "7 !~ in_height=(out_height*stride)")]
     fn test_downsample_config_panic() {
         let config = BasicBlockConfig::new(16, 32).with_stride(2);
         assert_eq!(config.stride(), 2);
@@ -326,12 +326,12 @@ mod tests {
         let batch_size = 2;
         let in_channels = 2;
         let out_channels = in_channels;
-        let height_in = 8;
-        let width_in = 8;
+        let in_height = 8;
+        let in_width = 8;
 
         let block: BasicBlock<B> = BasicBlockConfig::new(in_channels, out_channels).init(&device);
 
-        let input = Tensor::ones([batch_size, in_channels, height_in, width_in], &device);
+        let input = Tensor::ones([batch_size, in_channels, in_height, in_width], &device);
         let output = block.forward(input);
 
         assert_shape_contract!(
@@ -340,8 +340,8 @@ mod tests {
             &[
                 ("batch", batch_size),
                 ("out_channels", out_channels),
-                ("out_height", height_in),
-                ("out_width", width_in)
+                ("out_height", in_height),
+                ("out_width", in_width)
             ],
         );
     }
@@ -354,8 +354,8 @@ mod tests {
         let batch_size = 2;
         let in_channels = 2;
         let out_channels = 4;
-        let height_in = 8;
-        let width_in = 8;
+        let in_height = 8;
+        let in_width = 8;
 
         let block: BasicBlock<B> = BasicBlockConfig::new(in_channels, out_channels)
             .with_drop_path_prob(0.1)
@@ -363,11 +363,11 @@ mod tests {
             .with_stride(2)
             .init(&device);
 
-        let [height_out, width_out] = block.output_resolution([height_in, width_in]);
-        assert_eq!(height_out, 4);
-        assert_eq!(width_out, 4);
+        let [out_height, out_width] = block.output_resolution([in_height, in_width]);
+        assert_eq!(out_height, 4);
+        assert_eq!(out_width, 4);
 
-        let input = Tensor::ones([batch_size, in_channels, height_in, width_in], &device);
+        let input = Tensor::ones([batch_size, in_channels, in_height, in_width], &device);
         let output = block.forward(input);
 
         assert_shape_contract!(
@@ -376,8 +376,8 @@ mod tests {
             &[
                 ("batch", batch_size),
                 ("out_channels", out_channels),
-                ("out_height", height_out),
-                ("out_width", width_out)
+                ("out_height", out_height),
+                ("out_width", out_width)
             ],
         );
     }

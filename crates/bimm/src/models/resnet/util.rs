@@ -8,11 +8,11 @@ use burn::nn::Initializer;
 ///
 /// # Arguments
 ///
-/// - `input_resolution`: ``[height_in=height_out*stride, width_in=width_out*stride]``.
+/// - `input_resolution`: ``[in_height=out_height*stride, in_width=out_width*stride]``.
 ///
 /// # Returns
 ///
-/// ``[height_out, width_out]``
+/// ``[out_height, out_width]``
 ///
 /// # Panics
 ///
@@ -24,11 +24,11 @@ pub fn stride_div_output_resolution(
 ) -> [usize; 2] {
     unpack_shape_contract!(
         [
-            "height_in" = "height_out" * "stride",
-            "width_in" = "width_out" * "stride"
+            "in_height" = "out_height" * "stride",
+            "in_width" = "out_width" * "stride"
         ],
         &input_resolution,
-        &["height_out", "width_out"],
+        &["out_height", "out_width"],
         &[("stride", stride)]
     )
 }
