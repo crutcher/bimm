@@ -1,5 +1,6 @@
 //! # The `ResNet` Downsample Implementation.
 
+use crate::models::resnet::util::stride_div_output_resolution;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::nn::conv::{Conv2d, Conv2dConfig};
 use burn::nn::{BatchNorm, BatchNormConfig, Initializer, PaddingConfig2d};
@@ -16,17 +17,17 @@ pub trait ConvDownsampleMeta {
     /// The stride of the downsample layer.
     fn stride(&self) -> usize;
 
-    /// Predict the output resolution.
+    /// Get the output resolution for a given input resolution.
     ///
     /// The input must be a multiple of the stride.
     ///
     /// # Arguments
     ///
-    /// - `input_resolution`: ``[height_in, width_in]``.
+    /// - `input_resolution`: ``[height_in=height_out*stride, width_in=width_out*stride]``.
     ///
     /// # Returns
     ///
-    /// Output `[[height_out, width_out]]`.
+    /// ``[height_out, width_out]``
     ///
     /// # Panics
     ///
@@ -35,12 +36,7 @@ pub trait ConvDownsampleMeta {
         &self,
         input_resolution: [usize; 2],
     ) -> [usize; 2] {
-        unpack_shape_contract!(
-            ["height_in" = "height_out" * "stride", "width_in" = "width_out" * "stride"],
-            &input_resolution,
-            &["height_out", "width_out"],
-            &[("stride", self.stride())]
-        )
+        stride_div_output_resolution(input_resolution, self.stride())
     }
 }
 
@@ -57,7 +53,7 @@ pub struct ConvDownsampleConfig {
     #[config(default = 1)]
     stride: usize,
 
-    /// The type of function used to initialize neural network parameters
+    /// The [`Conv2D`] initializer.
     /// Default is recommended for use with Relu.
     #[config(
         default = "Initializer::KaimingNormal{gain:std::f64::consts::SQRT_2, fan_out_only:true}"
@@ -151,7 +147,10 @@ impl<B: Backend> ConvDownsample<B> {
             ],
             &input,
             &["batch", "height_out", "width_out"],
-            &[("channels_in", self.in_channels()), ("stride", self.stride())]
+            &[
+                ("channels_in", self.in_channels()),
+                ("stride", self.stride())
+            ]
         );
 
         let out = self.conv.forward(input);
@@ -194,8 +193,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "7 !~ height_in=(height_out*stride)")]
     fn test_downsample_config_panic() {
-        let config = ConvDownsampleConfig::new(2, 4)
-            .with_stride(2);
+        let config = ConvDownsampleConfig::new(2, 4).with_stride(2);
         config.output_resolution([7, 7]);
     }
 
