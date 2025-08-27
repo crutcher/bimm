@@ -2,8 +2,10 @@
 
 use crate::layers::activation::{ActivationLayer, ActivationLayerConfig};
 use crate::layers::drop::drop_block::{DropBlock2d, DropBlock2dConfig, DropBlockOptions};
-use crate::models::resnet::downsample::ConvDownsample;
+use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
+use crate::models::resnet::downsample::{ConvDownsample, ConvDownsampleConfig};
 use crate::models::resnet::util;
+use crate::utility::probability::expect_probability;
 use bimm_contracts::{
     assert_shape_contract_periodically, define_shape_contract, unpack_shape_contract,
 };
@@ -58,6 +60,10 @@ pub struct BasicBlockConfig {
     #[config(default = 1)]
     pub stride: usize,
 
+    /// Drop path probability.
+    #[config(default = "0.0")]
+    pub drop_path_prob: f64,
+
     /// The drop block config.
     #[config(default = "None")]
     pub drop_block: Option<DropBlockOptions>,
@@ -97,9 +103,17 @@ impl BasicBlockConfig {
         self,
         device: &B::Device,
     ) -> BasicBlock<B> {
-        if self.in_channels != self.out_channels {
-            panic!("in_channels != out_channels requires downsample layer")
-        }
+        let downsample = if self.stride == 1 && self.in_channels == self.out_channels {
+            None
+        } else {
+            ConvDownsampleConfig::new(self.in_channels, self.out_channels)
+                .with_stride(self.stride)
+                .with_initializer(self.initializer.clone())
+                .init(device)
+                .into()
+        };
+
+        let drop_path_prob = expect_probability(self.drop_path_prob);
 
         BasicBlock {
             conv1: Conv2dConfig::new([self.in_channels, self.out_channels], [3, 3])
@@ -130,7 +144,16 @@ impl BasicBlockConfig {
 
             act2: self.activation.init(device),
 
-            downsample: None,
+            drop_path: if drop_path_prob == 0.0 {
+                None
+            } else {
+                DropPathConfig::new()
+                    .with_drop_prob(drop_path_prob)
+                    .init()
+                    .into()
+            },
+
+            downsample,
         }
     }
 }
@@ -150,6 +173,8 @@ pub struct BasicBlock<B: Backend> {
 
     // TODO: se: attention layer
     // TODO: drop_path: drop path layer
+    drop_path: Option<DropPath>,
+
     downsample: Option<ConvDownsample<B>>,
 }
 
@@ -223,7 +248,11 @@ impl<B: Backend> BasicBlock<B> {
         let x = self.bn2.forward(x);
 
         // se? - attention?
-        // drop_path?
+
+        let x = match &self.drop_path {
+            Some(drop_path) => drop_path.forward(x),
+            None => x,
+        };
 
         let shortcut = match &self.downsample {
             Some(downsample) => downsample.forward(shortcut),
@@ -299,9 +328,7 @@ mod tests {
         let height_in = 8;
         let width_in = 8;
 
-        let block: BasicBlock<B> = BasicBlockConfig::new(in_channels, out_channels)
-            .with_drop_block(Some(DropBlockOptions::default()))
-            .init(&device);
+        let block: BasicBlock<B> = BasicBlockConfig::new(in_channels, out_channels).init(&device);
 
         let input = Tensor::ones([batch_size, in_channels, height_in, width_in], &device);
         let output = block.forward(input);
@@ -314,6 +341,42 @@ mod tests {
                 ("out_channels", out_channels),
                 ("out_height", height_in),
                 ("out_width", width_in)
+            ],
+        );
+    }
+
+    #[test]
+    fn test_basic_block_forward_downsample_dropblock_droppath_autodiff() {
+        type B = Autodiff<NdArray<f32>>;
+        let device = Default::default();
+
+        let batch_size = 2;
+        let in_channels = 2;
+        let out_channels = 4;
+        let height_in = 8;
+        let width_in = 8;
+
+        let block: BasicBlock<B> = BasicBlockConfig::new(in_channels, out_channels)
+            .with_drop_path_prob(0.1)
+            .with_drop_block(Some(DropBlockOptions::default()))
+            .with_stride(2)
+            .init(&device);
+
+        let [height_out, width_out] = block.output_resolution([height_in, width_in]);
+        assert_eq!(height_out, 4);
+        assert_eq!(width_out, 4);
+
+        let input = Tensor::ones([batch_size, in_channels, height_in, width_in], &device);
+        let output = block.forward(input);
+
+        assert_shape_contract!(
+            ["batch", "out_channels", "out_height", "out_width"],
+            &output,
+            &[
+                ("batch", batch_size),
+                ("out_channels", out_channels),
+                ("out_height", height_out),
+                ("out_width", width_out)
             ],
         );
     }

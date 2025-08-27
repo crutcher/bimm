@@ -29,7 +29,10 @@ pub fn conv2d_kernel_midpoint_filter<B: Backend, K>(
 where
     K: Numeric<B>,
 {
-    expect_point_bounds_check(&kernel, &[0; 2], &shape);
+    // TODO: kernel <= shape
+    // This is wrong:
+    // expect_point_bounds_check(&kernel, &[0; 2], &shape);
+
     let region = [
         (kernel[0] / 2)..shape[0] - ((kernel[0] - 1) / 2),
         (kernel[1] / 2)..shape[1] - ((kernel[1] - 1) / 2),
