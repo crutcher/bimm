@@ -143,8 +143,10 @@ impl BasicBlockConfig {
             },
 
             downsample: if self.stride == 1 && self.in_channels == self.out_channels {
+                // No downsample is needed.
                 None
             } else {
+                // If present, downsample is used to adapt the skip connection.
                 ConvDownsampleConfig::new(self.in_channels, self.out_channels)
                     .with_stride(self.stride)
                     .with_initializer(self.initializer)
@@ -203,8 +205,6 @@ impl<B: Backend> BasicBlock<B> {
         &self,
         input: Tensor<B, 4>,
     ) -> Tensor<B, 4> {
-        let shortcut = input.clone();
-
         let [batch, out_height, out_width] = unpack_shape_contract!(
             [
                 "batch",
@@ -230,8 +230,18 @@ impl<B: Backend> BasicBlock<B> {
             ("out_width", out_width),
         ];
 
+        let shortcut = input.clone();
+        let shortcut = match &self.downsample {
+            // If present, downsample is used to adapt the skip connection.
+            Some(downsample) => downsample.forward(shortcut),
+            None => shortcut,
+        };
+        assert_shape_contract_periodically!(OUT_CONTRACT, &shortcut, &bindings);
+
         let x = self.conv1.forward(input);
+        // This is the only main operation that changes the shape of the input.
         assert_shape_contract_periodically!(OUT_CONTRACT, &x, &bindings);
+
         let x = self.bn1.forward(x);
         let x = match &self.drop_block {
             Some(drop_block) => drop_block.forward(x),
@@ -250,12 +260,6 @@ impl<B: Backend> BasicBlock<B> {
             Some(drop_path) => drop_path.forward(x),
             None => x,
         };
-
-        let shortcut = match &self.downsample {
-            Some(downsample) => downsample.forward(shortcut),
-            None => shortcut,
-        };
-        assert_shape_contract_periodically!(OUT_CONTRACT, &shortcut, &bindings);
 
         let x = x + shortcut;
         let x = self.act2.forward(x);
