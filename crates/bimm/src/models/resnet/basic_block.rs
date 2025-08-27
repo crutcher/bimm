@@ -4,7 +4,7 @@ use crate::layers::activation::{ActivationLayer, ActivationLayerConfig};
 use crate::layers::drop::drop_block::{DropBlock2d, DropBlock2dConfig, DropBlockOptions};
 use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
 use crate::models::resnet::downsample::{ConvDownsample, ConvDownsampleConfig};
-use crate::models::resnet::util;
+use crate::models::resnet::util::{CONV_INTO_RELU_INITIALIZER, stride_div_output_resolution};
 use crate::utility::probability::expect_probability;
 use bimm_contracts::{
     assert_shape_contract_periodically, define_shape_contract, unpack_shape_contract,
@@ -43,7 +43,7 @@ pub trait BasicBlockMeta {
         &self,
         input_resolution: [usize; 2],
     ) -> [usize; 2] {
-        util::stride_div_output_resolution(input_resolution, self.stride())
+        stride_div_output_resolution(input_resolution, self.stride())
     }
 }
 
@@ -73,10 +73,7 @@ pub struct BasicBlockConfig {
     pub activation: ActivationLayerConfig,
 
     /// The [`Conv2D`] initializer.
-    /// Default is recommended for use with Relu.
-    #[config(
-        default = "Initializer::KaimingNormal{gain:std::f64::consts::SQRT_2, fan_out_only:true}"
-    )]
+    #[config(default = "CONV_INTO_RELU_INITIALIZER.clone()")]
     pub initializer: Initializer,
 }
 
@@ -103,16 +100,6 @@ impl BasicBlockConfig {
         self,
         device: &B::Device,
     ) -> BasicBlock<B> {
-        let downsample = if self.stride == 1 && self.in_channels == self.out_channels {
-            None
-        } else {
-            ConvDownsampleConfig::new(self.in_channels, self.out_channels)
-                .with_stride(self.stride)
-                .with_initializer(self.initializer.clone())
-                .init(device)
-                .into()
-        };
-
         let drop_path_prob = expect_probability(self.drop_path_prob);
 
         BasicBlock {
@@ -125,11 +112,13 @@ impl BasicBlockConfig {
 
             bn1: BatchNormConfig::new(self.out_channels).init(device),
 
-            drop_block: self.drop_block.as_ref().map(|options| {
-                DropBlock2dConfig::new()
+            drop_block: match &self.drop_block {
+                Some(options) => DropBlock2dConfig::new()
                     .with_options(options.clone())
                     .init()
-            }),
+                    .into(),
+                None => None,
+            },
 
             act1: self.activation.init(device),
 
@@ -137,7 +126,7 @@ impl BasicBlockConfig {
                 .with_stride([1, 1])
                 .with_padding(PaddingConfig2d::Explicit(1, 1))
                 .with_bias(false)
-                .with_initializer(self.initializer)
+                .with_initializer(self.initializer.clone())
                 .init(device),
 
             bn2: BatchNormConfig::new(self.out_channels).init(device),
@@ -153,7 +142,15 @@ impl BasicBlockConfig {
                     .into()
             },
 
-            downsample,
+            downsample: if self.stride == 1 && self.in_channels == self.out_channels {
+                None
+            } else {
+                ConvDownsampleConfig::new(self.in_channels, self.out_channels)
+                    .with_stride(self.stride)
+                    .with_initializer(self.initializer)
+                    .init(device)
+                    .into()
+            },
         }
     }
 }

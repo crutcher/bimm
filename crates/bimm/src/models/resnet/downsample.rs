@@ -1,5 +1,6 @@
 //! # The `ResNet` Downsample Implementation.
 
+use crate::models::resnet::util::CONV_INTO_RELU_INITIALIZER;
 use crate::models::resnet::util::stride_div_output_resolution;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::nn::conv::{Conv2d, Conv2dConfig};
@@ -54,10 +55,7 @@ pub struct ConvDownsampleConfig {
     stride: usize,
 
     /// The [`Conv2D`] initializer.
-    /// Default is recommended for use with Relu.
-    #[config(
-        default = "Initializer::KaimingNormal{gain:std::f64::consts::SQRT_2, fan_out_only:true}"
-    )]
+    #[config(default = "CONV_INTO_RELU_INITIALIZER.clone()")]
     pub initializer: Initializer,
 }
 

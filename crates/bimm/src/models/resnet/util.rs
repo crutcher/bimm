@@ -1,5 +1,6 @@
 //! # `ResNet` Utilities
 use bimm_contracts::unpack_shape_contract;
+use burn::nn::Initializer;
 
 /// Get the output resolution for a given input resolution.
 ///
@@ -31,3 +32,9 @@ pub fn stride_div_output_resolution(
         &[("stride", stride)]
     )
 }
+
+/// Recommended initializer for conv layers feeding into a relu.
+pub static CONV_INTO_RELU_INITIALIZER: Initializer = Initializer::KaimingNormal {
+    gain: std::f64::consts::SQRT_2,
+    fan_out_only: true,
+};
