@@ -61,17 +61,14 @@ pub struct ConvDownsampleConfig {
 }
 
 impl ConvDownsampleMeta for ConvDownsampleConfig {
-    #[inline]
     fn in_channels(&self) -> usize {
         self.in_channels
     }
 
-    #[inline]
     fn out_channels(&self) -> usize {
         self.out_channels
     }
 
-    #[inline]
     fn stride(&self) -> usize {
         self.stride
     }
@@ -107,17 +104,14 @@ pub struct ConvDownsample<B: Backend> {
 }
 
 impl<B: Backend> ConvDownsampleMeta for ConvDownsample<B> {
-    #[inline]
     fn in_channels(&self) -> usize {
         self.conv_norm.conv.weight.shape().dims[1]
     }
 
-    #[inline]
     fn out_channels(&self) -> usize {
         self.conv_norm.conv.weight.shape().dims[0]
     }
 
-    #[inline]
     fn stride(&self) -> usize {
         self.conv_norm.conv.stride[0]
     }

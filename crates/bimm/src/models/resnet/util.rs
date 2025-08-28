@@ -17,7 +17,6 @@ use burn::nn::Initializer;
 /// # Panics
 ///
 /// If the input resolution is not a multiple of the stride.
-#[inline(always)]
 pub fn stride_div_output_resolution(
     input_resolution: [usize; 2],
     stride: usize,

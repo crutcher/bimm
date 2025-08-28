@@ -1,3 +1,6 @@
+//! # `ConvNorm` Module
+//!
+//! A [`ConvNorm`] module is a [`Conv2d`] layer followed by a [`BatchNorm`] layer.
 use burn::config::Config;
 use burn::module::Module;
 use burn::nn::conv::{Conv2d, Conv2dConfig};

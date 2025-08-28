@@ -79,17 +79,14 @@ pub struct BasicBlockConfig {
 }
 
 impl BasicBlockMeta for BasicBlockConfig {
-    #[inline]
     fn in_channels(&self) -> usize {
         self.in_channels
     }
 
-    #[inline]
     fn out_channels(&self) -> usize {
         self.out_channels
     }
 
-    #[inline]
     fn stride(&self) -> usize {
         self.stride
     }
