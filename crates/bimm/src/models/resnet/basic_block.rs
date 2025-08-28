@@ -3,7 +3,7 @@
 use crate::layers::activation::{ActivationLayer, ActivationLayerConfig};
 use crate::layers::drop::drop_block::{DropBlock2d, DropBlock2dConfig, DropBlockOptions};
 use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
-use crate::models::resnet::conv_norm::{ConvNorm, ConvNormConfig};
+use crate::models::resnet::conv_norm::{ConvNorm, ConvNormConfig, ConvNormMeta};
 use crate::models::resnet::downsample::{ConvDownsample, ConvDownsampleConfig};
 use crate::models::resnet::util::{CONV_INTO_RELU_INITIALIZER, stride_div_output_resolution};
 use crate::utility::probability::expect_probability;
@@ -176,15 +176,15 @@ pub struct BasicBlock<B: Backend> {
 
 impl<B: Backend> BasicBlockMeta for BasicBlock<B> {
     fn in_channels(&self) -> usize {
-        self.conv_norm1.conv.weight.shape().dims[1]
+        self.conv_norm1.in_channels()
     }
 
     fn out_channels(&self) -> usize {
-        self.conv_norm1.conv.weight.shape().dims[0]
+        self.conv_norm1.out_channels()
     }
 
     fn stride(&self) -> usize {
-        self.conv_norm1.conv.stride[0]
+        self.conv_norm1.stride()[0]
     }
 }
 
