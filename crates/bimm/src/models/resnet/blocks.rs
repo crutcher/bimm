@@ -27,7 +27,7 @@ pub trait BasicBlockMeta {
 
     /// The size of the out channels dimension.
     ///
-    /// ``out_planes := planes * out_planes_expansion_factor``
+    /// ``out_planes = planes * out_planes_expansion_factor``
     fn out_planes(&self) -> usize {
         self.planes() * self.out_planes_expansion_factor()
     }
@@ -37,7 +37,7 @@ pub trait BasicBlockMeta {
 
     /// First conv/norm layer output channels.
     ///
-    /// ``first_planes := planes // first_planes_reduction_factor``
+    /// ``first_planes = planes // first_planes_reduction_factor``
     fn first_planes(&self) -> usize {
         self.planes() / self.first_planes_reduction_factor()
     }
@@ -48,7 +48,7 @@ pub trait BasicBlockMeta {
     /// Dilation rate for conv layers.
     fn dilation(&self) -> usize;
 
-    /// Optional dilation rate for first conv.
+    /// Optional dilation rate for the first conv.
     fn first_dilation(&self) -> Option<usize>;
 
     /// Get the output resolution for a given input resolution.
@@ -99,7 +99,7 @@ pub struct BasicBlockConfig {
     #[config(default = 1)]
     pub dilation: usize,
 
-    /// Optional dilation rate for first conv.
+    /// Optional dilation rate for the first conv.
     #[config(default = "None")]
     pub first_dilation: Option<usize>,
 
@@ -158,36 +158,55 @@ impl BasicBlockConfig {
     ) -> BasicBlock<B> {
         let drop_path_prob = expect_probability(self.drop_path_prob);
 
-        let first_dilation = self.first_dilation.unwrap_or(self.dilation);
+        let in_planes = self.in_planes();
+        let first_planes = self.first_planes();
+        let first_dilation = self.first_dilation().unwrap_or(self.dilation());
+        let stride = self.stride();
+
+        // TODO: conditional stride logic for anti-aliasing.
+        let first_stride = stride;
 
         let conv_norm1_cfg = ConvNormConfig::from(
-            Conv2dConfig::new([self.in_planes(), self.first_planes()], [3, 3])
-                .with_stride([self.stride(), self.stride()])
+            Conv2dConfig::new([in_planes, first_planes], [3, 3])
+                .with_stride([first_stride, first_stride])
                 .with_dilation([first_dilation, first_dilation])
-                .with_padding(PaddingConfig2d::Explicit(1, 1))
+                .with_padding(PaddingConfig2d::Explicit(first_dilation, first_dilation))
                 .with_bias(false)
                 .with_initializer(self.initializer.clone()),
         );
+
+        let drop_block_cfg = match &self.drop_block {
+            Some(options) => DropBlock2dConfig::from(options.clone()).into(),
+            None => None,
+        };
+
+        let out_planes = self.out_planes();
+        let dilation = self.dilation();
 
         let conv_norm2_cfg = ConvNormConfig::from(
-            Conv2dConfig::new([self.first_planes(), self.out_planes()], [3, 3])
+            Conv2dConfig::new([first_planes, out_planes], [3, 3])
                 .with_stride([1, 1])
-                .with_dilation([self.dilation, self.dilation])
-                .with_padding(PaddingConfig2d::Explicit(1, 1))
+                .with_dilation([dilation, dilation])
+                .with_padding(PaddingConfig2d::Explicit(dilation, dilation))
                 .with_bias(false)
                 .with_initializer(self.initializer.clone()),
         );
 
-        let residual_downsample_cfg = if self.stride() == 1 && self.in_planes() == self.out_planes()
-        {
-            // No downsample is needed.
+        let drop_path_cfg = if drop_path_prob == 0.0 {
             None
         } else {
+            DropPathConfig::new().with_drop_prob(drop_path_prob).into()
+        };
+
+        let downsample_required = self.stride() != 1 || self.in_planes() != self.out_planes();
+        let residual_downsample_cfg = if downsample_required {
             // If present, downsample is used to adapt the skip connection.
             ConvDownsampleConfig::new(self.in_planes(), self.out_planes())
                 .with_stride(self.stride())
                 .with_initializer(self.initializer)
                 .into()
+        } else {
+            None
         };
 
         BasicBlock {
@@ -196,10 +215,7 @@ impl BasicBlockConfig {
 
             conv_norm1: conv_norm1_cfg.init(device),
 
-            drop_block: match &self.drop_block {
-                Some(options) => DropBlock2dConfig::from(options.clone()).init().into(),
-                None => None,
-            },
+            drop_block: drop_block_cfg.map(|cfg| cfg.init()),
 
             act1: self.activation.init(device),
 
@@ -207,14 +223,7 @@ impl BasicBlockConfig {
 
             act2: self.activation.init(device),
 
-            drop_path: if drop_path_prob == 0.0 {
-                None
-            } else {
-                DropPathConfig::new()
-                    .with_drop_prob(drop_path_prob)
-                    .init()
-                    .into()
-            },
+            drop_path: drop_path_cfg.map(|cfg| cfg.init()),
 
             residual_downsample: residual_downsample_cfg.map(|cfg| cfg.init(device)),
         }
@@ -261,20 +270,20 @@ impl<B: Backend> BasicBlockMeta for BasicBlock<B> {
         self.conv_norm1.out_channels() / self.out_planes_expansion_factor()
     }
 
-    fn first_planes(&self) -> usize {
-        self.conv_norm1.out_channels()
+    fn out_planes_expansion_factor(&self) -> usize {
+        self.out_planes_expansion_factor
     }
 
     fn out_planes(&self) -> usize {
         self.conv_norm2.out_channels()
     }
 
-    fn out_planes_expansion_factor(&self) -> usize {
-        self.out_planes_expansion_factor
-    }
-
     fn first_planes_reduction_factor(&self) -> usize {
         self.first_planes_reduction_factor
+    }
+
+    fn first_planes(&self) -> usize {
+        self.conv_norm1.out_channels()
     }
 
     fn stride(&self) -> usize {
@@ -444,7 +453,7 @@ mod tests {
     }
 
     #[test]
-    fn test_basic_block_forward_downsample_dropblock_droppath_autodiff() {
+    fn test_basic_block_forward_downsample_drop_block_drop_path_autodiff() {
         type B = Autodiff<NdArray<f32>>;
         let device = Default::default();
 
