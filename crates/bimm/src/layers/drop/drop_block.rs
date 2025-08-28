@@ -3,6 +3,7 @@
 //! Based upon [DropBlock (Ghiasi et al., 2018)](https://arxiv.org/pdf/1810.12890.pdf);
 //! inspired also by the `python-image-models` implementation.
 
+use crate::layers::drop::size_config::SizeConfig;
 use crate::utility::burn::kernels;
 use crate::utility::burn::noise::NoiseConfig;
 use crate::utility::burn::shape::shape_to_ranges;
@@ -22,7 +23,7 @@ pub struct DropBlockOptions {
     pub drop_prob: f64,
 
     /// The block size.
-    pub kernel: [usize; 2],
+    pub kernel: [SizeConfig; 2],
 
     /// The gamma scale.
     pub gamma_scale: f64,
@@ -52,7 +53,7 @@ impl ModuleDisplayDefault for DropBlockOptions {
         Some(
             content
                 .add("drop_prob", &self.drop_prob)
-                .add("kernel", &self.kernel)
+                .add("kernel", format!("{:?}", &self.kernel).as_str())
                 .add("gamma_scale", &self.gamma_scale)
                 .add("batchwise", &self.batchwise)
                 .add("couple_channels", &self.couple_channels)
@@ -66,7 +67,7 @@ impl Default for DropBlockOptions {
     fn default() -> Self {
         Self {
             drop_prob: 0.1,
-            kernel: [7; 2],
+            kernel: [7.into(); 2],
             gamma_scale: 1.0,
             noise: None,
             batchwise: true,
@@ -103,11 +104,17 @@ impl DropBlockOptions {
     /// # Arguments
     ///
     /// - `block_size` - the symmetric kernel size.
-    pub fn with_block_size(
+    pub fn with_block_size<S>(
         self,
-        block_size: usize,
-    ) -> Self {
-        self.with_kernel([block_size; 2])
+        block_size: S,
+    ) -> Self
+    where
+        S: Into<SizeConfig>,
+    {
+        Self {
+            kernel: [block_size.into(); 2],
+            ..self
+        }
     }
 
     /// Sets the kernel size.
@@ -115,10 +122,15 @@ impl DropBlockOptions {
     /// # Arguments
     ///
     /// - `kernel` - the kernel size.
-    pub fn with_kernel(
+    pub fn with_kernel<S>(
         self,
-        kernel: [usize; 2],
-    ) -> Self {
+        kernel: [S; 2],
+    ) -> Self
+    where
+        S: Into<SizeConfig>,
+    {
+        let [x, y] = kernel;
+        let kernel = [x.into(), y.into()];
         Self { kernel, ..self }
     }
 
@@ -210,6 +222,8 @@ impl DropBlockOptions {
     ) -> [usize; 2] {
         let [h, w] = shape;
         let [kh, kw] = self.kernel;
+        let kh = kh.resolve(h);
+        let kw = kw.resolve(w);
         [std::cmp::min(h, kh), std::cmp::min(w, kw)]
     }
 
@@ -440,7 +454,7 @@ mod tests {
     fn test_drop_block_options() {
         let options = DropBlockOptions::default();
         assert_eq!(options.drop_prob, 0.1);
-        assert_eq!(options.kernel, [7; 2]);
+        assert_eq!(options.kernel, [SizeConfig::Fixed(7); 2]);
         assert_eq!(options.gamma_scale, 1.0);
         assert!(options.noise.is_none());
         assert_eq!(options.batchwise, true);
@@ -448,8 +462,8 @@ mod tests {
         let options = options.with_drop_prob(0.2);
         assert_eq!(options.drop_prob, 0.2);
 
-        let options = options.with_block_size(10);
-        assert_eq!(options.kernel, [10; 2]);
+        let options = options.with_block_size(0.25);
+        assert_eq!(options.kernel, [SizeConfig::Ratio(0.25); 2]);
 
         let options = options.with_gamma_scale(0.5);
         assert_eq!(options.gamma_scale, 0.5);
@@ -468,10 +482,7 @@ mod tests {
             indoc::indoc! {r#"
                 DropBlockOptions {
                   drop_prob: 0.1
-                  kernel: [0..2] {
-                    0: 7
-                    1: 7
-                  }
+                  kernel: [Fixed(7), Fixed(7)]
                   gamma_scale: 1
                   batchwise: true
                   couple_channels: true
@@ -494,7 +505,7 @@ mod tests {
 
         let shape = [7, 9];
         let [h, w] = shape;
-        let [kh, kw] = options.kernel;
+        let [kh, kw] = options.clipped_kernel(shape);
 
         let total_size = (h * w) as f64;
 
