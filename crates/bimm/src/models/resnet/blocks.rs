@@ -175,11 +175,6 @@ impl BasicBlockConfig {
                 .with_initializer(self.initializer.clone()),
         );
 
-        let drop_block_cfg = match &self.drop_block {
-            Some(options) => DropBlock2dConfig::from(options.clone()).into(),
-            None => None,
-        };
-
         let out_planes = self.out_planes();
         let dilation = self.dilation();
 
@@ -192,30 +187,16 @@ impl BasicBlockConfig {
                 .with_initializer(self.initializer.clone()),
         );
 
-        let drop_path_cfg = if drop_path_prob == 0.0 {
-            None
-        } else {
-            DropPathConfig::new().with_drop_prob(drop_path_prob).into()
-        };
-
-        let downsample_required = self.stride() != 1 || self.in_planes() != self.out_planes();
-        let residual_downsample_cfg = if downsample_required {
-            // If present, downsample is used to adapt the skip connection.
-            ConvDownsampleConfig::new(self.in_planes(), self.out_planes())
-                .with_stride(self.stride())
-                .with_initializer(self.initializer)
-                .into()
-        } else {
-            None
-        };
-
         BasicBlock {
             out_planes_expansion_factor: self.out_planes_expansion_factor,
             first_planes_reduction_factor: self.first_planes_reduction_factor,
 
             conv_norm1: conv_norm1_cfg.init(device),
 
-            drop_block: drop_block_cfg.map(|cfg| cfg.init()),
+            drop_block: self
+                .drop_block
+                .as_ref()
+                .map(|options| DropBlock2dConfig::from(options.clone()).init()),
 
             act1: self.activation.init(device),
 
@@ -223,9 +204,25 @@ impl BasicBlockConfig {
 
             act2: self.activation.init(device),
 
-            drop_path: drop_path_cfg.map(|cfg| cfg.init()),
+            drop_path: if drop_path_prob != 0.0 {
+                DropPathConfig::new()
+                    .with_drop_prob(drop_path_prob)
+                    .init()
+                    .into()
+            } else {
+                None
+            },
 
-            residual_downsample: residual_downsample_cfg.map(|cfg| cfg.init(device)),
+            residual_downsample: if stride != 1 || in_planes != out_planes {
+                // TODO: mechanism to select different pool operations.
+                ConvDownsampleConfig::new(self.in_planes(), self.out_planes())
+                    .with_stride(self.stride())
+                    .with_initializer(self.initializer)
+                    .init(device)
+                    .into()
+            } else {
+                None
+            },
         }
     }
 }
