@@ -242,7 +242,7 @@ pub struct BasicBlock<B: Backend> {
     /// Optional `DropBlock` layer.
     pub drop_block: Option<DropBlock2d>,
 
-    /// First conv/norm layer.
+    /// First activation layer.
     pub act1: ActivationLayer<B>,
 
     // TODO: aa: anti-aliasing layer
