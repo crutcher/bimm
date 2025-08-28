@@ -166,26 +166,26 @@ impl BasicBlockConfig {
         // TODO: conditional stride logic for anti-aliasing.
         let first_stride = stride;
 
-        let conv_norm1_cfg = Conv2dNormBlockConfig::from(
+        let conv_norm1_cfg: Conv2dNormBlockConfig =
             Conv2dConfig::new([in_planes, first_planes], [3, 3])
                 .with_stride([first_stride, first_stride])
                 .with_dilation([first_dilation, first_dilation])
                 .with_padding(PaddingConfig2d::Explicit(first_dilation, first_dilation))
                 .with_bias(false)
-                .with_initializer(self.initializer.clone()),
-        );
+                .with_initializer(self.initializer.clone())
+                .into();
 
         let out_planes = self.out_planes();
         let dilation = self.dilation();
 
-        let conv_norm2_cfg = Conv2dNormBlockConfig::from(
+        let conv_norm2_cfg: Conv2dNormBlockConfig =
             Conv2dConfig::new([first_planes, out_planes], [3, 3])
                 .with_stride([1, 1])
                 .with_dilation([dilation, dilation])
                 .with_padding(PaddingConfig2d::Explicit(dilation, dilation))
                 .with_bias(false)
-                .with_initializer(self.initializer.clone()),
-        );
+                .with_initializer(self.initializer.clone())
+                .into();
 
         BasicBlock {
             out_planes_expansion_factor: self.out_planes_expansion_factor,
