@@ -1,11 +1,10 @@
 use burn::nn::{
-    Gelu, HardSigmoid, HardSigmoidConfig, LeakyRelu, LeakyReluConfig, Linear, LinearConfig, PRelu,
-    PReluConfig, Relu, Sigmoid, SwiGlu, SwiGluConfig, Tanh,
+    Gelu, HardSigmoid, HardSigmoidConfig, LeakyRelu, LeakyReluConfig, PRelu, PReluConfig, Relu,
+    Sigmoid, SwiGlu, SwiGluConfig, Tanh,
 };
 use burn::prelude::{Backend, Config, Module, Tensor};
 
 /// [`ActivationLayer`] Configuration.
-// TODO: GLU's dim-select interaction with DimSelectActivationLayer needs thought.
 #[derive(Config, Debug)]
 #[non_exhaustive]
 pub enum ActivationLayerConfig {
@@ -32,9 +31,6 @@ pub enum ActivationLayerConfig {
 
     /// [`HardSigmoid`] activation layer.
     HardSigmoid(HardSigmoidConfig),
-
-    /// [`Linear`] activation layer.
-    Linear(LinearConfig),
 }
 
 impl Default for ActivationLayerConfig {
@@ -58,7 +54,6 @@ impl ActivationLayerConfig {
             ActivationLayerConfig::HardSigmoid(conf) => ActivationLayer::HardSigmoid(conf.init()),
             ActivationLayerConfig::Sigmoid => ActivationLayer::Sigmoid(Sigmoid),
             ActivationLayerConfig::Tanh => ActivationLayer::Tanh(Tanh),
-            ActivationLayerConfig::Linear(conf) => ActivationLayer::Linear(conf.init(device)),
         }
     }
 }
@@ -92,9 +87,6 @@ pub enum ActivationLayer<B: Backend> {
 
     /// [`HardSigmoid`] activation layer.
     HardSigmoid(HardSigmoid),
-
-    /// [`Linear`] activation layer.
-    Linear(Linear<B>),
 }
 
 impl<B: Backend> ActivationLayer<B> {
@@ -112,7 +104,6 @@ impl<B: Backend> ActivationLayer<B> {
             ActivationLayer::HardSigmoid(layer) => layer.forward(input),
             ActivationLayer::Sigmoid(layer) => layer.forward(input),
             ActivationLayer::Tanh(layer) => layer.forward(input),
-            ActivationLayer::Linear(layer) => layer.forward(input),
         }
     }
 }
@@ -121,9 +112,7 @@ impl<B: Backend> ActivationLayer<B> {
 mod tests {
     use super::*;
     use burn::backend::NdArray;
-    use burn::nn::{
-        HardSigmoidConfig, LeakyReluConfig, Linear, LinearConfig, PReluConfig, SwiGlu, SwiGluConfig,
-    };
+    use burn::nn::{HardSigmoidConfig, LeakyReluConfig, PReluConfig, SwiGlu, SwiGluConfig};
 
     type TestBackend = NdArray<f32>;
 
@@ -263,35 +252,6 @@ mod tests {
             input,
             expected,
             &device,
-        )
-    }
-
-    #[test]
-    fn test_linear() {
-        let device = Default::default();
-        let input = make_input::<TestBackend>(&device);
-
-        let d_input = input.shape().dims[1];
-        let d_output = 2 * d_input;
-
-        let inner_config = LinearConfig::new(d_input, d_output);
-        let mut reference: Linear<TestBackend> = inner_config.init(&device);
-
-        let config = ActivationLayerConfig::Linear(inner_config);
-        let layer = config.init(&device);
-
-        match &layer {
-            ActivationLayer::Linear(inner) => {
-                // Clone the initialized weights.
-                let state = inner.clone().into_record();
-                reference = reference.load_record(state);
-            }
-            _ => unreachable!(),
-        };
-
-        expect_tensor(
-            layer.forward(input.clone()),
-            reference.forward(input.clone()),
         )
     }
 }
