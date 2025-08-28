@@ -1,6 +1,6 @@
 //! # `ConvNorm` Module
 //!
-//! A [`ConvNorm`] module is a [`Conv2d`] layer followed by a [`BatchNorm`] layer.
+//! A [`Conv2dNormBlock`] module is a [`Conv2d`] layer followed by a [`BatchNorm`] layer.
 
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::config::Config;
@@ -9,8 +9,8 @@ use burn::nn::conv::{Conv2d, Conv2dConfig};
 use burn::nn::{BatchNorm, BatchNormConfig};
 use burn::prelude::{Backend, Tensor};
 
-/// [`ConvNorm`] Meta.
-pub trait ConvNormMeta {
+/// [`Conv2dNormBlock`] Meta.
+pub trait Conv2dNormBlockMeta {
     /// Number of input channels.
     fn in_channels(&self) -> usize;
 
@@ -21,14 +21,14 @@ pub trait ConvNormMeta {
     fn stride(&self) -> &[usize; 2];
 }
 
-/// [`ConvNorm`] Config.
+/// [`Conv2dNormBlock`] Config.
 #[derive(Config, Debug)]
-pub struct ConvNormConfig {
+pub struct Conv2dNormBlockConfig {
     /// The [`Conv2D`] config.
     pub conv: Conv2dConfig,
 }
 
-impl ConvNormMeta for ConvNormConfig {
+impl Conv2dNormBlockMeta for Conv2dNormBlockConfig {
     fn in_channels(&self) -> usize {
         self.conv.channels[0]
     }
@@ -42,19 +42,19 @@ impl ConvNormMeta for ConvNormConfig {
     }
 }
 
-impl From<Conv2dConfig> for ConvNormConfig {
+impl From<Conv2dConfig> for Conv2dNormBlockConfig {
     fn from(conv: Conv2dConfig) -> Self {
         Self { conv }
     }
 }
 
-impl ConvNormConfig {
-    /// Initialize a [`ConvNorm`].
+impl Conv2dNormBlockConfig {
+    /// Initialize a [`Conv2dNormBlock`].
     pub fn init<B: Backend>(
         self,
         device: &B::Device,
-    ) -> ConvNorm<B> {
-        ConvNorm {
+    ) -> Conv2dNormBlock<B> {
+        Conv2dNormBlock {
             conv: self.conv.init(device),
 
             norm: BatchNormConfig::new(self.conv.channels[1]).init(device),
@@ -64,7 +64,7 @@ impl ConvNormConfig {
 
 /// Grouped [`Conv2d`] and [`BatchNorm`] layer.
 #[derive(Module, Debug)]
-pub struct ConvNorm<B: Backend> {
+pub struct Conv2dNormBlock<B: Backend> {
     /// Internal Conv2d layer.
     pub conv: Conv2d<B>,
 
@@ -72,7 +72,7 @@ pub struct ConvNorm<B: Backend> {
     pub norm: BatchNorm<B, 2>,
 }
 
-impl<B: Backend> ConvNormMeta for ConvNorm<B> {
+impl<B: Backend> Conv2dNormBlockMeta for Conv2dNormBlock<B> {
     fn in_channels(&self) -> usize {
         self.conv.weight.shape().dims[1]
     }
@@ -86,7 +86,7 @@ impl<B: Backend> ConvNormMeta for ConvNorm<B> {
     }
 }
 
-impl<B: Backend> ConvNorm<B> {
+impl<B: Backend> Conv2dNormBlock<B> {
     /// Forward Pass.
     pub fn forward(
         &self,
@@ -138,7 +138,7 @@ mod tests {
             .with_padding(PaddingConfig2d::Explicit(1, 1))
             .with_bias(false);
 
-        let config: ConvNormConfig = inner_config.clone().into();
+        let config: Conv2dNormBlockConfig = inner_config.clone().into();
 
         assert_eq!(&config.conv.channels, &inner_config.channels);
         assert_eq!(&config.conv.kernel_size, &inner_config.kernel_size);

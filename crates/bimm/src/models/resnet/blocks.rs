@@ -1,15 +1,15 @@
 //! # Basic Block for `ResNet`
 
 use crate::layers::activation::{ActivationLayer, ActivationLayerConfig};
+use crate::layers::blocks::conv_norm::{
+    Conv2dNormBlock, Conv2dNormBlockConfig, Conv2dNormBlockMeta,
+};
 use crate::layers::drop::drop_block::{DropBlock2d, DropBlock2dConfig, DropBlockOptions};
 use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
-use crate::models::resnet::conv_norm::{ConvNorm, ConvNormConfig, ConvNormMeta};
 use crate::models::resnet::downsample::{ConvDownsample, ConvDownsampleConfig};
 use crate::models::resnet::util::{CONV_INTO_RELU_INITIALIZER, stride_div_output_resolution};
 use crate::utility::probability::expect_probability;
-use bimm_contracts::{
-    assert_shape_contract_periodically, define_shape_contract, unpack_shape_contract,
-};
+use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::nn::conv::Conv2dConfig;
 use burn::nn::{Initializer, PaddingConfig2d};
 use burn::prelude::{Backend, Config, Module, Tensor};
@@ -166,7 +166,7 @@ impl BasicBlockConfig {
         // TODO: conditional stride logic for anti-aliasing.
         let first_stride = stride;
 
-        let conv_norm1_cfg = ConvNormConfig::from(
+        let conv_norm1_cfg = Conv2dNormBlockConfig::from(
             Conv2dConfig::new([in_planes, first_planes], [3, 3])
                 .with_stride([first_stride, first_stride])
                 .with_dilation([first_dilation, first_dilation])
@@ -178,7 +178,7 @@ impl BasicBlockConfig {
         let out_planes = self.out_planes();
         let dilation = self.dilation();
 
-        let conv_norm2_cfg = ConvNormConfig::from(
+        let conv_norm2_cfg = Conv2dNormBlockConfig::from(
             Conv2dConfig::new([first_planes, out_planes], [3, 3])
                 .with_stride([1, 1])
                 .with_dilation([dilation, dilation])
@@ -234,7 +234,7 @@ pub struct BasicBlock<B: Backend> {
     first_planes_reduction_factor: usize,
 
     /// First conv/norm layer.
-    pub conv_norm1: ConvNorm<B>,
+    pub conv_norm1: Conv2dNormBlock<B>,
 
     /// Optional `DropBlock` layer.
     pub drop_block: Option<DropBlock2d>,
@@ -244,7 +244,7 @@ pub struct BasicBlock<B: Backend> {
 
     // TODO: aa: anti-aliasing layer
     /// Second conv/norm layer.
-    pub conv_norm2: ConvNorm<B>,
+    pub conv_norm2: Conv2dNormBlock<B>,
 
     /// Second activation layer.
     pub act2: ActivationLayer<B>,
@@ -303,11 +303,11 @@ impl<B: Backend> BasicBlock<B> {
     ///
     /// # Arguments
     ///
-    /// - `input`: ``[batch, in_channels, in_height=out_height*stride, in_width=out_width*stride]``.
+    /// - `input`: ``[batch, in_planes, in_height=out_height*stride, in_width=out_width*stride]``.
     ///
     /// # Returns
     ///
-    /// A ``[batch, out_channels, out_height, out_width]`` tensor.
+    /// A ``[batch, out_planes, out_height, out_width]`` tensor.
     pub fn forward(
         &self,
         input: Tensor<B, 4>,
@@ -315,36 +315,28 @@ impl<B: Backend> BasicBlock<B> {
         let [batch, out_height, out_width] = unpack_shape_contract!(
             [
                 "batch",
-                "in_channels",
+                "in_planes",
                 "in_height" = "out_height" * "stride",
                 "in_width" = "out_width" * "stride"
             ],
             &input,
             &["batch", "out_height", "out_width"],
-            &[("in_channels", self.in_planes()), ("stride", self.stride())],
+            &[("in_planes", self.in_planes()), ("stride", self.stride())],
         );
-        define_shape_contract!(
-            OUT_CONTRACT,
-            ["batch", "out_channels", "out_height", "out_width"]
-        );
-        let bindings = [
-            ("batch", batch),
-            ("out_channels", self.out_planes()),
-            ("out_height", out_height),
-            ("out_width", out_width),
-        ];
-
         let shortcut = input.clone();
-        let shortcut = match &self.residual_downsample {
-            // If present, downsample is used to adapt the skip connection.
-            Some(downsample) => downsample.forward(shortcut),
-            None => shortcut,
-        };
-        assert_shape_contract_periodically!(OUT_CONTRACT, &shortcut, &bindings);
 
         let x = self.conv_norm1.forward(input);
-        // This is the only main operation that changes the shape of the input.
-        assert_shape_contract_periodically!(OUT_CONTRACT, &x, &bindings);
+
+        assert_shape_contract_periodically!(
+            ["batch", "first_planes", "out_height", "out_width"],
+            &x,
+            &[
+                ("batch", batch),
+                ("first_planes", self.first_planes()),
+                ("out_height", out_height),
+                ("out_width", out_width),
+            ]
+        );
 
         let x = match &self.drop_block {
             Some(drop_block) => drop_block.forward(x),
@@ -363,11 +355,25 @@ impl<B: Backend> BasicBlock<B> {
             None => x,
         };
 
-        let x = x + shortcut;
-        let x = self.act2.forward(x);
+        let shortcut = match &self.residual_downsample {
+            // If present, downsample is used to adapt the skip connection.
+            Some(downsample) => downsample.forward(shortcut),
+            None => shortcut,
+        };
+        assert_shape_contract_periodically!(
+            ["batch", "out_planes", "out_height", "out_width"],
+            &shortcut,
+            &[
+                ("batch", batch),
+                ("out_planes", self.out_planes()),
+                ("out_height", out_height),
+                ("out_width", out_width),
+            ],
+        );
 
-        assert_shape_contract_periodically!(OUT_CONTRACT, &x, &bindings);
-        x
+        let x = x + shortcut;
+
+        self.act2.forward(x)
     }
 }
 
