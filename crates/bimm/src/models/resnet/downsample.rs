@@ -1,10 +1,11 @@
 //! # The `ResNet` Downsample Implementation.
 
+use crate::models::resnet::conv_norm::{ConvNorm, ConvNormConfig};
 use crate::models::resnet::util::CONV_INTO_RELU_INITIALIZER;
 use crate::models::resnet::util::stride_div_output_resolution;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
-use burn::nn::conv::{Conv2d, Conv2dConfig};
-use burn::nn::{BatchNorm, BatchNormConfig, Initializer, PaddingConfig2d};
+use burn::nn::conv::Conv2dConfig;
+use burn::nn::{Initializer, PaddingConfig2d};
 use burn::prelude::{Backend, Config, Module, Tensor};
 
 /// [`ConvDownsample`] Meta trait.
@@ -82,15 +83,16 @@ impl ConvDownsampleConfig {
         &self,
         device: &B::Device,
     ) -> ConvDownsample<B> {
-        ConvDownsample {
-            conv: Conv2dConfig::new([self.in_channels, self.out_channels], [1, 1])
+        let config: ConvNormConfig =
+            Conv2dConfig::new([self.in_channels, self.out_channels], [1, 1])
                 .with_stride([self.stride, self.stride])
                 .with_padding(PaddingConfig2d::Explicit(0, 0))
                 .with_initializer(self.initializer.clone())
                 .with_bias(false)
-                .init(device),
+                .into();
 
-            bn: BatchNormConfig::new(self.out_channels).init(device),
+        ConvDownsample {
+            conv_norm: config.init(device),
         }
     }
 }
@@ -101,24 +103,23 @@ impl ConvDownsampleConfig {
 /// ``[batch_size, out_channels, out_height, out_width]`` tensors.
 #[derive(Module, Debug)]
 pub struct ConvDownsample<B: Backend> {
-    conv: Conv2d<B>,
-    bn: BatchNorm<B, 2>,
+    conv_norm: ConvNorm<B>,
 }
 
 impl<B: Backend> ConvDownsampleMeta for ConvDownsample<B> {
     #[inline]
     fn in_channels(&self) -> usize {
-        self.conv.weight.shape().dims[1]
+        self.conv_norm.conv.weight.shape().dims[1]
     }
 
     #[inline]
     fn out_channels(&self) -> usize {
-        self.conv.weight.shape().dims[0]
+        self.conv_norm.conv.weight.shape().dims[0]
     }
 
     #[inline]
     fn stride(&self) -> usize {
-        self.conv.stride[0]
+        self.conv_norm.conv.stride[0]
     }
 }
 
@@ -151,8 +152,7 @@ impl<B: Backend> ConvDownsample<B> {
             ]
         );
 
-        let out = self.conv.forward(input);
-        let out = self.bn.forward(out);
+        let out = self.conv_norm.forward(input);
 
         assert_shape_contract_periodically!(
             ["batch", "out_channels", "out_height", "out_width"],

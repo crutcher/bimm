@@ -3,14 +3,15 @@
 use crate::layers::activation::{ActivationLayer, ActivationLayerConfig};
 use crate::layers::drop::drop_block::{DropBlock2d, DropBlock2dConfig, DropBlockOptions};
 use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
+use crate::models::resnet::conv_norm::{ConvNorm, ConvNormConfig};
 use crate::models::resnet::downsample::{ConvDownsample, ConvDownsampleConfig};
 use crate::models::resnet::util::{CONV_INTO_RELU_INITIALIZER, stride_div_output_resolution};
 use crate::utility::probability::expect_probability;
 use bimm_contracts::{
     assert_shape_contract_periodically, define_shape_contract, unpack_shape_contract,
 };
-use burn::nn::conv::{Conv2d, Conv2dConfig};
-use burn::nn::{BatchNorm, BatchNormConfig, Initializer, PaddingConfig2d};
+use burn::nn::conv::Conv2dConfig;
+use burn::nn::{Initializer, PaddingConfig2d};
 use burn::prelude::{Backend, Config, Module, Tensor};
 
 /// [`BasicBlock`] Meta trait.
@@ -103,14 +104,14 @@ impl BasicBlockConfig {
         let drop_path_prob = expect_probability(self.drop_path_prob);
 
         BasicBlock {
-            conv1: Conv2dConfig::new([self.in_channels, self.out_channels], [3, 3])
-                .with_stride([self.stride, self.stride])
-                .with_padding(PaddingConfig2d::Explicit(1, 1))
-                .with_bias(false)
-                .with_initializer(self.initializer.clone())
-                .init(device),
-
-            bn1: BatchNormConfig::new(self.out_channels).init(device),
+            conv_norm1: ConvNormConfig::new(
+                Conv2dConfig::new([self.in_channels, self.out_channels], [3, 3])
+                    .with_stride([self.stride, self.stride])
+                    .with_padding(PaddingConfig2d::Explicit(1, 1))
+                    .with_bias(false)
+                    .with_initializer(self.initializer.clone()),
+            )
+            .init(device),
 
             drop_block: match &self.drop_block {
                 Some(options) => DropBlock2dConfig::new()
@@ -122,14 +123,14 @@ impl BasicBlockConfig {
 
             act1: self.activation.init(device),
 
-            conv2: Conv2dConfig::new([self.out_channels, self.out_channels], [3, 3])
-                .with_stride([1, 1])
-                .with_padding(PaddingConfig2d::Explicit(1, 1))
-                .with_bias(false)
-                .with_initializer(self.initializer.clone())
-                .init(device),
-
-            bn2: BatchNormConfig::new(self.out_channels).init(device),
+            conv_norm2: ConvNormConfig::new(
+                Conv2dConfig::new([self.out_channels, self.out_channels], [3, 3])
+                    .with_stride([1, 1])
+                    .with_padding(PaddingConfig2d::Explicit(1, 1))
+                    .with_bias(false)
+                    .with_initializer(self.initializer.clone()),
+            )
+            .init(device),
 
             act2: self.activation.init(device),
 
@@ -160,14 +161,13 @@ impl BasicBlockConfig {
 /// Basic Block for `ResNet`.
 #[derive(Module, Debug)]
 pub struct BasicBlock<B: Backend> {
-    conv1: Conv2d<B>,
-    bn1: BatchNorm<B, 2>,
+    conv_norm1: ConvNorm<B>,
+
     drop_block: Option<DropBlock2d>,
     act1: ActivationLayer<B>,
 
     // TODO: aa: anti-aliasing layer
-    conv2: Conv2d<B>,
-    bn2: BatchNorm<B, 2>,
+    conv_norm2: ConvNorm<B>,
     act2: ActivationLayer<B>,
 
     // TODO: se: attention layer
@@ -179,15 +179,15 @@ pub struct BasicBlock<B: Backend> {
 
 impl<B: Backend> BasicBlockMeta for BasicBlock<B> {
     fn in_channels(&self) -> usize {
-        self.conv1.weight.shape().dims[1]
+        self.conv_norm1.conv.weight.shape().dims[1]
     }
 
     fn out_channels(&self) -> usize {
-        self.conv2.weight.shape().dims[0]
+        self.conv_norm1.conv.weight.shape().dims[0]
     }
 
     fn stride(&self) -> usize {
-        self.conv1.stride[0]
+        self.conv_norm1.conv.stride[0]
     }
 }
 
@@ -238,11 +238,10 @@ impl<B: Backend> BasicBlock<B> {
         };
         assert_shape_contract_periodically!(OUT_CONTRACT, &shortcut, &bindings);
 
-        let x = self.conv1.forward(input);
+        let x = self.conv_norm1.forward(input);
         // This is the only main operation that changes the shape of the input.
         assert_shape_contract_periodically!(OUT_CONTRACT, &x, &bindings);
 
-        let x = self.bn1.forward(x);
         let x = match &self.drop_block {
             Some(drop_block) => drop_block.forward(x),
             None => x,
@@ -251,8 +250,7 @@ impl<B: Backend> BasicBlock<B> {
 
         // aa? - anti-aliasing?
 
-        let x = self.conv2.forward(x);
-        let x = self.bn2.forward(x);
+        let x = self.conv_norm2.forward(x);
 
         // se? - attention?
 
