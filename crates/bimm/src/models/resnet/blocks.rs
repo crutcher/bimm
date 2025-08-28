@@ -22,6 +22,9 @@ pub trait BasicBlockMeta {
     /// Configures the size of `first_planes` and `out_planes`.
     fn planes(&self) -> usize;
 
+    /// Groups of the first conv.
+    fn cardinality(&self) -> usize;
+
     /// Control factor for `out_planes()`
     fn out_planes_expansion_factor(&self) -> usize;
 
@@ -90,6 +93,10 @@ pub struct BasicBlockConfig {
     /// Configures the `out_planes` as a function of `expansion_factor`.
     pub planes: usize,
 
+    /// Groups of the first conv.
+    #[config(default = "1")]
+    pub cardinality: usize,
+
     /// Control factor for `out_planes()`
     #[config(default = 1)]
     pub out_planes_expansion_factor: usize,
@@ -139,6 +146,10 @@ impl BasicBlockMeta for BasicBlockConfig {
         self.planes
     }
 
+    fn cardinality(&self) -> usize {
+        self.cardinality
+    }
+
     fn out_planes_expansion_factor(&self) -> usize {
         self.out_planes_expansion_factor
     }
@@ -179,6 +190,7 @@ impl BasicBlockConfig {
         let conv_norm1_cfg: Conv2dNormBlockConfig =
             Conv2dConfig::new([in_planes, first_planes], [3, 3])
                 .with_stride([first_stride, first_stride])
+                .with_groups(self.cardinality())
                 .with_dilation([first_dilation, first_dilation])
                 .with_padding(PaddingConfig2d::Explicit(first_dilation, first_dilation))
                 .with_bias(false)
@@ -275,6 +287,10 @@ impl<B: Backend> BasicBlockMeta for BasicBlock<B> {
 
     fn planes(&self) -> usize {
         self.conv_norm1.out_channels() / self.out_planes_expansion_factor()
+    }
+
+    fn cardinality(&self) -> usize {
+        self.conv_norm1.conv.groups
     }
 
     fn out_planes_expansion_factor(&self) -> usize {
