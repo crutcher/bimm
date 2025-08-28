@@ -123,6 +123,9 @@ pub struct BasicBlockConfig {
     pub activation: ActivationLayerConfig,
 
     /// The [`Conv2D`] initializer.
+    ///
+    /// This should be set to a value tuned by the relationship
+    /// with `activation`.
     #[config(default = "CONV_INTO_RELU_INITIALIZER.clone()")]
     pub initializer: Initializer,
 }
