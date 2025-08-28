@@ -377,6 +377,12 @@ pub struct DropBlock2dConfig {
     pub options: DropBlockOptions,
 }
 
+impl From<DropBlockOptions> for DropBlock2dConfig {
+    fn from(options: DropBlockOptions) -> Self {
+        Self { options }
+    }
+}
+
 impl DropBlock2dConfig {
     /// Initialize a [`DropBlock2d`] module.
     pub fn init(&self) -> DropBlock2d {

@@ -101,7 +101,7 @@ impl BasicBlockConfig {
         let drop_path_prob = expect_probability(self.drop_path_prob);
 
         BasicBlock {
-            conv_norm1: ConvNormConfig::new(
+            conv_norm1: ConvNormConfig::from(
                 Conv2dConfig::new([self.in_channels, self.out_channels], [3, 3])
                     .with_stride([self.stride, self.stride])
                     .with_padding(PaddingConfig2d::Explicit(1, 1))
@@ -111,16 +111,13 @@ impl BasicBlockConfig {
             .init(device),
 
             drop_block: match &self.drop_block {
-                Some(options) => DropBlock2dConfig::new()
-                    .with_options(options.clone())
-                    .init()
-                    .into(),
+                Some(options) => DropBlock2dConfig::from(options.clone()).init().into(),
                 None => None,
             },
 
             act1: self.activation.init(device),
 
-            conv_norm2: ConvNormConfig::new(
+            conv_norm2: ConvNormConfig::from(
                 Conv2dConfig::new([self.out_channels, self.out_channels], [3, 3])
                     .with_stride([1, 1])
                     .with_padding(PaddingConfig2d::Explicit(1, 1))
