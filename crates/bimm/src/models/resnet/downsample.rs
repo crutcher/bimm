@@ -1,6 +1,6 @@
 //! # The `ResNet` Downsample Implementation.
 
-use crate::models::resnet::conv_norm::{ConvNorm, ConvNormConfig};
+use crate::models::resnet::conv_norm::{ConvNorm, ConvNormConfig, ConvNormMeta};
 use crate::models::resnet::util::CONV_INTO_RELU_INITIALIZER;
 use crate::models::resnet::util::stride_div_output_resolution;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
@@ -105,15 +105,15 @@ pub struct ConvDownsample<B: Backend> {
 
 impl<B: Backend> ConvDownsampleMeta for ConvDownsample<B> {
     fn in_channels(&self) -> usize {
-        self.conv_norm.conv.weight.shape().dims[1]
+        self.conv_norm.in_channels()
     }
 
     fn out_channels(&self) -> usize {
-        self.conv_norm.conv.weight.shape().dims[0]
+        self.conv_norm.out_channels()
     }
 
     fn stride(&self) -> usize {
-        self.conv_norm.conv.stride[0]
+        self.conv_norm.stride()[0]
     }
 }
 
