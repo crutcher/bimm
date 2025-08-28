@@ -51,6 +51,13 @@ pub trait BasicBlockMeta {
     /// Optional dilation rate for the first conv.
     fn first_dilation(&self) -> Option<usize>;
 
+    /// Effective first dilation.
+    ///
+    /// Resolves `first_dilation()` vrs `dilation()`.
+    fn effective_first_dilation(&self) -> usize {
+        self.first_dilation().unwrap_or(self.dilation())
+    }
+
     /// Get the output resolution for a given input resolution.
     ///
     /// The input must be a multiple of the stride.
@@ -160,9 +167,9 @@ impl BasicBlockConfig {
 
         let in_planes = self.in_planes();
         let first_planes = self.first_planes();
-        let first_dilation = self.first_dilation().unwrap_or(self.dilation());
-        let stride = self.stride();
+        let first_dilation = self.effective_first_dilation();
 
+        let stride = self.stride();
         // TODO: conditional stride logic for anti-aliasing.
         let first_stride = stride;
 
