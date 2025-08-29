@@ -81,7 +81,7 @@ pub struct Conv2dNormBlock<B: Backend> {
 
 impl<B: Backend> Conv2dNormBlockMeta for Conv2dNormBlock<B> {
     fn in_channels(&self) -> usize {
-        self.conv.weight.shape().dims[1] * self.conv.groups
+        self.conv.weight.shape().dims[1] * self.groups()
     }
 
     fn groups(&self) -> usize {
