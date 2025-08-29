@@ -60,7 +60,9 @@ pub trait BottleneckBlockMeta {
         self.planes() * self.expansion_factor()
     }
 
-    /// The stride of the downsample layer.
+    /// The stride of convolution.
+    ///
+    /// Affects downsample behavior.
     fn stride(&self) -> usize;
 
     /// Get the output resolution for a given input resolution.

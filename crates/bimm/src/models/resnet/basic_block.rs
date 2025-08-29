@@ -53,7 +53,9 @@ pub trait BasicBlockMeta {
         self.planes() * self.expansion_factor()
     }
 
-    /// The stride of the downsample layer.
+    /// The stride of convolution.
+    ///
+    /// Affects downsample behavior.
     fn stride(&self) -> usize;
 
     /// Get the output resolution for a given input resolution.
@@ -350,7 +352,7 @@ impl<B: Backend> BasicBlock<B> {
     ///
     /// # Returns
     ///
-    /// A ``[batch, out_planes=planes*expansion, out_height, out_width]`` tensor.
+    /// A ``[batch, out_planes=planes*expansion_factor, out_height, out_width]`` tensor.
     pub fn forward(
         &self,
         input: Tensor<B, 4>,
