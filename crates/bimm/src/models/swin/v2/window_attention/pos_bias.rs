@@ -1,4 +1,4 @@
-use crate::layers::activation::{ActivationLayer, ActivationLayerConfig};
+use crate::layers::activation::{Activation, ActivationConfig};
 use crate::models::swin::v2::window_attention::{
     window_attention_relative_position_index, window_log1p_relative_offset_grid,
 };
@@ -49,8 +49,8 @@ pub struct RelativePositionBiasConfig {
     pub mlp_hidden_dim: usize,
 
     /// The activation layer configuration.
-    #[config(default = "ActivationLayerConfig::Relu")]
-    pub mlp_activation: ActivationLayerConfig,
+    #[config(default = "ActivationConfig::Relu")]
+    pub mlp_activation: ActivationConfig,
 }
 
 impl RelativePositionBiasMeta for RelativePositionBiasConfig {
@@ -221,8 +221,8 @@ pub struct ContinuousPositionBiasMlpConfig {
     pub d_hidden: usize,
 
     /// The activation layer configuration.
-    #[config(default = "ActivationLayerConfig::Relu")]
-    pub activation: ActivationLayerConfig,
+    #[config(default = "ActivationConfig::Relu")]
+    pub activation: ActivationConfig,
 }
 
 impl ContinuousPositionBiasMlpMeta for ContinuousPositionBiasMlpConfig {
@@ -239,7 +239,7 @@ impl ContinuousPositionBiasMlpMeta for ContinuousPositionBiasMlpConfig {
 #[derive(Module, Debug)]
 pub struct ContinuousPositionBiasMlp<B: Backend> {
     l1: nn::Linear<B>,
-    act: ActivationLayer<B>,
+    act: Activation<B>,
     l2: nn::Linear<B>,
 }
 

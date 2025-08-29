@@ -6,7 +6,7 @@ pub use attention_mask::*;
 pub use pos_bias::*;
 pub use pos_grid::*;
 
-use crate::layers::activation::ActivationLayerConfig;
+use crate::layers::activation::ActivationConfig;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::config::Config;
 use burn::module::{Module, Param, ParamId};
@@ -78,8 +78,8 @@ pub struct WindowAttentionConfig {
     pub rpb_mlp_hidden_dim: usize,
 
     /// The activation layer configuration.
-    #[config(default = "ActivationLayerConfig::Relu")]
-    pub rpb_mlp_activation: ActivationLayerConfig,
+    #[config(default = "ActivationConfig::Relu")]
+    pub rpb_mlp_activation: ActivationConfig,
 }
 
 impl WindowAttentionMeta for WindowAttentionConfig {

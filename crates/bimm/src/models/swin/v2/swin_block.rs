@@ -9,7 +9,7 @@ use burn::nn::{Dropout, DropoutConfig, LayerNorm, LayerNormConfig, Linear, Linea
 use burn::prelude::{Backend, Tensor};
 use burn::tensor::BasicOps;
 
-use crate::layers::activation::{ActivationLayer, ActivationLayerConfig};
+use crate::layers::activation::{Activation, ActivationConfig};
 use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
 use bimm_contracts::{assert_shape_contract_periodically, define_shape_contract};
 
@@ -43,8 +43,8 @@ pub struct BlockMlpConfig {
     drop: f64,
 
     /// The activation layer configuration.
-    #[config(default = "ActivationLayerConfig::Relu")]
-    pub activation: ActivationLayerConfig,
+    #[config(default = "ActivationConfig::Relu")]
+    pub activation: ActivationConfig,
 }
 
 impl BlockMlpMeta for BlockMlpConfig {
@@ -102,7 +102,7 @@ pub struct BlockMlp<B: Backend> {
     fc2: Linear<B>,
 
     /// Activation function.
-    act: ActivationLayer<B>,
+    act: Activation<B>,
 
     /// Dropout layer.
     drop: Dropout,
@@ -324,8 +324,8 @@ pub struct ShiftedWindowTransformerBlockConfig {
     pub attn_rpb_mlp_hidden_dim: usize,
 
     /// The activation layer configuration.
-    #[config(default = "ActivationLayerConfig::Relu")]
-    pub attn_rpb_mlp_activation: ActivationLayerConfig,
+    #[config(default = "ActivationConfig::Relu")]
+    pub attn_rpb_mlp_activation: ActivationConfig,
 
     /// Drop path rate for stochastic depth.
     #[config(default = 0.0)]

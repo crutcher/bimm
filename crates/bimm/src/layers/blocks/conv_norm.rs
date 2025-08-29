@@ -14,6 +14,9 @@ pub trait Conv2dNormBlockMeta {
     /// Number of input channels.
     fn in_channels(&self) -> usize;
 
+    /// Number of groups.
+    fn groups(&self) -> usize;
+
     /// Number of output channels.
     fn out_channels(&self) -> usize;
 
@@ -31,6 +34,10 @@ pub struct Conv2dNormBlockConfig {
 impl Conv2dNormBlockMeta for Conv2dNormBlockConfig {
     fn in_channels(&self) -> usize {
         self.conv.channels[0]
+    }
+
+    fn groups(&self) -> usize {
+        self.conv.groups
     }
 
     fn out_channels(&self) -> usize {
@@ -74,7 +81,11 @@ pub struct Conv2dNormBlock<B: Backend> {
 
 impl<B: Backend> Conv2dNormBlockMeta for Conv2dNormBlock<B> {
     fn in_channels(&self) -> usize {
-        self.conv.weight.shape().dims[1]
+        self.conv.weight.shape().dims[1] * self.conv.groups
+    }
+
+    fn groups(&self) -> usize {
+        self.conv.groups
     }
 
     fn out_channels(&self) -> usize {
@@ -87,6 +98,14 @@ impl<B: Backend> Conv2dNormBlockMeta for Conv2dNormBlock<B> {
 }
 
 impl<B: Backend> Conv2dNormBlock<B> {
+    /// Zero initialize the norm layer's weights.
+    ///
+    /// This is used by / referenced in upstream `ResNet` init.
+    ///
+    /// TODO: Track down the paper that recommends this.
+    pub fn zero_init_norm(&mut self) {
+        self.norm.gamma = self.norm.gamma.clone().map(|p| p.slice_fill([..], 0.0));
+    }
     /// Forward Pass.
     pub fn forward(
         &self,
@@ -103,8 +122,8 @@ impl<B: Backend> Conv2dNormBlock<B> {
             &["batch", "out_height", "out_width"],
             &[
                 ("in_channels", self.in_channels()),
-                ("height_stride", self.conv.stride[0]),
-                ("width_stride", self.conv.stride[0]),
+                ("height_stride", self.stride()[0]),
+                ("width_stride", self.stride()[1]),
             ]
         );
         let x = self.conv.forward(input);

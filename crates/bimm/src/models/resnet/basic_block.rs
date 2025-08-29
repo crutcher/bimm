@@ -1,0 +1,526 @@
+//! # Bottleneck Block for `ResNet`
+
+use crate::layers::activation::{Activation, ActivationConfig};
+use crate::layers::blocks::conv_norm::{
+    Conv2dNormBlock, Conv2dNormBlockConfig, Conv2dNormBlockMeta,
+};
+use crate::layers::drop::drop_block::{DropBlock2d, DropBlock2dConfig, DropBlockOptions};
+use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
+use crate::models::resnet::downsample::{ConvDownsample, ConvDownsampleConfig};
+use crate::models::resnet::util::{CONV_INTO_RELU_INITIALIZER, stride_div_output_resolution};
+use crate::utility::probability::expect_probability;
+use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
+use burn::nn::conv::Conv2dConfig;
+use burn::nn::{Initializer, PaddingConfig2d};
+use burn::prelude::{Backend, Config, Module, Tensor};
+
+/// [`BasicBlock`] Meta trait.
+pub trait BasicBlockMeta {
+    /// The size of the in channels dimension.
+    fn in_planes(&self) -> usize;
+
+    /// Configures the size of `first_planes` and `out_planes`.
+    fn planes(&self) -> usize;
+
+    /// Groups of the first conv.
+    fn cardinality(&self) -> usize;
+
+    /// Control factor for `out_planes()`
+    fn expansion_factor(&self) -> usize;
+
+    /// The size of the out channels dimension.
+    ///
+    /// ``out_planes = planes * expansion_factor``
+    fn out_planes(&self) -> usize {
+        self.planes() * self.expansion_factor()
+    }
+
+    /// Control factor for `first_planes()`
+    fn reduction_factor(&self) -> usize;
+
+    /// First conv/norm layer output channels.
+    ///
+    /// ``first_planes = planes // reduction_factor``
+    fn first_planes(&self) -> usize {
+        self.planes() / self.reduction_factor()
+    }
+
+    /// The stride of the downsample layer.
+    fn stride(&self) -> usize;
+
+    /// Dilation rate for conv layers.
+    fn dilation(&self) -> usize;
+
+    /// Optional dilation rate for the first conv.
+    fn first_dilation(&self) -> Option<usize>;
+
+    /// Effective first dilation.
+    ///
+    /// Resolves `first_dilation()` vrs `dilation()`.
+    fn effective_first_dilation(&self) -> usize {
+        self.first_dilation().unwrap_or(self.dilation())
+    }
+
+    /// Get the output resolution for a given input resolution.
+    ///
+    /// The input must be a multiple of the stride.
+    ///
+    /// # Arguments
+    ///
+    /// - `input_resolution`: ``[in_height=out_height*stride, in_width=out_width*stride]``.
+    ///
+    /// # Returns
+    ///
+    /// ``[out_height, out_width]``
+    ///
+    /// # Panics
+    ///
+    /// If the input resolution is not a multiple of the stride.
+    fn output_resolution(
+        &self,
+        input_resolution: [usize; 2],
+    ) -> [usize; 2] {
+        stride_div_output_resolution(input_resolution, self.stride())
+    }
+}
+
+/// [`BasicBlock`] Config.
+#[derive(Config, Debug)]
+pub struct BasicBlockConfig {
+    /// The size of the in channels dimension.
+    pub in_planes: usize,
+
+    /// Configures the `out_planes` as a function of `expansion_factor`.
+    pub planes: usize,
+
+    /// Groups of the first conv.
+    #[config(default = "1")]
+    pub cardinality: usize,
+
+    /// Control factor for `out_planes()`
+    #[config(default = 1)]
+    pub expansion_factor: usize,
+
+    /// Control factor for `first_planes()`
+    #[config(default = 1)]
+    pub reduction_factor: usize,
+
+    /// The stride of the downsample layer.
+    #[config(default = 1)]
+    pub stride: usize,
+
+    /// Dilation rate for conv layers.
+    #[config(default = 1)]
+    pub dilation: usize,
+
+    /// Optional dilation rate for the first conv.
+    #[config(default = "None")]
+    pub first_dilation: Option<usize>,
+
+    /// Drop path probability.
+    #[config(default = "0.0")]
+    pub drop_path_prob: f64,
+
+    /// The drop block config.
+    #[config(default = "None")]
+    pub drop_block: Option<DropBlockOptions>,
+
+    /// The activation layer config.
+    #[config(default = "ActivationConfig::Relu")]
+    pub activation: ActivationConfig,
+
+    /// The [`Conv2D`] initializer.
+    ///
+    /// This should be set to a value tuned by the relationship
+    /// with `activation`.
+    #[config(default = "CONV_INTO_RELU_INITIALIZER.clone()")]
+    pub initializer: Initializer,
+
+    /// Whether to zero initialize the last norm layer.
+    #[config(default = "true")]
+    pub zero_init_last: bool,
+}
+
+impl BasicBlockMeta for BasicBlockConfig {
+    fn in_planes(&self) -> usize {
+        self.in_planes
+    }
+
+    fn planes(&self) -> usize {
+        self.planes
+    }
+
+    fn cardinality(&self) -> usize {
+        self.cardinality
+    }
+
+    fn expansion_factor(&self) -> usize {
+        self.expansion_factor
+    }
+
+    fn reduction_factor(&self) -> usize {
+        self.reduction_factor
+    }
+
+    fn stride(&self) -> usize {
+        self.stride
+    }
+
+    fn dilation(&self) -> usize {
+        self.dilation
+    }
+
+    fn first_dilation(&self) -> Option<usize> {
+        self.first_dilation
+    }
+}
+
+impl BasicBlockConfig {
+    /// Initialize a [`BasicBlock`].
+    pub fn init<B: Backend>(
+        self,
+        device: &B::Device,
+    ) -> BasicBlock<B> {
+        let drop_path_prob = expect_probability(self.drop_path_prob);
+
+        let in_planes = self.in_planes();
+        let first_planes = self.first_planes();
+        let out_planes = self.out_planes();
+
+        let first_dilation = self.effective_first_dilation();
+        let dilation = self.dilation();
+
+        // TODO: conditional stride logic for anti-aliasing.
+        let stride = self.stride();
+
+        let cn1_cfg: Conv2dNormBlockConfig = Conv2dConfig::new([in_planes, first_planes], [3, 3])
+            .with_stride([stride, stride])
+            .with_dilation([first_dilation, first_dilation])
+            .with_padding(PaddingConfig2d::Explicit(first_dilation, first_dilation))
+            .with_groups(self.cardinality())
+            .with_bias(false)
+            .with_initializer(self.initializer.clone())
+            .into();
+
+        let cn2_cfg: Conv2dNormBlockConfig = Conv2dConfig::new([first_planes, out_planes], [3, 3])
+            .with_dilation([dilation, dilation])
+            .with_padding(PaddingConfig2d::Explicit(dilation, dilation))
+            .with_bias(false)
+            .with_initializer(self.initializer.clone())
+            .into();
+
+        BasicBlock {
+            expansion_factor: self.expansion_factor,
+            reduction_factor: self.reduction_factor,
+
+            residual_downsample: if stride != 1 || in_planes != out_planes {
+                // TODO: mechanism to select different pool operations.
+                ConvDownsampleConfig::new(self.in_planes(), self.out_planes())
+                    .with_stride(self.stride())
+                    .with_initializer(self.initializer)
+                    .init(device)
+                    .into()
+            } else {
+                None
+            },
+
+            // Group 1
+            cn1: cn1_cfg.init(device),
+            drop_block: self
+                .drop_block
+                .as_ref()
+                .map(|options| DropBlock2dConfig::from(options.clone()).init()),
+            act1: self.activation.init(device),
+            ae: None,
+
+            // Group 2
+            cn2: {
+                let mut block = cn2_cfg.init(device);
+                if self.zero_init_last {
+                    block.zero_init_norm()
+                }
+                block
+            },
+            se: None,
+            drop_path: if drop_path_prob != 0.0 {
+                DropPathConfig::new()
+                    .with_drop_prob(drop_path_prob)
+                    .init()
+                    .into()
+            } else {
+                None
+            },
+            act2: self.activation.init(device),
+        }
+    }
+}
+
+/// Basic Block for `ResNet`.
+#[derive(Module, Debug)]
+pub struct BasicBlock<B: Backend> {
+    expansion_factor: usize,
+    reduction_factor: usize,
+
+    /// Optional `DownSample` layer; for the residual connection.
+    pub residual_downsample: Option<ConvDownsample<B>>,
+
+    /// First conv/norm layer.
+    pub cn1: Conv2dNormBlock<B>,
+
+    /// Optional `DropBlock` layer.
+    pub drop_block: Option<DropBlock2d>,
+
+    /// First activation layer.
+    pub act1: Activation<B>,
+
+    /// Optional anti-aliasing layer.
+    // TODO: aa: anti-aliasing layer
+    pub ae: Option<usize>,
+
+    /// Second conv/norm layer.
+    pub cn2: Conv2dNormBlock<B>,
+
+    /// Optional attention layer.
+    // TODO: se: attention layer
+    pub se: Option<usize>,
+
+    /// Optional `DropPath` layer.
+    pub drop_path: Option<DropPath>,
+
+    /// Second activation layer.
+    pub act2: Activation<B>,
+}
+
+impl<B: Backend> BasicBlockMeta for BasicBlock<B> {
+    fn in_planes(&self) -> usize {
+        self.cn1.in_channels()
+    }
+
+    fn planes(&self) -> usize {
+        self.cn1.out_channels() / self.expansion_factor()
+    }
+
+    fn cardinality(&self) -> usize {
+        self.cn1.conv.groups
+    }
+
+    fn expansion_factor(&self) -> usize {
+        self.expansion_factor
+    }
+
+    fn out_planes(&self) -> usize {
+        self.cn2.out_channels()
+    }
+
+    fn reduction_factor(&self) -> usize {
+        self.reduction_factor
+    }
+
+    fn first_planes(&self) -> usize {
+        self.cn1.out_channels()
+    }
+
+    fn stride(&self) -> usize {
+        self.cn1.stride()[0]
+    }
+
+    fn dilation(&self) -> usize {
+        self.cn2.conv.dilation[0]
+    }
+
+    fn first_dilation(&self) -> Option<usize> {
+        let d1 = self.cn1.conv.dilation[0];
+        let d2 = self.cn2.conv.dilation[0];
+        if d1 == d2 { None } else { Some(d1) }
+    }
+}
+
+impl<B: Backend> BasicBlock<B> {
+    /// Forward Pass.
+    ///
+    /// # Arguments
+    ///
+    /// - `input`: ``[batch, in_planes, in_height=out_height*stride, in_width=out_width*stride]``.
+    ///
+    /// # Returns
+    ///
+    /// A ``[batch, out_planes=planes*expansion, out_height, out_width]`` tensor.
+    pub fn forward(
+        &self,
+        input: Tensor<B, 4>,
+    ) -> Tensor<B, 4> {
+        let [batch, out_height, out_width] = unpack_shape_contract!(
+            [
+                "batch",
+                "in_planes",
+                "in_height" = "out_height" * "stride",
+                "in_width" = "out_width" * "stride"
+            ],
+            &input,
+            &["batch", "out_height", "out_width"],
+            &[("in_planes", self.in_planes()), ("stride", self.stride())],
+        );
+
+        let shortcut = match &self.residual_downsample {
+            Some(downsample) => downsample.forward(input.clone()),
+            None => input.clone(),
+        };
+        assert_shape_contract_periodically!(
+            ["batch", "out_planes", "out_height", "out_width"],
+            &shortcut,
+            &[
+                ("batch", batch),
+                ("out_planes", self.out_planes()),
+                ("out_height", out_height),
+                ("out_width", out_width),
+            ],
+        );
+
+        // Group 1
+        let x = self.cn1.forward(input);
+        assert_shape_contract_periodically!(
+            ["batch", "first_planes", "out_height", "out_width"],
+            &x,
+            &[
+                ("batch", batch),
+                ("first_planes", self.first_planes()),
+                ("out_height", out_height),
+                ("out_width", out_width),
+            ]
+        );
+        let x = match &self.drop_block {
+            Some(drop_block) => drop_block.forward(x),
+            None => x,
+        };
+        let x = self.act1.forward(x);
+
+        // aa? - anti-aliasing?
+
+        // Group 2
+        let x = self.cn2.forward(x);
+        // se? - attention?
+        let x = match &self.drop_path {
+            Some(drop_path) => drop_path.forward(x),
+            None => x,
+        };
+        let x = x + shortcut;
+        self.act2.forward(x)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bimm_contracts::assert_shape_contract;
+    use burn::backend::{Autodiff, NdArray};
+
+    #[test]
+    fn test_basic_block_config() {
+        let in_channels = 16;
+        let out_channels = 32;
+        let config = BasicBlockConfig::new(in_channels, out_channels);
+        assert_eq!(config.in_planes(), in_channels);
+        assert_eq!(config.out_planes(), out_channels);
+        assert_eq!(config.stride(), 1);
+        assert_eq!(config.output_resolution([16, 16]), [16, 16]);
+        assert!(matches!(config.activation, ActivationConfig::Relu));
+
+        let config = config
+            .with_stride(2)
+            .with_activation(ActivationConfig::Sigmoid);
+        assert_eq!(config.stride(), 2);
+        assert_eq!(config.output_resolution([16, 16]), [8, 8]);
+        assert!(matches!(config.activation, ActivationConfig::Sigmoid));
+    }
+
+    #[test]
+    #[should_panic(expected = "7 !~ in_height=(out_height*stride)")]
+    fn test_downsample_config_panic() {
+        let config = BasicBlockConfig::new(16, 32).with_stride(2);
+        assert_eq!(config.stride(), 2);
+        config.output_resolution([7, 7]);
+    }
+
+    #[test]
+    fn test_basic_block_meta() {
+        type B = NdArray<f32>;
+        let device = Default::default();
+
+        let in_channels = 2;
+        let out_channels = in_channels;
+
+        let block: BasicBlock<B> = BasicBlockConfig::new(in_channels, out_channels).init(&device);
+
+        assert_eq!(block.in_planes(), in_channels);
+        assert_eq!(block.out_planes(), out_channels);
+        assert_eq!(block.stride(), 1);
+        assert_eq!(block.output_resolution([16, 16]), [16, 16]);
+    }
+
+    #[test]
+    fn test_basic_block_forward_same_channels_no_downsample_autodiff() {
+        type B = Autodiff<NdArray<f32>>;
+        let device = Default::default();
+
+        let batch_size = 2;
+        let in_planes = 2;
+        let planes = 8;
+        let in_height = 8;
+        let in_width = 8;
+
+        let block: BasicBlock<B> = BasicBlockConfig::new(in_planes, planes).init(&device);
+        let out_planes = block.out_planes();
+
+        let input = Tensor::ones([batch_size, in_planes, in_height, in_width], &device);
+        let output = block.forward(input);
+
+        assert_shape_contract!(
+            ["batch", "out_channels", "out_height", "out_width"],
+            &output,
+            &[
+                ("batch", batch_size),
+                ("out_channels", out_planes),
+                ("out_height", in_height),
+                ("out_width", in_width)
+            ],
+        );
+    }
+
+    #[test]
+    fn test_basic_block_forward_downsample_drop_block_drop_path_autodiff() {
+        type B = Autodiff<NdArray<f32>>;
+        let device = Default::default();
+
+        let batch_size = 2;
+        let in_planes = 2;
+        let planes = 4;
+        let in_height = 8;
+        let in_width = 8;
+
+        let block: BasicBlock<B> = BasicBlockConfig::new(in_planes, planes)
+            .with_drop_path_prob(0.1)
+            .with_drop_block(Some(DropBlockOptions::default()))
+            .with_stride(2)
+            .init(&device);
+
+        let out_planes = block.out_planes();
+
+        let [out_height, out_width] = block.output_resolution([in_height, in_width]);
+        assert_eq!(out_height, 4);
+        assert_eq!(out_width, 4);
+
+        let input = Tensor::ones([batch_size, in_planes, in_height, in_width], &device);
+        let output = block.forward(input);
+
+        assert_shape_contract!(
+            ["batch", "out_channels", "out_height", "out_width"],
+            &output,
+            &[
+                ("batch", batch_size),
+                ("out_channels", out_planes),
+                ("out_height", out_height),
+                ("out_width", out_width)
+            ],
+        );
+    }
+}

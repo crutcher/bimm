@@ -4,10 +4,10 @@ use burn::nn::{
 };
 use burn::prelude::{Backend, Config, Module, Tensor};
 
-/// [`ActivationLayer`] Configuration.
+/// [`Activation`] Configuration.
 #[derive(Config, Debug)]
 #[non_exhaustive]
-pub enum ActivationLayerConfig {
+pub enum ActivationConfig {
     /// [`Gelu`] activation layer.
     GeLu,
 
@@ -33,27 +33,27 @@ pub enum ActivationLayerConfig {
     HardSigmoid(HardSigmoidConfig),
 }
 
-impl Default for ActivationLayerConfig {
+impl Default for ActivationConfig {
     fn default() -> Self {
         Self::Relu
     }
 }
 
-impl ActivationLayerConfig {
+impl ActivationConfig {
     /// Initialize a wrapped activation layer.
     pub fn init<B: Backend>(
         &self,
         device: &B::Device,
-    ) -> ActivationLayer<B> {
+    ) -> Activation<B> {
         match self {
-            ActivationLayerConfig::Relu => ActivationLayer::Relu(Relu),
-            ActivationLayerConfig::LeakyRelu(conf) => ActivationLayer::LeakyRelu(conf.init()),
-            ActivationLayerConfig::GeLu => ActivationLayer::Gelu(Gelu),
-            ActivationLayerConfig::PRelu(conf) => ActivationLayer::PRelu(conf.init(device)),
-            ActivationLayerConfig::SwiGlu(conf) => ActivationLayer::SwiGlu(conf.init(device)),
-            ActivationLayerConfig::HardSigmoid(conf) => ActivationLayer::HardSigmoid(conf.init()),
-            ActivationLayerConfig::Sigmoid => ActivationLayer::Sigmoid(Sigmoid),
-            ActivationLayerConfig::Tanh => ActivationLayer::Tanh(Tanh),
+            ActivationConfig::Relu => Activation::Relu(Relu),
+            ActivationConfig::LeakyRelu(conf) => Activation::LeakyRelu(conf.init()),
+            ActivationConfig::GeLu => Activation::Gelu(Gelu),
+            ActivationConfig::PRelu(conf) => Activation::PRelu(conf.init(device)),
+            ActivationConfig::SwiGlu(conf) => Activation::SwiGlu(conf.init(device)),
+            ActivationConfig::HardSigmoid(conf) => Activation::HardSigmoid(conf.init()),
+            ActivationConfig::Sigmoid => Activation::Sigmoid(Sigmoid),
+            ActivationConfig::Tanh => Activation::Tanh(Tanh),
         }
     }
 }
@@ -63,7 +63,7 @@ impl ActivationLayerConfig {
 /// Provides support for many in-built `burn::nn` activations.
 #[derive(Module, Debug)]
 #[non_exhaustive]
-pub enum ActivationLayer<B: Backend> {
+pub enum Activation<B: Backend> {
     /// [`Gelu`] activation layer.
     Gelu(Gelu),
 
@@ -89,21 +89,21 @@ pub enum ActivationLayer<B: Backend> {
     HardSigmoid(HardSigmoid),
 }
 
-impl<B: Backend> ActivationLayer<B> {
+impl<B: Backend> Activation<B> {
     /// Forward pass.
     pub fn forward<const D: usize>(
         &self,
         input: Tensor<B, D>,
     ) -> Tensor<B, D> {
         match self {
-            ActivationLayer::Relu(layer) => layer.forward(input),
-            ActivationLayer::LeakyRelu(layer) => layer.forward(input),
-            ActivationLayer::Gelu(layer) => layer.forward(input),
-            ActivationLayer::PRelu(layer) => layer.forward(input),
-            ActivationLayer::SwiGlu(layer) => layer.forward(input),
-            ActivationLayer::HardSigmoid(layer) => layer.forward(input),
-            ActivationLayer::Sigmoid(layer) => layer.forward(input),
-            ActivationLayer::Tanh(layer) => layer.forward(input),
+            Activation::Relu(layer) => layer.forward(input),
+            Activation::LeakyRelu(layer) => layer.forward(input),
+            Activation::Gelu(layer) => layer.forward(input),
+            Activation::PRelu(layer) => layer.forward(input),
+            Activation::SwiGlu(layer) => layer.forward(input),
+            Activation::HardSigmoid(layer) => layer.forward(input),
+            Activation::Sigmoid(layer) => layer.forward(input),
+            Activation::Tanh(layer) => layer.forward(input),
         }
     }
 }
@@ -128,7 +128,7 @@ mod tests {
     }
 
     fn check_stateless_config_output<B: Backend, const D: usize>(
-        config: ActivationLayerConfig,
+        config: ActivationConfig,
         input: Tensor<B, D>,
         expected: Tensor<B, D>,
         device: &B::Device,
@@ -145,7 +145,7 @@ mod tests {
 
         let expected = Gelu::default().forward(input.clone());
 
-        check_stateless_config_output(ActivationLayerConfig::GeLu, input, expected, &device)
+        check_stateless_config_output(ActivationConfig::GeLu, input, expected, &device)
     }
 
     #[test]
@@ -157,7 +157,7 @@ mod tests {
         let expected = inner_config.init(&device).forward(input.clone());
 
         check_stateless_config_output(
-            ActivationLayerConfig::PRelu(inner_config),
+            ActivationConfig::PRelu(inner_config),
             input,
             expected,
             &device,
@@ -171,7 +171,7 @@ mod tests {
 
         let expected = Relu::default().forward(input.clone());
 
-        check_stateless_config_output(ActivationLayerConfig::Relu, input, expected, &device)
+        check_stateless_config_output(ActivationConfig::Relu, input, expected, &device)
     }
 
     #[test]
@@ -183,7 +183,7 @@ mod tests {
         let expected = inner_config.init().forward(input.clone());
 
         check_stateless_config_output(
-            ActivationLayerConfig::LeakyRelu(inner_config),
+            ActivationConfig::LeakyRelu(inner_config),
             input,
             expected,
             &device,
@@ -201,11 +201,11 @@ mod tests {
         let inner_config = SwiGluConfig::new(d_input, d_output);
         let mut reference: SwiGlu<TestBackend> = inner_config.init(&device);
 
-        let config = ActivationLayerConfig::SwiGlu(inner_config);
+        let config = ActivationConfig::SwiGlu(inner_config);
         let layer = config.init(&device);
 
         match &layer {
-            ActivationLayer::SwiGlu(inner) => {
+            Activation::SwiGlu(inner) => {
                 // Clone the initialized weights.
                 let state = inner.clone().into_record();
                 reference = reference.load_record(state);
@@ -226,7 +226,7 @@ mod tests {
 
         let expected = Sigmoid::default().forward(input.clone());
 
-        check_stateless_config_output(ActivationLayerConfig::Sigmoid, input, expected, &device)
+        check_stateless_config_output(ActivationConfig::Sigmoid, input, expected, &device)
     }
 
     #[test]
@@ -236,7 +236,7 @@ mod tests {
 
         let expected = Tanh::default().forward(input.clone());
 
-        check_stateless_config_output(ActivationLayerConfig::Tanh, input, expected, &device)
+        check_stateless_config_output(ActivationConfig::Tanh, input, expected, &device)
     }
 
     #[test]
@@ -248,7 +248,7 @@ mod tests {
         let expected = inner_config.init().forward(input.clone());
 
         check_stateless_config_output(
-            ActivationLayerConfig::HardSigmoid(inner_config),
+            ActivationConfig::HardSigmoid(inner_config),
             input,
             expected,
             &device,
