@@ -146,6 +146,10 @@ impl BottleneckBlockMeta for BottleneckBlockConfig {
         self.in_planes
     }
 
+    fn dilation(&self) -> usize {
+        self.dilation
+    }
+
     fn planes(&self) -> usize {
         self.planes
     }
@@ -168,10 +172,6 @@ impl BottleneckBlockMeta for BottleneckBlockConfig {
 
     fn stride(&self) -> usize {
         self.stride
-    }
-
-    fn dilation(&self) -> usize {
-        self.dilation
     }
 }
 
@@ -314,12 +314,16 @@ impl<B: Backend> BottleneckBlockMeta for BottleneckBlock<B> {
         self.cn1.in_channels()
     }
 
+    fn dilation(&self) -> usize {
+        self.cn3.conv.dilation[0]
+    }
+
     fn planes(&self) -> usize {
         self.out_planes() / self.expansion_factor()
     }
 
     fn cardinality(&self) -> usize {
-        self.cn2.conv.groups
+        self.cn2.groups()
     }
 
     fn base_width(&self) -> usize {
@@ -348,10 +352,6 @@ impl<B: Backend> BottleneckBlockMeta for BottleneckBlock<B> {
 
     fn stride(&self) -> usize {
         self.cn2.stride()[0]
-    }
-
-    fn dilation(&self) -> usize {
-        self.cn3.conv.dilation[0]
     }
 }
 
@@ -428,11 +428,10 @@ impl<B: Backend> BottleneckBlock<B> {
             None => x,
         };
         let x = self.act2.forward(x);
-        // TODO: anti-aliasing
-        // let x = match &self.aa {
-        //     Some(se) => ae.forward(x),
-        //     None => x,
-        // };
+        let x = match &self.ae {
+            Some(_) => unimplemented!("anti-aliasing is not implemented"),
+            None => x,
+        };
 
         // Group 3
         let x = self.cn3.forward(x);
@@ -446,11 +445,10 @@ impl<B: Backend> BottleneckBlock<B> {
                 ("out_width", out_width),
             ],
         );
-        // TODO: attention
-        // let x = match &self.se {
-        //     Some(se) => se.forward(x),
-        //     None => x,
-        // };
+        let x = match &self.se {
+            Some(_) => unimplemented!("attention is not implemented"),
+            None => x,
+        };
         let x = match &self.drop_path {
             Some(drop_path) => drop_path.forward(x),
             None => x,

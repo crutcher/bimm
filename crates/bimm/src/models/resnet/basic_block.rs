@@ -146,6 +146,14 @@ impl BasicBlockMeta for BasicBlockConfig {
         self.in_planes
     }
 
+    fn dilation(&self) -> usize {
+        self.dilation
+    }
+
+    fn first_dilation(&self) -> Option<usize> {
+        self.first_dilation
+    }
+
     fn planes(&self) -> usize {
         self.planes
     }
@@ -164,14 +172,6 @@ impl BasicBlockMeta for BasicBlockConfig {
 
     fn stride(&self) -> usize {
         self.stride
-    }
-
-    fn dilation(&self) -> usize {
-        self.dilation
-    }
-
-    fn first_dilation(&self) -> Option<usize> {
-        self.first_dilation
     }
 }
 
@@ -299,20 +299,26 @@ impl<B: Backend> BasicBlockMeta for BasicBlock<B> {
         self.cn1.in_channels()
     }
 
+    fn dilation(&self) -> usize {
+        self.cn2.conv.dilation[0]
+    }
+
+    fn first_dilation(&self) -> Option<usize> {
+        let d1 = self.cn1.conv.dilation[0];
+        let d2 = self.cn2.conv.dilation[0];
+        if d1 == d2 { None } else { Some(d1) }
+    }
+
     fn planes(&self) -> usize {
         self.cn1.out_channels() / self.expansion_factor()
     }
 
     fn cardinality(&self) -> usize {
-        self.cn1.conv.groups
+        self.cn1.groups()
     }
 
     fn expansion_factor(&self) -> usize {
         self.expansion_factor
-    }
-
-    fn out_planes(&self) -> usize {
-        self.cn2.out_channels()
     }
 
     fn reduction_factor(&self) -> usize {
@@ -323,18 +329,12 @@ impl<B: Backend> BasicBlockMeta for BasicBlock<B> {
         self.cn1.out_channels()
     }
 
+    fn out_planes(&self) -> usize {
+        self.cn2.out_channels()
+    }
+
     fn stride(&self) -> usize {
         self.cn1.stride()[0]
-    }
-
-    fn dilation(&self) -> usize {
-        self.cn2.conv.dilation[0]
-    }
-
-    fn first_dilation(&self) -> Option<usize> {
-        let d1 = self.cn1.conv.dilation[0];
-        let d2 = self.cn2.conv.dilation[0];
-        if d1 == d2 { None } else { Some(d1) }
     }
 }
 
@@ -396,11 +396,10 @@ impl<B: Backend> BasicBlock<B> {
             None => x,
         };
         let x = self.act1.forward(x);
-        // TODO: anti-aliasing
-        // let x = match &self.aa {
-        //     Some(se) => ae.forward(x),
-        //     None => x,
-        // };
+        let x = match &self.ae {
+            Some(_) => unimplemented!("anti-aliasing is not implemented"),
+            None => x,
+        };
 
         // Group 2
         let x = self.cn2.forward(x);
@@ -414,11 +413,10 @@ impl<B: Backend> BasicBlock<B> {
                 ("out_width", out_width),
             ]
         );
-        // TODO: attention
-        // let x = match &self.se {
-        //     Some(se) => se.forward(x),
-        //     None => x,
-        // };
+        let x = match &self.se {
+            Some(_) => unimplemented!("attention is not implemented"),
+            None => x,
+        };
         let x = match &self.drop_path {
             Some(drop_path) => drop_path.forward(x),
             None => x,
