@@ -196,6 +196,16 @@ impl BasicBlockConfig {
         // use_aa = aa_layer is not None and (stride == 2 or first_dilation != dilation)
         // stride = 1 if use_aa else stride
 
+        let downsample_cfg = if stride != 1 || in_planes != out_planes {
+            // TODO: mechanism to select different pool operations.
+            ConvDownsampleConfig::new(self.in_planes(), self.out_planes())
+                .with_stride(self.stride())
+                .with_initializer(self.initializer.clone())
+                .into()
+        } else {
+            None
+        };
+
         let cn1_cfg: Conv2dNormBlockConfig = Conv2dConfig::new([in_planes, first_planes], [3, 3])
             .with_stride([stride, stride])
             .with_dilation([first_dilation, first_dilation])
@@ -216,16 +226,7 @@ impl BasicBlockConfig {
             expansion_factor: self.expansion_factor,
             reduction_factor: self.reduction_factor,
 
-            downsample: if stride != 1 || in_planes != out_planes {
-                // TODO: mechanism to select different pool operations.
-                ConvDownsampleConfig::new(self.in_planes(), self.out_planes())
-                    .with_stride(self.stride())
-                    .with_initializer(self.initializer)
-                    .init(device)
-                    .into()
-            } else {
-                None
-            },
+            downsample: downsample_cfg.as_ref().map(|cfg| cfg.init(device)),
 
             // Group 1
             cn1: cn1_cfg.init(device),
