@@ -9,7 +9,9 @@ use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
 use crate::models::resnet::downsample::{ConvDownsample, ConvDownsampleConfig};
 use crate::models::resnet::util::{CONV_INTO_RELU_INITIALIZER, stride_div_output_resolution};
 use crate::utility::probability::expect_probability;
-use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
+use bimm_contracts::{
+    assert_shape_contract_periodically, define_shape_contract, unpack_shape_contract,
+};
 use burn::nn::conv::Conv2dConfig;
 use burn::nn::{Initializer, PaddingConfig2d};
 use burn::prelude::{Backend, Config, Module, Tensor};
@@ -386,16 +388,17 @@ impl<B: Backend> BottleneckBlock<B> {
             Some(downsample) => downsample.forward(input.clone()),
             None => input.clone(),
         };
-        assert_shape_contract_periodically!(
+        define_shape_contract!(
+            OUT_CONTRACT,
             ["batch", "out_planes", "out_height", "out_width"],
-            &identity,
-            &[
-                ("batch", batch),
-                ("out_planes", self.out_planes()),
-                ("out_height", out_height),
-                ("out_width", out_width),
-            ],
         );
+        let out_bindings = [
+            ("batch", batch),
+            ("out_planes", self.out_planes()),
+            ("out_height", out_height),
+            ("out_width", out_width),
+        ];
+        assert_shape_contract_periodically!(OUT_CONTRACT, &identity, &out_bindings);
 
         // Group 1
         let x = self.cn1.forward(input);
@@ -435,16 +438,7 @@ impl<B: Backend> BottleneckBlock<B> {
 
         // Group 3
         let x = self.cn3.forward(x);
-        assert_shape_contract_periodically!(
-            ["batch", "out_planes", "out_height", "out_width"],
-            &x,
-            &[
-                ("batch", batch),
-                ("out_planes", self.out_planes()),
-                ("out_height", out_height),
-                ("out_width", out_width),
-            ],
-        );
+        assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
         let x = match &self.se {
             Some(_) => unimplemented!("attention is not implemented"),
             None => x,
@@ -455,16 +449,7 @@ impl<B: Backend> BottleneckBlock<B> {
         };
         let x = x + identity;
         let x = self.act3.forward(x);
-        assert_shape_contract_periodically!(
-            ["batch", "out_planes", "out_height", "out_width"],
-            &x,
-            &[
-                ("batch", batch),
-                ("out_planes", self.out_planes()),
-                ("out_height", out_height),
-                ("out_width", out_width),
-            ],
-        );
+        assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
         x
     }
 }
