@@ -19,6 +19,12 @@ pub trait BasicBlockMeta {
     /// The size of the in channels dimension.
     fn in_planes(&self) -> usize;
 
+    /// Dilation rate for conv layers.
+    fn dilation(&self) -> usize;
+
+    /// Optional dilation rate for the first conv.
+    fn first_dilation(&self) -> Option<usize>;
+
     /// Configures the size of `first_planes` and `out_planes`.
     fn planes(&self) -> usize;
 
@@ -27,13 +33,6 @@ pub trait BasicBlockMeta {
 
     /// Control factor for `out_planes()`
     fn expansion_factor(&self) -> usize;
-
-    /// The size of the out channels dimension.
-    ///
-    /// ``out_planes = planes * expansion_factor``
-    fn out_planes(&self) -> usize {
-        self.planes() * self.expansion_factor()
-    }
 
     /// Control factor for `first_planes()`
     fn reduction_factor(&self) -> usize;
@@ -45,21 +44,15 @@ pub trait BasicBlockMeta {
         self.planes() / self.reduction_factor()
     }
 
+    /// The size of the out channels dimension.
+    ///
+    /// ``out_planes = planes * expansion_factor``
+    fn out_planes(&self) -> usize {
+        self.planes() * self.expansion_factor()
+    }
+
     /// The stride of the downsample layer.
     fn stride(&self) -> usize;
-
-    /// Dilation rate for conv layers.
-    fn dilation(&self) -> usize;
-
-    /// Optional dilation rate for the first conv.
-    fn first_dilation(&self) -> Option<usize>;
-
-    /// Effective first dilation.
-    ///
-    /// Resolves `first_dilation()` vrs `dilation()`.
-    fn effective_first_dilation(&self) -> usize {
-        self.first_dilation().unwrap_or(self.dilation())
-    }
 
     /// Get the output resolution for a given input resolution.
     ///
@@ -81,6 +74,13 @@ pub trait BasicBlockMeta {
         input_resolution: [usize; 2],
     ) -> [usize; 2] {
         stride_div_output_resolution(input_resolution, self.stride())
+    }
+
+    /// Effective first dilation.
+    ///
+    /// Resolves `first_dilation()` vrs `dilation()`.
+    fn effective_first_dilation(&self) -> usize {
+        self.first_dilation().unwrap_or(self.dilation())
     }
 }
 
@@ -190,8 +190,11 @@ impl BasicBlockConfig {
         let first_dilation = self.effective_first_dilation();
         let dilation = self.dilation();
 
-        // TODO: conditional stride logic for anti-aliasing.
         let stride = self.stride();
+
+        // TODO: conditional stride logic for anti-aliasing.
+        // use_aa = aa_layer is not None and (stride == 2 or first_dilation != dilation)
+        // stride = 1 if use_aa else stride
 
         let cn1_cfg: Conv2dNormBlockConfig = Conv2dConfig::new([in_planes, first_planes], [3, 3])
             .with_stride([stride, stride])
@@ -393,18 +396,46 @@ impl<B: Backend> BasicBlock<B> {
             None => x,
         };
         let x = self.act1.forward(x);
-
-        // aa? - anti-aliasing?
+        // TODO: anti-aliasing
+        // let x = match &self.aa {
+        //     Some(se) => ae.forward(x),
+        //     None => x,
+        // };
 
         // Group 2
         let x = self.cn2.forward(x);
-        // se? - attention?
+        assert_shape_contract_periodically!(
+            ["batch", "out_planes", "out_height", "out_width"],
+            &x,
+            &[
+                ("batch", batch),
+                ("out_planes", self.out_planes()),
+                ("out_height", out_height),
+                ("out_width", out_width),
+            ]
+        );
+        // TODO: attention
+        // let x = match &self.se {
+        //     Some(se) => se.forward(x),
+        //     None => x,
+        // };
         let x = match &self.drop_path {
             Some(drop_path) => drop_path.forward(x),
             None => x,
         };
         let x = x + shortcut;
-        self.act2.forward(x)
+        let x = self.act2.forward(x);
+        assert_shape_contract_periodically!(
+            ["batch", "out_planes", "out_height", "out_width"],
+            &x,
+            &[
+                ("batch", batch),
+                ("out_planes", self.out_planes()),
+                ("out_height", out_height),
+                ("out_width", out_width),
+            ]
+        );
+        x
     }
 }
 

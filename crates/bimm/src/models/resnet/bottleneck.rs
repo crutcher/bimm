@@ -19,6 +19,9 @@ pub trait BottleneckBlockMeta {
     /// The size of the in channels dimension.
     fn in_planes(&self) -> usize;
 
+    /// Dilation rate for conv layers.
+    fn dilation(&self) -> usize;
+
     /// Configures the size of `first_planes` and `out_planes`.
     fn planes(&self) -> usize;
 
@@ -57,9 +60,6 @@ pub trait BottleneckBlockMeta {
 
     /// The stride of the downsample layer.
     fn stride(&self) -> usize;
-
-    /// Dilation rate for conv layers.
-    fn dilation(&self) -> usize;
 
     /// Get the output resolution for a given input resolution.
     ///
@@ -190,8 +190,11 @@ impl BottleneckBlockConfig {
 
         let dilation = self.dilation();
 
-        // TODO: conditional stride logic for anti-aliasing.
         let stride = self.stride();
+
+        // TODO: conditional stride logic for anti-aliasing.
+        // use_aa = aa_layer is not None and stride == 2
+        // stride = 1 if use_aa else stride
 
         let cn1_cfg: Conv2dNormBlockConfig = Conv2dConfig::new([in_planes, first_planes], [1, 1])
             .with_bias(false)
@@ -425,8 +428,11 @@ impl<B: Backend> BottleneckBlock<B> {
             None => x,
         };
         let x = self.act2.forward(x);
-
-        // aa? - anti-aliasing?
+        // TODO: anti-aliasing
+        // let x = match &self.aa {
+        //     Some(se) => ae.forward(x),
+        //     None => x,
+        // };
 
         // Group 3
         let x = self.cn3.forward(x);
@@ -440,13 +446,28 @@ impl<B: Backend> BottleneckBlock<B> {
                 ("out_width", out_width),
             ],
         );
-        // se? - attention?
+        // TODO: attention
+        // let x = match &self.se {
+        //     Some(se) => se.forward(x),
+        //     None => x,
+        // };
         let x = match &self.drop_path {
             Some(drop_path) => drop_path.forward(x),
             None => x,
         };
         let x = x + shortcut;
-        self.act3.forward(x)
+        let x = self.act3.forward(x);
+        assert_shape_contract_periodically!(
+            ["batch", "out_planes", "out_height", "out_width"],
+            &x,
+            &[
+                ("batch", batch),
+                ("out_planes", self.out_planes()),
+                ("out_height", out_height),
+                ("out_width", out_width),
+            ],
+        );
+        x
     }
 }
 
