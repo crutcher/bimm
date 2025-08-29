@@ -474,8 +474,7 @@ impl<B: Backend> BottleneckBlock<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bimm_contracts::assert_shape_contract;
-    use burn::backend::{Autodiff, Cuda, NdArray};
+    use burn::backend::NdArray;
 
     #[test]
     fn test_basic_block_config() {
@@ -521,9 +520,10 @@ mod tests {
         assert_eq!(block.output_resolution([16, 16]), [16, 16]);
     }
 
+    #[cfg(feature = "cuda")]
     #[test]
     fn test_conv2d_example() {
-        type B = Cuda;
+        type B = burn::backend::Cuda;
         let device = Default::default();
 
         let input: Tensor<B, 4> = Tensor::ones([2, 32, 64, 64], &device);
@@ -538,9 +538,13 @@ mod tests {
         assert_eq!(&result.shape().dims, &[2, 32, 64, 64]);
     }
 
+    #[cfg(feature = "cuda")]
     #[test]
     fn test_basic_block_forward_same_channels_no_downsample_autodiff() {
+        use bimm_contracts::assert_shape_contract;
+        use burn::backend::{Autodiff, Cuda};
         type B = Autodiff<Cuda>;
+
         let device = Default::default();
 
         let batch_size = 2;
@@ -567,9 +571,13 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "cuda")]
     #[test]
     fn test_basic_block_forward_downsample_drop_block_drop_path_autodiff() {
+        use bimm_contracts::assert_shape_contract;
+        use burn::backend::{Autodiff, Cuda};
         type B = Autodiff<Cuda>;
+
         let device = Default::default();
 
         let batch_size = 2;

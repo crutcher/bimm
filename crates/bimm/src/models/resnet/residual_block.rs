@@ -171,7 +171,7 @@ impl<B: Backend> ResidualBlock<B> {
 mod tests {
     use super::*;
     use bimm_contracts::assert_shape_contract;
-    use burn::backend::Cuda;
+    use burn::backend::NdArray;
 
     #[test]
     fn test_residual_block_config() {
@@ -200,7 +200,48 @@ mod tests {
     }
 
     #[test]
-    fn test_residual_block() {
+    fn test_residual_block_basic_block() {
+        type B = NdArray;
+        let device = Default::default();
+
+        let batch_size = 2;
+        let in_planes = 16;
+        let planes = 32;
+        let in_height = 8;
+        let in_width = 8;
+        let out_height = 4;
+        let out_width = 4;
+
+        let cfg: ResidualBlockConfig = BasicBlockConfig::new(in_planes, planes)
+            .with_stride(2)
+            .into();
+
+        let block: ResidualBlock<B> = cfg.init(&device);
+        assert!(matches!(block, ResidualBlock::Basic(_)));
+        assert_eq!(block.in_planes(), in_planes);
+        assert_eq!(block.out_planes(), planes);
+        assert_eq!(block.stride(), 2);
+        assert_eq!(block.output_resolution([20, 20]), [10, 10]);
+
+        let input = Tensor::ones([batch_size, in_planes, in_height, in_width], &device);
+        let output = block.forward(input);
+
+        assert_shape_contract!(
+            ["batch", "out_channels", "out_height", "out_width"],
+            &output,
+            &[
+                ("batch", batch_size),
+                ("out_planes", planes),
+                ("out_height", out_height),
+                ("out_width", out_width)
+            ],
+        );
+    }
+
+    #[cfg(feature = "cuda")]
+    #[test]
+    fn test_residual_block_bottleneck_block() {
+        use burn::backend::Cuda;
         type B = Cuda;
         let device = Default::default();
 
@@ -212,58 +253,29 @@ mod tests {
         let out_height = 4;
         let out_width = 4;
 
-        {
-            let cfg: ResidualBlockConfig = BasicBlockConfig::new(in_planes, planes)
-                .with_stride(2)
-                .into();
+        let cfg: ResidualBlockConfig = BottleneckBlockConfig::new(in_planes, planes)
+            .with_stride(2)
+            .into();
 
-            let block: ResidualBlock<B> = cfg.init(&device);
-            assert!(matches!(block, ResidualBlock::Basic(_)));
-            assert_eq!(block.in_planes(), in_planes);
-            assert_eq!(block.out_planes(), planes);
-            assert_eq!(block.stride(), 2);
-            assert_eq!(block.output_resolution([20, 20]), [10, 10]);
+        let block: ResidualBlock<B> = cfg.init(&device);
+        assert!(matches!(block, ResidualBlock::Bottleneck(_)));
+        assert_eq!(block.in_planes(), in_planes);
+        assert_eq!(block.out_planes(), planes);
+        assert_eq!(block.stride(), 2);
+        assert_eq!(block.output_resolution([20, 20]), [10, 10]);
 
-            let input = Tensor::ones([batch_size, in_planes, in_height, in_width], &device);
-            let output = block.forward(input);
+        let input = Tensor::ones([batch_size, in_planes, in_height, in_width], &device);
+        let output = block.forward(input);
 
-            assert_shape_contract!(
-                ["batch", "out_channels", "out_height", "out_width"],
-                &output,
-                &[
-                    ("batch", batch_size),
-                    ("out_planes", planes),
-                    ("out_height", out_height),
-                    ("out_width", out_width)
-                ],
-            );
-        }
-
-        {
-            let cfg: ResidualBlockConfig = BottleneckBlockConfig::new(in_planes, planes)
-                .with_stride(2)
-                .into();
-
-            let block: ResidualBlock<B> = cfg.init(&device);
-            assert!(matches!(block, ResidualBlock::Bottleneck(_)));
-            assert_eq!(block.in_planes(), in_planes);
-            assert_eq!(block.out_planes(), planes);
-            assert_eq!(block.stride(), 2);
-            assert_eq!(block.output_resolution([20, 20]), [10, 10]);
-
-            let input = Tensor::ones([batch_size, in_planes, in_height, in_width], &device);
-            let output = block.forward(input);
-
-            assert_shape_contract!(
-                ["batch", "out_channels", "out_height", "out_width"],
-                &output,
-                &[
-                    ("batch", batch_size),
-                    ("out_planes", planes),
-                    ("out_height", out_height),
-                    ("out_width", out_width)
-                ],
-            );
-        }
+        assert_shape_contract!(
+            ["batch", "out_channels", "out_height", "out_width"],
+            &output,
+            &[
+                ("batch", batch_size),
+                ("out_planes", planes),
+                ("out_height", out_height),
+                ("out_width", out_width)
+            ],
+        );
     }
 }
