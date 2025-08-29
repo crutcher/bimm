@@ -10,10 +10,10 @@ use burn::prelude::{Backend, Module, Tensor};
 
 /// [`ResidualBlock`] Meta API.
 pub trait ResidualBlockMeta {
-    /// The size of the in channels dimension.
+    /// The number of input feature planes.
     fn in_planes(&self) -> usize;
 
-    /// The size of the out channels dimension.
+    /// The number of outpu feature planes.
     fn out_planes(&self) -> usize;
 
     /// The stride of convolution.

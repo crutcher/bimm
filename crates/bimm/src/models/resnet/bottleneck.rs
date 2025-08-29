@@ -18,7 +18,7 @@ use burn::prelude::{Backend, Config, Module, Tensor};
 
 /// [`BottleneckBlock`] Meta trait.
 pub trait BottleneckBlockMeta {
-    /// The size of the in channels dimension.
+    /// The number of input feature planes.
     fn in_planes(&self) -> usize;
 
     /// Dilation rate for conv layers.
@@ -53,7 +53,7 @@ pub trait BottleneckBlockMeta {
         self.planes() * (self.base_width() / 64) * self.cardinality()
     }
 
-    /// The size of the out channels dimension.
+    /// The number of output feature planes.
     ///
     /// ``out_planes = planes * expansion_factor``
     fn out_planes(&self) -> usize {
