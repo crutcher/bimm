@@ -28,7 +28,7 @@ pub trait BasicBlockMeta {
     /// Configures the size of `first_planes` and `out_planes`.
     fn planes(&self) -> usize;
 
-    /// Groups of the first conv.
+    /// Groups of the conv filters.
     fn cardinality(&self) -> usize;
 
     /// Control factor for `out_planes()`
@@ -93,7 +93,7 @@ pub struct BasicBlockConfig {
     /// Configures the `out_planes` as a function of `expansion_factor`.
     pub planes: usize,
 
-    /// Groups of the first conv.
+    /// Groups of the conv filters.
     #[config(default = "1")]
     pub cardinality: usize,
 
@@ -216,7 +216,7 @@ impl BasicBlockConfig {
             expansion_factor: self.expansion_factor,
             reduction_factor: self.reduction_factor,
 
-            residual_downsample: if stride != 1 || in_planes != out_planes {
+            downsample: if stride != 1 || in_planes != out_planes {
                 // TODO: mechanism to select different pool operations.
                 ConvDownsampleConfig::new(self.in_planes(), self.out_planes())
                     .with_stride(self.stride())
@@ -265,7 +265,7 @@ pub struct BasicBlock<B: Backend> {
     reduction_factor: usize,
 
     /// Optional `DownSample` layer; for the residual connection.
-    pub residual_downsample: Option<ConvDownsample<B>>,
+    pub downsample: Option<ConvDownsample<B>>,
 
     /// First conv/norm layer.
     pub cn1: Conv2dNormBlock<B>,
@@ -364,13 +364,13 @@ impl<B: Backend> BasicBlock<B> {
             &[("in_planes", self.in_planes()), ("stride", self.stride())],
         );
 
-        let shortcut = match &self.residual_downsample {
+        let identity = match &self.downsample {
             Some(downsample) => downsample.forward(input.clone()),
             None => input.clone(),
         };
         assert_shape_contract_periodically!(
             ["batch", "out_planes", "out_height", "out_width"],
-            &shortcut,
+            &identity,
             &[
                 ("batch", batch),
                 ("out_planes", self.out_planes()),
@@ -421,7 +421,7 @@ impl<B: Backend> BasicBlock<B> {
             Some(drop_path) => drop_path.forward(x),
             None => x,
         };
-        let x = x + shortcut;
+        let x = x + identity;
         let x = self.act2.forward(x);
         assert_shape_contract_periodically!(
             ["batch", "out_planes", "out_height", "out_width"],
