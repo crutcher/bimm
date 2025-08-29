@@ -6,6 +6,7 @@ use crate::models::resnet::residual_block::{
     ResidualBlock, ResidualBlockConfig, ResidualBlockMeta,
 };
 use crate::models::resnet::util::stride_div_output_resolution;
+use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::config::Config;
 use burn::prelude::{Backend, Module, Tensor};
 
@@ -164,7 +165,33 @@ impl<B: Backend> LayerBlock<B> {
         &self,
         input: Tensor<B, 4>,
     ) -> Tensor<B, 4> {
-        self.blocks.iter().fold(input, |x, block| block.forward(x))
+        let [batch, out_height, out_width] = unpack_shape_contract!(
+            [
+                "batch",
+                "in_planes",
+                "in_height" = "out_height" * "stride",
+                "in_width" = "out_width" * "stride"
+            ],
+            &input,
+            &["batch", "out_height", "out_width"],
+            &[("in_planes", self.in_planes()), ("stride", self.stride())],
+        );
+
+        let x = self.blocks.iter().fold(input, |x, block| block.forward(x));
+
+        #[cfg(debug_assertions)]
+        assert_shape_contract_periodically!(
+            ["batch", "out_planes", "out_height", "out_width"],
+            &x,
+            &[
+                ("batch", batch),
+                ("out_planes", self.out_planes()),
+                ("out_height", out_height),
+                ("out_width", out_width)
+            ],
+        );
+
+        x
     }
 }
 

@@ -373,20 +373,26 @@ impl<B: Backend> BasicBlock<B> {
             Some(downsample) => downsample.forward(input.clone()),
             None => input.clone(),
         };
+
+        #[cfg(debug_assertions)]
         define_shape_contract!(
             OUT_CONTRACT,
             ["batch", "out_planes", "out_height", "out_width"],
         );
+        #[cfg(debug_assertions)]
         let out_bindings = [
             ("batch", batch),
             ("out_planes", self.out_planes()),
             ("out_height", out_height),
             ("out_width", out_width),
         ];
+        #[cfg(debug_assertions)]
         assert_shape_contract_periodically!(OUT_CONTRACT, &identity, &out_bindings);
 
         // Group 1
         let x = self.cn1.forward(input);
+
+        #[cfg(debug_assertions)]
         assert_shape_contract_periodically!(
             ["batch", "first_planes", "out_height", "out_width"],
             &x,
@@ -397,6 +403,7 @@ impl<B: Backend> BasicBlock<B> {
                 ("out_width", out_width),
             ]
         );
+
         let x = match &self.drop_block {
             Some(drop_block) => drop_block.forward(x),
             None => x,
@@ -409,7 +416,10 @@ impl<B: Backend> BasicBlock<B> {
 
         // Group 2
         let x = self.cn2.forward(x);
+
+        #[cfg(debug_assertions)]
         assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
+
         let x = match &self.se {
             Some(_) => unimplemented!("attention is not implemented"),
             None => x,
@@ -420,7 +430,10 @@ impl<B: Backend> BasicBlock<B> {
         };
         let x = x + identity;
         let x = self.act2.forward(x);
+
+        #[cfg(debug_assertions)]
         assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
+
         x
     }
 }

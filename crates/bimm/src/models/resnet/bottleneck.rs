@@ -390,20 +390,26 @@ impl<B: Backend> BottleneckBlock<B> {
             Some(downsample) => downsample.forward(input.clone()),
             None => input.clone(),
         };
+
+        #[cfg(debug_assertions)]
         define_shape_contract!(
             OUT_CONTRACT,
             ["batch", "out_planes", "out_height", "out_width"],
         );
+        #[cfg(debug_assertions)]
         let out_bindings = [
             ("batch", batch),
             ("out_planes", self.out_planes()),
             ("out_height", out_height),
             ("out_width", out_width),
         ];
+        #[cfg(debug_assertions)]
         assert_shape_contract_periodically!(OUT_CONTRACT, &identity, &out_bindings);
 
         // Group 1
         let x = self.cn1.forward(input);
+
+        #[cfg(debug_assertions)]
         assert_shape_contract_periodically!(
             ["batch", "first_planes", "in_height", "in_width"],
             &x,
@@ -414,10 +420,13 @@ impl<B: Backend> BottleneckBlock<B> {
                 ("in_width", in_width),
             ],
         );
+
         let x = self.act1.forward(x);
 
         // Group 2
         let x = self.cn2.forward(x);
+
+        #[cfg(debug_assertions)]
         assert_shape_contract_periodically!(
             ["batch", "width", "out_height", "out_width"],
             &x,
@@ -440,7 +449,10 @@ impl<B: Backend> BottleneckBlock<B> {
 
         // Group 3
         let x = self.cn3.forward(x);
+
+        #[cfg(debug_assertions)]
         assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
+
         let x = match &self.se {
             Some(_) => unimplemented!("attention is not implemented"),
             None => x,
@@ -451,7 +463,10 @@ impl<B: Backend> BottleneckBlock<B> {
         };
         let x = x + identity;
         let x = self.act3.forward(x);
+
+        #[cfg(debug_assertions)]
         assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
+
         x
     }
 }
