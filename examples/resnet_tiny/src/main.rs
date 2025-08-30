@@ -53,7 +53,7 @@ pub struct Args {
     seed: u64,
 
     /// Batch size for processing
-    #[arg(short, long, default_value_t = 512)]
+    #[arg(short, long, default_value_t = 128)]
     batch_size: usize,
 
     /// Number of workers for data loading.

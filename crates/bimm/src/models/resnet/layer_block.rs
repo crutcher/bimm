@@ -96,12 +96,11 @@ impl LayerBlockConfig {
     ) -> Self {
         let blocks = (0..num_blocks)
             .map(|b| {
-                ResidualBlockConfig::new(
-                    in_planes,
-                    out_planes,
-                    if b == 0 { stride } else { 1 },
-                    bottleneck,
-                )
+                if b == 0 {
+                    ResidualBlockConfig::new(in_planes, out_planes, stride, bottleneck)
+                } else {
+                    ResidualBlockConfig::new(out_planes, out_planes, stride, bottleneck)
+                }
             })
             .collect();
 
@@ -123,11 +122,12 @@ impl LayerBlockConfig {
             let curr = &self.blocks[idx];
             if prev.out_planes() != curr.in_planes() {
                 return Err(format!(
-                    "block[{}].out_planes({}) != block[{}].in_planes({})",
+                    "block[{}].out_planes({}) != block[{}].in_planes({})\n{:#?}",
                     idx - 1,
                     prev.out_planes(),
                     idx,
                     curr.in_planes(),
+                    self,
                 ));
             }
         }
