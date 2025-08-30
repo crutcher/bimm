@@ -53,7 +53,7 @@ pub struct Args {
     seed: u64,
 
     /// Batch size for processing
-    #[arg(short, long, default_value_t = 128)]
+    #[arg(short, long, default_value_t = 32)]
     batch_size: usize,
 
     /// Number of workers for data loading.
@@ -77,15 +77,15 @@ pub struct Args {
     drop_block_rate: f64,
 
     /// Learning rate for the optimizer.
-    #[arg(long, default_value = "1.0e-4")]
+    #[arg(long, default_value = "1.0e-5")]
     learning_rate: f64,
 
     /// Learning rate decay gamma.
-    #[arg(long, default_value = "0.9995")]
+    #[arg(long, default_value = "0.9997")]
     lr_gamma: f64,
 
     /// Directory to save the artifacts.
-    #[arg(long, default_value = "/tmp/swin_tiny_cinic10")]
+    #[arg(long, default_value = "/tmp/resnet_tiny")]
     artifact_dir: Option<String>,
 
     /// Root directory of the training dataset.
@@ -150,8 +150,8 @@ pub fn backend_main<B: AutodiffBackend>(
         // Load the image from the path, resize it to 32x32 pixels, and convert it to RGB8.
         ImageLoader::default()
             .with_resize(ResizeSpec::new(ImageShape {
-                width: 32,
-                height: 32,
+                width: 256,
+                height: 256,
             }))
             .with_recolor(ColorType::Rgb8)
             .to_plan(PATH_COLUMN, IMAGE_COLUMN)
