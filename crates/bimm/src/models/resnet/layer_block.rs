@@ -15,6 +15,11 @@ pub trait LayerBlockMeta {
     /// The number of blocks.
     fn len(&self) -> usize;
 
+    /// Check if the layer block is empty.
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// The number of input feature planes.
     fn in_planes(&self) -> usize;
 
