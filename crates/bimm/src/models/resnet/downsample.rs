@@ -1,8 +1,6 @@
 //! # The `ResNet` Downsample Implementation.
 
-use crate::layers::blocks::conv_norm::{
-    Conv2dNormBlock, Conv2dNormBlockConfig, Conv2dNormBlockMeta,
-};
+use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig, ConvNorm2dMeta};
 use crate::models::resnet::util::CONV_INTO_RELU_INITIALIZER;
 use crate::models::resnet::util::stride_div_output_resolution;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
@@ -82,7 +80,7 @@ impl ConvDownsampleConfig {
         &self,
         device: &B::Device,
     ) -> ConvDownsample<B> {
-        let config: Conv2dNormBlockConfig =
+        let config: ConvNorm2dConfig =
             Conv2dConfig::new([self.in_channels, self.out_channels], [1, 1])
                 .with_stride([self.stride, self.stride])
                 .with_padding(PaddingConfig2d::Explicit(0, 0))
@@ -102,7 +100,7 @@ impl ConvDownsampleConfig {
 /// ``[batch_size, out_channels, out_height, out_width]`` tensors.
 #[derive(Module, Debug)]
 pub struct ConvDownsample<B: Backend> {
-    conv_norm: Conv2dNormBlock<B>,
+    conv_norm: ConvNorm2d<B>,
 }
 
 impl<B: Backend> ConvDownsampleMeta for ConvDownsample<B> {

@@ -1,9 +1,7 @@
 //! # Basic Block for `ResNet`
 
 use crate::layers::activation::{Activation, ActivationConfig};
-use crate::layers::blocks::conv_norm::{
-    Conv2dNormBlock, Conv2dNormBlockConfig, Conv2dNormBlockMeta,
-};
+use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig, ConvNorm2dMeta};
 use crate::layers::drop::drop_block::{DropBlock2d, DropBlock2dConfig, DropBlockOptions};
 use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
 use crate::models::resnet::downsample::{ConvDownsample, ConvDownsampleConfig};
@@ -197,7 +195,7 @@ impl BottleneckBlockConfig {
         // use_aa = aa_layer is not None and stride == 2
         // stride = 1 if use_aa else stride
 
-        let downsample_cfg = if stride != 1 || in_planes != out_planes {
+        let downsample = if stride != 1 || in_planes != out_planes {
             // TODO: mechanism to select different pool operations.
             ConvDownsampleConfig::new(in_planes, out_planes)
                 .with_stride(stride)
@@ -207,12 +205,12 @@ impl BottleneckBlockConfig {
             None
         };
 
-        let cn1_cfg: Conv2dNormBlockConfig = Conv2dConfig::new([in_planes, first_planes], [1, 1])
+        let conv_norm1: ConvNorm2dConfig = Conv2dConfig::new([in_planes, first_planes], [1, 1])
             .with_bias(false)
             .with_initializer(self.initializer.clone())
             .into();
 
-        let cn2_cfg: Conv2dNormBlockConfig = Conv2dConfig::new([first_planes, width], [3, 3])
+        let conv_norm2: ConvNorm2dConfig = Conv2dConfig::new([first_planes, width], [3, 3])
             .with_stride([stride, stride])
             .with_dilation([dilation, dilation])
             .with_padding(PaddingConfig2d::Explicit(dilation, dilation))
@@ -221,7 +219,7 @@ impl BottleneckBlockConfig {
             .with_initializer(self.initializer.clone())
             .into();
 
-        let cn3_cfg: Conv2dNormBlockConfig = Conv2dConfig::new([width, out_planes], [1, 1])
+        let conv_norm3: ConvNorm2dConfig = Conv2dConfig::new([width, out_planes], [1, 1])
             .with_bias(false)
             .with_initializer(self.initializer.clone())
             .into();
@@ -231,14 +229,14 @@ impl BottleneckBlockConfig {
             expansion_factor: self.expansion_factor,
             reduction_factor: self.reduction_factor,
 
-            downsample: downsample_cfg.as_ref().map(|c| c.init(device)),
+            downsample: downsample.as_ref().map(|c| c.init(device)),
 
             // Group 1
-            cn1: cn1_cfg.init(device),
+            conv_norm1: conv_norm1.init(device),
             act1: self.activation.init(device),
 
             // Group 2
-            cn2: cn2_cfg.init(device),
+            conv_norm2: conv_norm2.init(device),
             drop_block: self
                 .drop_block
                 .as_ref()
@@ -247,8 +245,8 @@ impl BottleneckBlockConfig {
             ae: None,
 
             // Group 3
-            cn3: {
-                let mut block = cn3_cfg.init(device);
+            conv_norm3: {
+                let mut block = conv_norm3.init(device);
                 if self.zero_init_last {
                     block.zero_init_norm()
                 }
@@ -279,13 +277,13 @@ pub struct BottleneckBlock<B: Backend> {
     pub downsample: Option<ConvDownsample<B>>,
 
     /// First conv/norm layer.
-    pub cn1: Conv2dNormBlock<B>,
+    pub conv_norm1: ConvNorm2d<B>,
 
     /// First activation layer.
     pub act1: Activation<B>,
 
     /// Second conv/norm layer.
-    pub cn2: Conv2dNormBlock<B>,
+    pub conv_norm2: ConvNorm2d<B>,
 
     /// Optional `DropBlock` layer.
     pub drop_block: Option<DropBlock2d>,
@@ -298,7 +296,7 @@ pub struct BottleneckBlock<B: Backend> {
     pub ae: Option<usize>,
 
     /// Third conv/norm layer.
-    pub cn3: Conv2dNormBlock<B>,
+    pub conv_norm3: ConvNorm2d<B>,
 
     /// Optional attention layer.
     // TODO: se: attention layer
@@ -313,11 +311,11 @@ pub struct BottleneckBlock<B: Backend> {
 
 impl<B: Backend> BottleneckBlockMeta for BottleneckBlock<B> {
     fn in_planes(&self) -> usize {
-        self.cn1.in_channels()
+        self.conv_norm1.in_channels()
     }
 
     fn dilation(&self) -> usize {
-        self.cn3.conv.dilation[0]
+        self.conv_norm3.conv.dilation[0]
     }
 
     fn planes(&self) -> usize {
@@ -325,7 +323,7 @@ impl<B: Backend> BottleneckBlockMeta for BottleneckBlock<B> {
     }
 
     fn cardinality(&self) -> usize {
-        self.cn2.groups()
+        self.conv_norm2.groups()
     }
 
     fn base_width(&self) -> usize {
@@ -341,19 +339,19 @@ impl<B: Backend> BottleneckBlockMeta for BottleneckBlock<B> {
     }
 
     fn first_planes(&self) -> usize {
-        self.cn1.out_channels()
+        self.conv_norm1.out_channels()
     }
 
     fn width(&self) -> usize {
-        self.cn3.in_channels()
+        self.conv_norm3.in_channels()
     }
 
     fn out_planes(&self) -> usize {
-        self.cn3.out_channels()
+        self.conv_norm3.out_channels()
     }
 
     fn stride(&self) -> usize {
-        self.cn2.stride()[0]
+        self.conv_norm2.stride()[0]
     }
 }
 
@@ -405,7 +403,7 @@ impl<B: Backend> BottleneckBlock<B> {
         bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &identity, &out_bindings);
 
         // Group 1
-        let x = self.cn1.forward(input);
+        let x = self.conv_norm1.forward(input);
 
         #[cfg(debug_assertions)]
         bimm_contracts::assert_shape_contract_periodically!(
@@ -422,7 +420,7 @@ impl<B: Backend> BottleneckBlock<B> {
         let x = self.act1.forward(x);
 
         // Group 2
-        let x = self.cn2.forward(x);
+        let x = self.conv_norm2.forward(x);
 
         #[cfg(debug_assertions)]
         bimm_contracts::assert_shape_contract_periodically!(
@@ -446,7 +444,7 @@ impl<B: Backend> BottleneckBlock<B> {
         };
 
         // Group 3
-        let x = self.cn3.forward(x);
+        let x = self.conv_norm3.forward(x);
 
         #[cfg(debug_assertions)]
         bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);

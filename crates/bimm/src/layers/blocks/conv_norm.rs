@@ -1,6 +1,6 @@
 //! # `ConvNorm` Module
 //!
-//! A [`Conv2dNormBlock`] module is a [`Conv2d`] layer followed by a [`BatchNorm`] layer.
+//! A [`ConvNorm2d`] module is a [`Conv2d`] layer followed by a [`BatchNorm`] layer.
 
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::config::Config;
@@ -9,8 +9,8 @@ use burn::nn::conv::{Conv2d, Conv2dConfig};
 use burn::nn::{BatchNorm, BatchNormConfig};
 use burn::prelude::{Backend, Tensor};
 
-/// [`Conv2dNormBlock`] Meta.
-pub trait Conv2dNormBlockMeta {
+/// [`ConvNorm2d`] Meta.
+pub trait ConvNorm2dMeta {
     /// Number of input channels.
     fn in_channels(&self) -> usize;
 
@@ -24,14 +24,14 @@ pub trait Conv2dNormBlockMeta {
     fn stride(&self) -> &[usize; 2];
 }
 
-/// [`Conv2dNormBlock`] Config.
+/// [`ConvNorm2d`] Config.
 #[derive(Config, Debug)]
-pub struct Conv2dNormBlockConfig {
+pub struct ConvNorm2dConfig {
     /// The [`Conv2D`] config.
     pub conv: Conv2dConfig,
 }
 
-impl Conv2dNormBlockMeta for Conv2dNormBlockConfig {
+impl ConvNorm2dMeta for ConvNorm2dConfig {
     fn in_channels(&self) -> usize {
         self.conv.channels[0]
     }
@@ -49,19 +49,19 @@ impl Conv2dNormBlockMeta for Conv2dNormBlockConfig {
     }
 }
 
-impl From<Conv2dConfig> for Conv2dNormBlockConfig {
+impl From<Conv2dConfig> for ConvNorm2dConfig {
     fn from(conv: Conv2dConfig) -> Self {
         Self { conv }
     }
 }
 
-impl Conv2dNormBlockConfig {
-    /// Initialize a [`Conv2dNormBlock`].
+impl ConvNorm2dConfig {
+    /// Initialize a [`ConvNorm2d`].
     pub fn init<B: Backend>(
         self,
         device: &B::Device,
-    ) -> Conv2dNormBlock<B> {
-        Conv2dNormBlock {
+    ) -> ConvNorm2d<B> {
+        ConvNorm2d {
             conv: self.conv.init(device),
 
             norm: BatchNormConfig::new(self.conv.channels[1]).init(device),
@@ -71,7 +71,7 @@ impl Conv2dNormBlockConfig {
 
 /// Grouped [`Conv2d`] and [`BatchNorm`] layer.
 #[derive(Module, Debug)]
-pub struct Conv2dNormBlock<B: Backend> {
+pub struct ConvNorm2d<B: Backend> {
     /// Internal Conv2d layer.
     pub conv: Conv2d<B>,
 
@@ -79,7 +79,7 @@ pub struct Conv2dNormBlock<B: Backend> {
     pub norm: BatchNorm<B, 2>,
 }
 
-impl<B: Backend> Conv2dNormBlockMeta for Conv2dNormBlock<B> {
+impl<B: Backend> ConvNorm2dMeta for ConvNorm2d<B> {
     fn in_channels(&self) -> usize {
         self.conv.weight.shape().dims[1] * self.groups()
     }
@@ -97,7 +97,7 @@ impl<B: Backend> Conv2dNormBlockMeta for Conv2dNormBlock<B> {
     }
 }
 
-impl<B: Backend> Conv2dNormBlock<B> {
+impl<B: Backend> ConvNorm2d<B> {
     /// Zero initialize the norm layer's weights.
     ///
     /// This is used by / referenced in upstream `ResNet` init.
@@ -157,7 +157,7 @@ mod tests {
             .with_padding(PaddingConfig2d::Explicit(1, 1))
             .with_bias(false);
 
-        let config: Conv2dNormBlockConfig = inner_config.clone().into();
+        let config: ConvNorm2dConfig = inner_config.clone().into();
 
         assert_eq!(&config.conv.channels, &inner_config.channels);
         assert_eq!(&config.conv.kernel_size, &inner_config.kernel_size);

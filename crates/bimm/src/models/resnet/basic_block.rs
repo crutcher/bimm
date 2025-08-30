@@ -1,9 +1,7 @@
 //! # Bottleneck Block for `ResNet`
 
 use crate::layers::activation::{Activation, ActivationConfig};
-use crate::layers::blocks::conv_norm::{
-    Conv2dNormBlock, Conv2dNormBlockConfig, Conv2dNormBlockMeta,
-};
+use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig, ConvNorm2dMeta};
 use crate::layers::drop::drop_block::{DropBlock2d, DropBlock2dConfig, DropBlockOptions};
 use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
 use crate::models::resnet::downsample::{ConvDownsample, ConvDownsampleConfig};
@@ -197,7 +195,7 @@ impl BasicBlockConfig {
         // use_aa = aa_layer is not None and (stride == 2 or first_dilation != dilation)
         // stride = 1 if use_aa else stride
 
-        let downsample_cfg = if stride != 1 || in_planes != out_planes {
+        let downsample = if stride != 1 || in_planes != out_planes {
             // TODO: mechanism to select different pool operations.
             ConvDownsampleConfig::new(self.in_planes(), self.out_planes())
                 .with_stride(self.stride())
@@ -207,7 +205,7 @@ impl BasicBlockConfig {
             None
         };
 
-        let cn1_cfg: Conv2dNormBlockConfig = Conv2dConfig::new([in_planes, first_planes], [3, 3])
+        let conv_norm1: ConvNorm2dConfig = Conv2dConfig::new([in_planes, first_planes], [3, 3])
             .with_stride([stride, stride])
             .with_dilation([first_dilation, first_dilation])
             .with_padding(PaddingConfig2d::Explicit(first_dilation, first_dilation))
@@ -216,7 +214,7 @@ impl BasicBlockConfig {
             .with_initializer(self.initializer.clone())
             .into();
 
-        let cn2_cfg: Conv2dNormBlockConfig = Conv2dConfig::new([first_planes, out_planes], [3, 3])
+        let conv_norm2: ConvNorm2dConfig = Conv2dConfig::new([first_planes, out_planes], [3, 3])
             .with_dilation([dilation, dilation])
             .with_padding(PaddingConfig2d::Explicit(dilation, dilation))
             .with_bias(false)
@@ -227,10 +225,10 @@ impl BasicBlockConfig {
             expansion_factor: self.expansion_factor,
             reduction_factor: self.reduction_factor,
 
-            downsample: downsample_cfg.as_ref().map(|cfg| cfg.init(device)),
+            downsample: downsample.as_ref().map(|cfg| cfg.init(device)),
 
             // Group 1
-            cn1: cn1_cfg.init(device),
+            conv_norm1: conv_norm1.init(device),
             drop_block: self
                 .drop_block
                 .as_ref()
@@ -239,8 +237,8 @@ impl BasicBlockConfig {
             ae: None,
 
             // Group 2
-            cn2: {
-                let mut block = cn2_cfg.init(device);
+            conv_norm2: {
+                let mut block = conv_norm2.init(device);
                 if self.zero_init_last {
                     block.zero_init_norm()
                 }
@@ -270,7 +268,7 @@ pub struct BasicBlock<B: Backend> {
     pub downsample: Option<ConvDownsample<B>>,
 
     /// First conv/norm layer.
-    pub cn1: Conv2dNormBlock<B>,
+    pub conv_norm1: ConvNorm2d<B>,
 
     /// Optional `DropBlock` layer.
     pub drop_block: Option<DropBlock2d>,
@@ -283,7 +281,7 @@ pub struct BasicBlock<B: Backend> {
     pub ae: Option<usize>,
 
     /// Second conv/norm layer.
-    pub cn2: Conv2dNormBlock<B>,
+    pub conv_norm2: ConvNorm2d<B>,
 
     /// Optional attention layer.
     // TODO: se: attention layer
@@ -298,25 +296,25 @@ pub struct BasicBlock<B: Backend> {
 
 impl<B: Backend> BasicBlockMeta for BasicBlock<B> {
     fn in_planes(&self) -> usize {
-        self.cn1.in_channels()
+        self.conv_norm1.in_channels()
     }
 
     fn dilation(&self) -> usize {
-        self.cn2.conv.dilation[0]
+        self.conv_norm2.conv.dilation[0]
     }
 
     fn first_dilation(&self) -> Option<usize> {
-        let d1 = self.cn1.conv.dilation[0];
-        let d2 = self.cn2.conv.dilation[0];
+        let d1 = self.conv_norm1.conv.dilation[0];
+        let d2 = self.conv_norm2.conv.dilation[0];
         if d1 == d2 { None } else { Some(d1) }
     }
 
     fn planes(&self) -> usize {
-        self.cn1.out_channels() / self.expansion_factor()
+        self.conv_norm1.out_channels() / self.expansion_factor()
     }
 
     fn cardinality(&self) -> usize {
-        self.cn1.groups()
+        self.conv_norm1.groups()
     }
 
     fn expansion_factor(&self) -> usize {
@@ -328,15 +326,15 @@ impl<B: Backend> BasicBlockMeta for BasicBlock<B> {
     }
 
     fn first_planes(&self) -> usize {
-        self.cn1.out_channels()
+        self.conv_norm1.out_channels()
     }
 
     fn out_planes(&self) -> usize {
-        self.cn2.out_channels()
+        self.conv_norm2.out_channels()
     }
 
     fn stride(&self) -> usize {
-        self.cn1.stride()[0]
+        self.conv_norm1.stride()[0]
     }
 }
 
@@ -388,7 +386,7 @@ impl<B: Backend> BasicBlock<B> {
         bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &identity, &out_bindings);
 
         // Group 1
-        let x = self.cn1.forward(input);
+        let x = self.conv_norm1.forward(input);
 
         #[cfg(debug_assertions)]
         bimm_contracts::assert_shape_contract_periodically!(
@@ -413,7 +411,7 @@ impl<B: Backend> BasicBlock<B> {
         };
 
         // Group 2
-        let x = self.cn2.forward(x);
+        let x = self.conv_norm2.forward(x);
 
         #[cfg(debug_assertions)]
         bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);

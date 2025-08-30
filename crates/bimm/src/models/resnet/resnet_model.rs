@@ -1,27 +1,85 @@
 //! # `ResNet` Core Model
 use crate::layers::activation::{Activation, ActivationConfig};
-use crate::layers::blocks::conv_norm::{Conv2dNormBlock, Conv2dNormBlockConfig};
-use crate::models::resnet::layer_block::{LayerBlock, LayerBlockConfig};
+use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig};
+use crate::models::resnet::layer_block::{LayerBlock, LayerBlockConfig, LayerBlockMeta};
+use crate::models::resnet::util::CONV_INTO_RELU_INITIALIZER;
 use burn::module::Module;
 use burn::nn::conv::Conv2dConfig;
 use burn::nn::pool::{AdaptiveAvgPool2d, AdaptiveAvgPool2dConfig, MaxPool2d, MaxPool2dConfig};
-use burn::nn::{Linear, LinearConfig, PaddingConfig2d};
-use burn::prelude::{Backend, Tensor};
+use burn::nn::{Initializer, Linear, LinearConfig, PaddingConfig2d};
+use burn::prelude::{Backend, Config, Tensor};
+
+/// [`ResNet`] Structure Config.
+///
+/// This config defines the structure of a converted `ResNet` model.
+/// It is not a semantic configuration and does not check the validity
+/// of the internal sizes before or during construction.
+#[derive(Config, Debug)]
+pub struct ResnetStructureConfig {
+    /// The input Conv/Norm block configuration.
+    pub input_conv_norm: ConvNorm2dConfig,
+
+    /// Optional override for the input Conv2d initializer.
+    #[config(default = "CONV_INTO_RELU_INITIALIZER.clone().into()")]
+    pub input_conv_norm_initializer: Option<Initializer>,
+
+    /// The input activation configuration.
+    #[config(default = "ActivationConfig::Relu")]
+    pub input_act: ActivationConfig,
+
+    /// The inner layers configuration.
+    pub layers: Vec<LayerBlockConfig>,
+
+    /// The number of classes.
+    pub num_classes: usize,
+}
+
+impl ResnetStructureConfig {
+    /// Initialize a [`ResNet`] model.
+    pub fn init<B: Backend>(
+        self,
+        device: &B::Device,
+    ) -> ResNet<B> {
+        let mut input_conv_norm = self.input_conv_norm.clone();
+        if self.input_conv_norm_initializer.is_some() {
+            input_conv_norm.conv = input_conv_norm
+                .conv
+                .with_initializer(self.input_conv_norm_initializer.unwrap());
+        }
+
+        let head_planes = self.layers.last().unwrap().out_planes();
+
+        ResNet {
+            input_conv_norm: input_conv_norm.init(device),
+            input_act: self.input_act.init(device),
+            input_pool: MaxPool2dConfig::new([3, 3])
+                .with_strides([2, 2])
+                .with_padding(PaddingConfig2d::Explicit(1, 1))
+                .init(),
+
+            layers: self
+                .layers
+                .into_iter()
+                .map(|c| c.init(device))
+                .collect::<Vec<_>>(),
+
+            output_pool: AdaptiveAvgPool2dConfig::new([1, 1]).init(),
+            output_fc: LinearConfig::new(head_planes, self.num_classes).init(device),
+        }
+    }
+}
 
 /// `ResNet` model.
 #[derive(Module, Debug)]
 pub struct ResNet<B: Backend> {
-    cn: Conv2dNormBlock<B>,
-    act: Activation<B>,
-    maxpool: MaxPool2d,
+    input_conv_norm: ConvNorm2d<B>,
+    input_act: Activation<B>,
+    input_pool: MaxPool2d,
 
-    layer1: LayerBlock<B>,
-    layer2: LayerBlock<B>,
-    layer3: LayerBlock<B>,
-    layer4: LayerBlock<B>,
+    layers: Vec<LayerBlock<B>>,
 
-    avgpool: AdaptiveAvgPool2d,
-    fc: Linear<B>,
+    output_pool: AdaptiveAvgPool2d,
+    output_fc: Linear<B>,
 }
 
 impl<B: Backend> ResNet<B> {
@@ -38,47 +96,35 @@ impl<B: Backend> ResNet<B> {
             "ResNet module only supports expansion values [1, 4] for residual blocks"
         );
 
-        // 7x7 conv, 64, /2
-        let conv1: Conv2dNormBlockConfig = Conv2dConfig::new([3, 64], [7, 7])
-            .with_stride([2, 2])
-            .with_padding(PaddingConfig2d::Explicit(3, 3))
-            .with_bias(false)
-            .into();
-
-        // 3x3 maxpool, /2
-        let maxpool = MaxPool2dConfig::new([3, 3])
-            .with_strides([2, 2])
-            .with_padding(PaddingConfig2d::Explicit(1, 1));
-
         // Residual blocks
         let bottleneck = expansion > 1;
-        let layer1 = LayerBlockConfig::build(blocks[0], 64, 64 * expansion, 1, bottleneck);
-        let layer2 =
-            LayerBlockConfig::build(blocks[1], 64 * expansion, 128 * expansion, 2, bottleneck);
-        let layer3 =
-            LayerBlockConfig::build(blocks[2], 128 * expansion, 256 * expansion, 2, bottleneck);
-        let layer4 =
-            LayerBlockConfig::build(blocks[3], 256 * expansion, 512 * expansion, 2, bottleneck);
 
-        // Average pooling [B, 512 * expansion, H, W] -> [B, 512 * expansion, 1, 1]
-        let avgpool = AdaptiveAvgPool2dConfig::new([1, 1]);
+        let make_block = |idx: usize, in_factor: usize, out_factor: usize, stride: usize| {
+            LayerBlockConfig::build(
+                blocks[idx],
+                64 * in_factor,
+                64 * out_factor,
+                stride,
+                bottleneck,
+            )
+        };
 
-        // Output layer
-        let fc = LinearConfig::new(512 * expansion, num_classes);
-
-        Self {
-            cn: conv1.init(device),
-            act: ActivationConfig::Relu.init(device),
-            maxpool: maxpool.init(),
-
-            layer1: layer1.init(device),
-            layer2: layer2.init(device),
-            layer3: layer3.init(device),
-            layer4: layer4.init(device),
-
-            avgpool: avgpool.init(),
-            fc: fc.init(device),
-        }
+        ResnetStructureConfig::new(
+            ConvNorm2dConfig::from(
+                Conv2dConfig::new([3, 64], [7, 7])
+                    .with_stride([2, 2])
+                    .with_padding(PaddingConfig2d::Explicit(3, 3))
+                    .with_bias(false),
+            ),
+            vec![
+                make_block(blocks[0], 1, expansion, 1),
+                make_block(blocks[1], expansion, 2 * expansion, 2),
+                make_block(blocks[2], 2 * expansion, 4 * expansion, 2),
+                make_block(blocks[3], 4 * expansion, 8 * expansion, 2),
+            ],
+            num_classes,
+        )
+        .init(device)
     }
 
     /// `ResNet` forward pass.
@@ -87,21 +133,17 @@ impl<B: Backend> ResNet<B> {
         input: Tensor<B, 4>,
     ) -> Tensor<B, 2> {
         // Prep block
-        let x = self.cn.forward(input);
-        let x = self.act.forward(x);
-        let x = self.maxpool.forward(x);
+        let x = self.input_conv_norm.forward(input);
+        let x = self.input_act.forward(x);
+        let x = self.input_pool.forward(x);
 
         // Residual blocks
-        let x = self.layer1.forward(x);
-        let x = self.layer2.forward(x);
-        let x = self.layer3.forward(x);
-        let x = self.layer4.forward(x);
+        let x = self.layers.iter().fold(x, |x, layer| layer.forward(x));
 
         // Head
-        let x = self.avgpool.forward(x);
+        let x = self.output_pool.forward(x);
         // Reshape [B, C, 1, 1] -> [B, C]
         let x = x.flatten(1, 3);
-
-        self.fc.forward(x)
+        self.output_fc.forward(x)
     }
 }
