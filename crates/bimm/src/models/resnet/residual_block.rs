@@ -110,6 +110,24 @@ impl ResidualBlockConfig {
             Self::Bottleneck(config) => ResidualBlock::Bottleneck(config.clone().init(device)),
         }
     }
+
+    /// Legacy constructor.
+    pub fn new(
+        in_planes: usize,
+        out_planes: usize,
+        stride: usize,
+        bottleneck: bool,
+    ) -> Self {
+        if bottleneck {
+            BottleneckBlockConfig::new(in_planes, out_planes)
+                .with_stride(stride)
+                .into()
+        } else {
+            BasicBlockConfig::new(in_planes, out_planes)
+                .with_stride(stride)
+                .into()
+        }
+    }
 }
 
 /// A `ResNet` [`BasicBlock`] or [`BottleneckBlock`] wrapper.

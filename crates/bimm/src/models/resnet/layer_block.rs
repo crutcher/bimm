@@ -86,6 +86,28 @@ impl LayerBlockMeta for LayerBlockConfig {
 }
 
 impl LayerBlockConfig {
+    /// Build a config.
+    pub fn build(
+        num_blocks: usize,
+        in_planes: usize,
+        out_planes: usize,
+        stride: usize,
+        bottleneck: bool,
+    ) -> Self {
+        let blocks = (0..num_blocks)
+            .map(|b| {
+                ResidualBlockConfig::new(
+                    in_planes,
+                    out_planes,
+                    if b == 0 { stride } else { 1 },
+                    bottleneck,
+                )
+            })
+            .collect();
+
+        Self { blocks }
+    }
+
     /// Check if the config is valid.
     ///
     /// # Returns

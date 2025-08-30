@@ -4595,6 +4595,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "resnet_tiny"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "bimm",
+ "bimm-firehose",
+ "bimm-firehose-image",
+ "burn",
+ "clap",
+ "rand 0.9.2",
+ "serde",
+]
+
+[[package]]
 name = "rgb"
 version = "0.8.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
