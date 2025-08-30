@@ -1,7 +1,7 @@
 #![recursion_limit = "256"]
 extern crate core;
 
-use bimm::models::resnet::resnet_model::ResNet;
+use bimm::models::resnet::resnet_model::{ResNet, ResNetConfig};
 use bimm_firehose::burn::batcher::{
     BatcherInputAdapter, BatcherOutputAdapter, FirehoseExecutorBatcher,
 };
@@ -77,7 +77,7 @@ pub struct Args {
     drop_block_rate: f64,
 
     /// Learning rate for the optimizer.
-    #[arg(long, default_value = "1.0e-5")]
+    #[arg(long, default_value = "1.0e-4")]
     learning_rate: f64,
 
     /// Learning rate decay gamma.
@@ -124,7 +124,7 @@ pub fn backend_main<B: AutodiffBackend>(
     B::seed(args.seed);
 
     let model: Model<B> = Model {
-        resnet: ResNet::legacy_new([2, 2, 2, 2], num_classes, 1, &devices[0]),
+        resnet: ResNetConfig::resnet18(num_classes).init(&devices[0]),
     };
 
     let optim_config = AdamWConfig::new();

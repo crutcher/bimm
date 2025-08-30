@@ -9,13 +9,24 @@ use burn::nn::pool::{AdaptiveAvgPool2d, AdaptiveAvgPool2dConfig, MaxPool2d, MaxP
 use burn::nn::{Initializer, Linear, LinearConfig, PaddingConfig2d};
 use burn::prelude::{Backend, Config, Tensor};
 
+/// ResNet-18 block depths.
+pub const RESNET18_BLOCKS: [usize; 4] = [2, 2, 2, 2];
+/// ResNet-34 block depths.
+pub const RESNET34_BLOCKS: [usize; 4] = [3, 4, 6, 3];
+/// ResNet-50 block depths.
+pub const RESNET50_BLOCKS: [usize; 4] = [3, 4, 6, 3];
+/// ResNet-101 block depths.
+pub const RESNET101_BLOCKS: [usize; 4] = [3, 4, 23, 3];
+/// ResNet-152 block depths.
+pub const RESNET152_BLOCKS: [usize; 4] = [3, 8, 36, 3];
+
 /// [`ResNet`] Structure Config.
 ///
 /// This config defines the structure of a converted `ResNet` model.
 /// It is not a semantic configuration and does not check the validity
 /// of the internal sizes before or during construction.
 #[derive(Config, Debug)]
-pub struct ResnetStructureConfig {
+pub struct ResNetConfig {
     /// The input Conv/Norm block configuration.
     pub input_conv_norm: ConvNorm2dConfig,
 
@@ -34,7 +45,7 @@ pub struct ResnetStructureConfig {
     pub num_classes: usize,
 }
 
-impl ResnetStructureConfig {
+impl ResNetConfig {
     /// Initialize a [`ResNet`] model.
     pub fn init<B: Backend>(
         self,
@@ -67,30 +78,19 @@ impl ResnetStructureConfig {
             output_fc: LinearConfig::new(head_planes, self.num_classes).init(device),
         }
     }
-}
 
-/// `ResNet` model.
-#[derive(Module, Debug)]
-pub struct ResNet<B: Backend> {
-    input_conv_norm: ConvNorm2d<B>,
-    input_act: Activation<B>,
-    input_pool: MaxPool2d,
-
-    layers: Vec<LayerBlock<B>>,
-
-    output_pool: AdaptiveAvgPool2d,
-    output_fc: Linear<B>,
-}
-
-impl<B: Backend> ResNet<B> {
-    /// Create a new instance of `ResNet`.
-    pub fn legacy_new(
+    /// Create a new instance of vanilla `ResNet` config.
+    ///
+    /// # Arguments
+    ///
+    /// - `blocks` - layer block depths.
+    /// - `num_classes` - number of classes.
+    /// - `expansion` - must be 1 or 4.
+    pub fn new_basic_config(
         blocks: [usize; 4],
         num_classes: usize,
         expansion: usize,
-        device: &B::Device,
     ) -> Self {
-        // `new()` is private but still check just in case...
         assert!(
             expansion == 1 || expansion == 4,
             "ResNet module only supports expansion values [1, 4] for residual blocks"
@@ -109,7 +109,7 @@ impl<B: Backend> ResNet<B> {
             )
         };
 
-        ResnetStructureConfig::new(
+        ResNetConfig::new(
             ConvNorm2dConfig::from(
                 Conv2dConfig::new([3, 64], [7, 7])
                     .with_stride([2, 2])
@@ -124,9 +124,28 @@ impl<B: Backend> ResNet<B> {
             ],
             num_classes,
         )
-        .init(device)
     }
 
+    /// Create a ResNet-18 model.
+    pub fn resnet18(num_classes: usize) -> Self {
+        Self::new_basic_config(RESNET18_BLOCKS, num_classes, 1)
+    }
+}
+
+/// `ResNet` model.
+#[derive(Module, Debug)]
+pub struct ResNet<B: Backend> {
+    input_conv_norm: ConvNorm2d<B>,
+    input_act: Activation<B>,
+    input_pool: MaxPool2d,
+
+    layers: Vec<LayerBlock<B>>,
+
+    output_pool: AdaptiveAvgPool2d,
+    output_fc: Linear<B>,
+}
+
+impl<B: Backend> ResNet<B> {
     /// `ResNet` forward pass.
     pub fn forward(
         &self,
