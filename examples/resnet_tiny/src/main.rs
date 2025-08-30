@@ -21,6 +21,7 @@ use bimm_firehose_image::{ColorType, ImageShape};
 use burn::backend::{Autodiff, Cuda};
 use burn::data::dataloader::{DataLoaderBuilder, Dataset};
 use burn::data::dataset::transform::SamplerDataset;
+use burn::grad_clipping::GradientClippingConfig;
 use burn::lr_scheduler::cosine::CosineAnnealingLrSchedulerConfig;
 use burn::module::Module;
 use burn::nn::loss::CrossEntropyLossConfig;
@@ -127,9 +128,9 @@ pub fn backend_main<B: AutodiffBackend>(
         resnet: ResNetConfig::resnet18(num_classes).init(&devices[0]),
     };
 
-    let optim_config = AdamWConfig::new();
-    // .with_weight_decay(0.01)
-    // .with_grad_clipping(Some(GradientClippingConfig::Norm(5.0))),
+    let optim_config = AdamWConfig::new()
+        .with_weight_decay(0.005)
+        .with_grad_clipping(Some(GradientClippingConfig::Value(0.5)));
 
     let artifact_dir = args.artifact_dir.as_ref().unwrap().as_ref();
     create_artifact_dir(artifact_dir);
