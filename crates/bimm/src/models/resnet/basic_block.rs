@@ -9,9 +9,6 @@ use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
 use crate::models::resnet::downsample::{ConvDownsample, ConvDownsampleConfig};
 use crate::models::resnet::util::{CONV_INTO_RELU_INITIALIZER, stride_div_output_resolution};
 use crate::utility::probability::expect_probability;
-use bimm_contracts::{
-    assert_shape_contract_periodically, define_shape_contract, unpack_shape_contract,
-};
 use burn::nn::conv::Conv2dConfig;
 use burn::nn::{Initializer, PaddingConfig2d};
 use burn::prelude::{Backend, Config, Module, Tensor};
@@ -357,7 +354,8 @@ impl<B: Backend> BasicBlock<B> {
         &self,
         input: Tensor<B, 4>,
     ) -> Tensor<B, 4> {
-        let [batch, out_height, out_width] = unpack_shape_contract!(
+        #[cfg(debug_assertions)]
+        let [batch, out_height, out_width] = bimm_contracts::unpack_shape_contract!(
             [
                 "batch",
                 "in_planes",
@@ -375,7 +373,7 @@ impl<B: Backend> BasicBlock<B> {
         };
 
         #[cfg(debug_assertions)]
-        define_shape_contract!(
+        bimm_contracts::define_shape_contract!(
             OUT_CONTRACT,
             ["batch", "out_planes", "out_height", "out_width"],
         );
@@ -387,13 +385,13 @@ impl<B: Backend> BasicBlock<B> {
             ("out_width", out_width),
         ];
         #[cfg(debug_assertions)]
-        assert_shape_contract_periodically!(OUT_CONTRACT, &identity, &out_bindings);
+        bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &identity, &out_bindings);
 
         // Group 1
         let x = self.cn1.forward(input);
 
         #[cfg(debug_assertions)]
-        assert_shape_contract_periodically!(
+        bimm_contracts::assert_shape_contract_periodically!(
             ["batch", "first_planes", "out_height", "out_width"],
             &x,
             &[
@@ -418,7 +416,7 @@ impl<B: Backend> BasicBlock<B> {
         let x = self.cn2.forward(x);
 
         #[cfg(debug_assertions)]
-        assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
+        bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
 
         let x = match &self.se {
             Some(_) => unimplemented!("attention is not implemented"),
@@ -432,7 +430,7 @@ impl<B: Backend> BasicBlock<B> {
         let x = self.act2.forward(x);
 
         #[cfg(debug_assertions)]
-        assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
+        bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
 
         x
     }

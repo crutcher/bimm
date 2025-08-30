@@ -206,7 +206,6 @@ impl<B: Backend> LayerBlock<B> {
 
         let x = self.blocks.iter().fold(input, |x, block| block.forward(x));
 
-        #[cfg(debug_assertions)]
         assert_shape_contract_periodically!(
             ["batch", "out_planes", "out_height", "out_width"],
             &x,
