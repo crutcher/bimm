@@ -24,6 +24,85 @@ pub const RESNET101_BLOCKS: [usize; 4] = [3, 4, 23, 3];
 /// ResNet-152 block depths.
 pub const RESNET152_BLOCKS: [usize; 4] = [3, 8, 36, 3];
 
+/// High-level `ResNet` model configuration.
+#[derive(Config, Debug)]
+pub struct ResNetAbstractConfig {
+    /// Layer block depths.
+    pub layers: [usize; 4],
+
+    /// Number of classification classes.
+    pub num_classes: usize,
+
+    /// Model feature expansion rate.
+    #[config(default = "1")]
+    pub expansion: usize,
+
+    /// Use bottleneck blocks.
+    #[config(default = "false")]
+    pub bottleneck: bool,
+}
+
+impl From<ResNetAbstractConfig> for ResNetConfig {
+    fn from(config: ResNetAbstractConfig) -> Self {
+        assert!(
+            config.expansion == 1 || config.expansion == 4,
+            "ResNet module only supports expansion values [1, 4] for residual blocks"
+        );
+        let expansion = config.expansion;
+
+        // Residual blocks
+        let bottleneck = expansion > 1;
+
+        let make_block = |idx: usize, in_factor: usize, out_factor: usize, stride: usize| {
+            LayerBlockConfig::build(
+                config.layers[idx],
+                64 * in_factor,
+                64 * out_factor,
+                stride,
+                bottleneck,
+            )
+        };
+
+        ResNetConfig::new(
+            ConvNorm2dConfig::from(
+                Conv2dConfig::new([3, 64], [7, 7])
+                    .with_stride([2, 2])
+                    .with_padding(PaddingConfig2d::Explicit(3, 3))
+                    .with_bias(false),
+            ),
+            vec![
+                make_block(0, 1, expansion, 1),
+                make_block(1, expansion, 2 * expansion, 2),
+                make_block(2, 2 * expansion, 4 * expansion, 2),
+                make_block(3, 4 * expansion, 8 * expansion, 2),
+            ],
+            config.num_classes,
+        )
+    }
+}
+
+impl ResNetAbstractConfig {
+    /// Convert to a [`ResNetConfig`].
+    pub fn to_structure(self) -> ResNetConfig {
+        self.into()
+    }
+
+    /// Create a ResNet-18 model.
+    pub fn resnet18(num_classes: usize) -> Self {
+        Self::new(RESNET18_BLOCKS, num_classes).with_bottleneck(true)
+    }
+
+    /// Create a ResNet-34 model.
+    pub fn resnet34(num_classes: usize) -> Self {
+        Self::new(RESNET34_BLOCKS, num_classes).with_bottleneck(true)
+    }
+
+    /// Create a ResNet-34 model.
+    pub fn resnet101(num_classes: usize) -> Self {
+        Self::new(RESNET101_BLOCKS, num_classes).with_bottleneck(true)
+    }
+}
+
 /// [`ResNet`] Structure Config.
 ///
 /// This config defines the structure of a converted `ResNet` model.
@@ -81,53 +160,6 @@ impl ResNetConfig {
             output_pool: AdaptiveAvgPool2dConfig::new([1, 1]).init(),
             output_fc: LinearConfig::new(head_planes, self.num_classes).init(device),
         }
-    }
-
-    /// Create a new instance of vanilla `ResNet` config.
-    ///
-    /// # Arguments
-    ///
-    /// - `blocks` - layer block depths.
-    /// - `num_classes` - number of classes.
-    /// - `expansion` - must be 1 or 4.
-    pub fn new_basic_config(
-        blocks: [usize; 4],
-        num_classes: usize,
-        expansion: usize,
-    ) -> Self {
-        assert!(
-            expansion == 1 || expansion == 4,
-            "ResNet module only supports expansion values [1, 4] for residual blocks"
-        );
-
-        // Residual blocks
-        let bottleneck = expansion > 1;
-
-        let make_block = |idx: usize, in_factor: usize, out_factor: usize, stride: usize| {
-            LayerBlockConfig::build(
-                blocks[idx],
-                64 * in_factor,
-                64 * out_factor,
-                stride,
-                bottleneck,
-            )
-        };
-
-        ResNetConfig::new(
-            ConvNorm2dConfig::from(
-                Conv2dConfig::new([3, 64], [7, 7])
-                    .with_stride([2, 2])
-                    .with_padding(PaddingConfig2d::Explicit(3, 3))
-                    .with_bias(false),
-            ),
-            vec![
-                make_block(0, 1, expansion, 1),
-                make_block(1, expansion, 2 * expansion, 2),
-                make_block(2, 2 * expansion, 4 * expansion, 2),
-                make_block(3, 4 * expansion, 8 * expansion, 2),
-            ],
-            num_classes,
-        )
     }
 
     /// Apply the given standard drop block probability scheme.
@@ -202,21 +234,6 @@ impl ResNetConfig {
                 .collect(),
             ..self
         }
-    }
-
-    /// Create a ResNet-18 model.
-    pub fn resnet18(num_classes: usize) -> Self {
-        Self::new_basic_config(RESNET18_BLOCKS, num_classes, 1)
-    }
-
-    /// Create a ResNet-34 model.
-    pub fn resnet34(num_classes: usize) -> Self {
-        Self::new_basic_config(RESNET34_BLOCKS, num_classes, 1)
-    }
-
-    /// Create a ResNet-34 model.
-    pub fn resnet101(num_classes: usize) -> Self {
-        Self::new_basic_config(RESNET101_BLOCKS, num_classes, 1)
     }
 }
 

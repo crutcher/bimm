@@ -1,7 +1,7 @@
 #![recursion_limit = "256"]
 extern crate core;
 
-use bimm::models::resnet::resnet_model::{ResNet, ResNetConfig};
+use bimm::models::resnet::resnet_model::{ResNet, ResNetAbstractConfig};
 use bimm_firehose::burn::batcher::{
     BatcherInputAdapter, BatcherOutputAdapter, FirehoseExecutorBatcher,
 };
@@ -130,7 +130,8 @@ pub fn backend_main<B: AutodiffBackend>(
     B::seed(args.seed);
 
     let model: Model<B> = Model {
-        resnet: ResNetConfig::resnet101(num_classes)
+        resnet: ResNetAbstractConfig::resnet101(num_classes)
+            .to_structure()
             .with_standard_drop_block_prob(0.3)
             .with_stochastic_depth_drop_path_rate(0.2)
             .init(&devices[0]),
