@@ -19,10 +19,12 @@ use bimm_firehose_image::burn_support::{ImageToTensorData, stack_tensor_data_col
 use bimm_firehose_image::loader::{ImageLoader, ResizeSpec};
 use bimm_firehose_image::{ColorType, ImageShape};
 use burn::backend::{Autodiff, Cuda};
-use burn::data::dataloader::{DataLoaderBuilder, Dataset};
-use burn::data::dataset::transform::SamplerDataset;
+use burn::data::dataloader::DataLoaderBuilder;
+use burn::data::dataset::transform::ShuffledDataset;
+use burn::grad_clipping::GradientClippingConfig;
 use burn::nn::loss::CrossEntropyLossConfig;
-use burn::optim::AdamWConfig;
+use burn::optim::SgdConfig;
+use burn::optim::decay::WeightDecayConfig;
 use burn::prelude::{Backend, Int, Module, Tensor};
 use burn::record::CompactRecorder;
 use burn::tensor::backend::AutodiffBackend;
@@ -55,7 +57,7 @@ pub struct Args {
     seed: u64,
 
     /// Batch size for processing
-    #[arg(short, long, default_value_t = 512)]
+    #[arg(short, long, default_value_t = 32)]
     batch_size: usize,
 
     /// Number of workers for data loading.
@@ -63,7 +65,7 @@ pub struct Args {
     num_workers: Option<usize>,
 
     /// Number of epochs to train the model.
-    #[arg(long, default_value = "60")]
+    #[arg(long, default_value = "100")]
     num_epochs: usize,
 
     /// Embedding ratio: ``ratio * channels * patch_size * patch_size``
@@ -79,7 +81,7 @@ pub struct Args {
     drop_block_rate: f64,
 
     /// Learning rate for the optimizer.
-    #[arg(long, default_value = "1.0e-3")]
+    #[arg(long, default_value = "1.0e-4")]
     learning_rate: f64,
 
     /// Learning rate decay gamma.
@@ -128,10 +130,15 @@ pub fn backend_main<B: AutodiffBackend>(
     B::seed(args.seed);
 
     let model: Model<B> = Model {
-        resnet: ResNetConfig::resnet18(num_classes).init(&devices[0]),
+        resnet: ResNetConfig::resnet101(num_classes)
+            .with_standard_drop_block_prob(0.3)
+            .with_stochastic_depth_drop_path_rate(0.2)
+            .init(&devices[0]),
     };
 
-    let optim_config = AdamWConfig::new().with_weight_decay(5e-5);
+    let optim_config = SgdConfig::new()
+        .with_weight_decay(WeightDecayConfig::new(1e-3).into())
+        .with_gradient_clipping(Some(GradientClippingConfig::Value(1.0)));
     // .with_grad_clipping(Some(GradientClippingConfig::Value(0.5)));
 
     // let `optim_config` = AdamConfig::new().with_weight_decay(WeightDecayConfig::new(5e-5).into());
@@ -164,8 +171,9 @@ pub fn backend_main<B: AutodiffBackend>(
     // let train_size: usize;
     let train_dataloader = {
         let ds = path_scanning::image_dataset_for_folder(args.training_root.clone())?;
-        let num_samples = (args.oversample_ratio * (ds.len() as f64)).ceil() as usize;
-        let ds = SamplerDataset::with_replacement(ds, num_samples);
+        let ds = ShuffledDataset::with_seed(ds, args.seed);
+        // let num_samples = (args.oversample_ratio * (ds.len() as f64)).ceil() as usize;
+        // let ds = SamplerDataset::with_replacement(ds, num_samples);
         //  train_size = ds.len();
 
         let schema = Arc::new({
@@ -195,7 +203,9 @@ pub fn backend_main<B: AutodiffBackend>(
             Arc::new(OutputAdapter::<B>::default()),
         );
 
-        let mut builder = DataLoaderBuilder::new(batcher).batch_size(args.batch_size);
+        let mut builder = DataLoaderBuilder::new(batcher)
+            .shuffle(args.seed)
+            .batch_size(args.batch_size);
         if let Some(num_workers) = args.num_workers {
             builder = builder.num_workers(num_workers);
         }
@@ -236,6 +246,7 @@ pub fn backend_main<B: AutodiffBackend>(
     let lr_scheduler = ExponentialLrSchedulerConfig::new(args.learning_rate, args.lr_gamma)
         .init()
         .map_err(|e| anyhow::anyhow!("Failed to initialize learning rate scheduler: {}", e))?;
+
      */
 
     /*
@@ -245,7 +256,7 @@ pub fn backend_main<B: AutodiffBackend>(
     let lr_scheduler = CosineAnnealingLrSchedulerConfig::new(args.learning_rate, iters_per_restart)
         .init()
         .map_err(|e| anyhow::anyhow!("Failed to initialize learning rate scheduler: {}", e))?;
-     */
+    */
 
     let learner = LearnerBuilder::new(artifact_dir)
         .metric_train_numeric(LossMetric::new())

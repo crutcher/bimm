@@ -2,10 +2,12 @@
 //!
 //! Collects a series of [`ResidualBlock`]s into a single module.
 
+use crate::layers::drop::drop_block::DropBlockOptions;
 use crate::models::resnet::residual_block::{
     ResidualBlock, ResidualBlockConfig, ResidualBlockMeta,
 };
 use crate::models::resnet::util::stride_div_output_resolution;
+use crate::utility::probability::expect_probability;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::config::Config;
 use burn::prelude::{Backend, Module, Tensor};
@@ -156,6 +158,45 @@ impl LayerBlockConfig {
                 .map(|block| block.init(device))
                 .collect(),
         }
+    }
+
+    /// Apply a mapping over the blocks.
+    pub fn map_blocks<F>(
+        self,
+        f: &mut F,
+    ) -> Self
+    where
+        F: FnMut(usize, ResidualBlockConfig) -> ResidualBlockConfig,
+    {
+        Self {
+            blocks: self
+                .blocks
+                .into_iter()
+                .enumerate()
+                .map(|(idx, block)| f(idx, block))
+                .collect(),
+        }
+    }
+
+    /// Update the drop block options.
+    pub fn with_drop_block<O>(
+        self,
+        options: O,
+    ) -> Self
+    where
+        O: Into<Option<DropBlockOptions>>,
+    {
+        let options = options.into();
+        self.map_blocks(&mut |_, block| block.with_drop_block(options.clone()))
+    }
+
+    /// Update the drop path probability.
+    pub fn with_drop_path_prob(
+        self,
+        prob: f64,
+    ) -> Self {
+        let prob = expect_probability(prob);
+        self.map_blocks(&mut |_, block| block.with_drop_path_prob(prob))
     }
 }
 

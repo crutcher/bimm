@@ -1,10 +1,12 @@
 //! # Residual Block Wrapper
 
+use crate::layers::drop::drop_block::DropBlockOptions;
 use crate::models::resnet::basic_block::{BasicBlock, BasicBlockConfig, BasicBlockMeta};
 use crate::models::resnet::bottleneck::{
     BottleneckBlock, BottleneckBlockConfig, BottleneckBlockMeta,
 };
 use crate::models::resnet::util::stride_div_output_resolution;
+use crate::utility::probability::expect_probability;
 use burn::config::Config;
 use burn::prelude::{Backend, Module, Tensor};
 
@@ -126,6 +128,29 @@ impl ResidualBlockConfig {
             BasicBlockConfig::new(in_planes, out_planes)
                 .with_stride(stride)
                 .into()
+        }
+    }
+
+    /// Set drop block options.
+    pub fn with_drop_block(
+        self,
+        options: Option<DropBlockOptions>,
+    ) -> Self {
+        match self {
+            Self::Basic(config) => config.with_drop_block(options).into(),
+            Self::Bottleneck(config) => config.with_drop_block(options).into(),
+        }
+    }
+
+    /// Set the drop path probability.
+    pub fn with_drop_path_prob(
+        self,
+        drop_path_prob: f64,
+    ) -> Self {
+        let drop_path_prob = expect_probability(drop_path_prob);
+        match self {
+            Self::Basic(config) => config.with_drop_path_prob(drop_path_prob).into(),
+            Self::Bottleneck(config) => config.with_drop_path_prob(drop_path_prob).into(),
         }
     }
 }

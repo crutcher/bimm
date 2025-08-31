@@ -1,8 +1,12 @@
 //! # `ResNet` Core Model
+
 use crate::layers::activation::{Activation, ActivationConfig};
 use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig};
+use crate::layers::drop::drop_block::DropBlockOptions;
 use crate::models::resnet::layer_block::{LayerBlock, LayerBlockConfig, LayerBlockMeta};
+use crate::models::resnet::residual_block::ResidualBlockConfig;
 use crate::models::resnet::util::CONV_INTO_RELU_INITIALIZER;
+use crate::utility::probability::expect_probability;
 use burn::module::Module;
 use burn::nn::conv::Conv2dConfig;
 use burn::nn::pool::{AdaptiveAvgPool2d, AdaptiveAvgPool2dConfig, MaxPool2d, MaxPool2dConfig};
@@ -126,6 +130,80 @@ impl ResNetConfig {
         )
     }
 
+    /// Apply the given standard drop block probability scheme.
+    pub fn with_standard_drop_block_prob(
+        self,
+        drop_prob: f64,
+    ) -> Self {
+        let drop_prob = expect_probability(drop_prob);
+        let k = self.layers.len();
+        let mut blocks = vec![None; k];
+        if drop_prob > 0.0 {
+            blocks[k - 2] = DropBlockOptions::default()
+                .with_drop_prob(drop_prob)
+                .with_block_size(5)
+                .with_gamma_scale(0.25)
+                .into();
+            blocks[k - 1] = DropBlockOptions::default()
+                .with_drop_prob(drop_prob)
+                .with_block_size(3)
+                .with_gamma_scale(1.0)
+                .into();
+        }
+        self.with_drop_block_options(blocks)
+    }
+
+    /// Update the config with stochastic depth.
+    pub fn with_stochastic_depth_drop_path_rate(
+        self,
+        drop_path_rate: f64,
+    ) -> Self {
+        let drop_path_rate = expect_probability(drop_path_rate);
+
+        let net_num_blocks = self.layers.iter().map(|b| b.len()).sum::<usize>();
+        let mut net_block_idx = 0;
+        let mut update_drop_path = |_idx: usize, block: ResidualBlockConfig| {
+            // stochastic depth linear decay rule
+            let block_dpr = drop_path_rate * (net_block_idx as f64) / ((net_num_blocks - 1) as f64);
+            net_block_idx += 1;
+            if block_dpr > 0.0 {
+                block.with_drop_path_prob(block_dpr)
+            } else {
+                block
+            }
+        };
+
+        Self {
+            layers: self
+                .layers
+                .into_iter()
+                .map(|b| b.map_blocks(&mut update_drop_path))
+                .collect(),
+            ..self
+        }
+    }
+
+    /// Update the config with the given drop block options.
+    ///
+    /// # Arguments
+    ///
+    /// - `options`: a vector of options, one for each layer.
+    pub fn with_drop_block_options(
+        self,
+        options: Vec<Option<DropBlockOptions>>,
+    ) -> Self {
+        assert_eq!(options.len(), self.layers.len());
+        Self {
+            layers: self
+                .layers
+                .into_iter()
+                .zip(options)
+                .map(|(b, o)| b.with_drop_block(o))
+                .collect(),
+            ..self
+        }
+    }
+
     /// Create a ResNet-18 model.
     pub fn resnet18(num_classes: usize) -> Self {
         Self::new_basic_config(RESNET18_BLOCKS, num_classes, 1)
@@ -134,6 +212,11 @@ impl ResNetConfig {
     /// Create a ResNet-34 model.
     pub fn resnet34(num_classes: usize) -> Self {
         Self::new_basic_config(RESNET34_BLOCKS, num_classes, 1)
+    }
+
+    /// Create a ResNet-34 model.
+    pub fn resnet101(num_classes: usize) -> Self {
+        Self::new_basic_config(RESNET101_BLOCKS, num_classes, 1)
     }
 }
 

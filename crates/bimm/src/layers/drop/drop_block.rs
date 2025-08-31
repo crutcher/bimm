@@ -71,7 +71,7 @@ impl Default for DropBlockOptions {
             gamma_scale: 1.0,
             noise: None,
             batchwise: true,
-            couple_channels: true,
+            couple_channels: false,
             partial_edge_blocks: false,
         }
     }
@@ -456,8 +456,12 @@ mod tests {
         assert_eq!(options.drop_prob, 0.1);
         assert_eq!(options.kernel, [SizeConfig::Fixed(7); 2]);
         assert_eq!(options.gamma_scale, 1.0);
+        assert_eq!(options.couple_channels, false);
         assert!(options.noise.is_none());
         assert_eq!(options.batchwise, true);
+
+        let options = options.with_couple_channels(true);
+        assert_eq!(options.couple_channels, true);
 
         let options = options.with_drop_prob(0.2);
         assert_eq!(options.drop_prob, 0.2);
@@ -485,7 +489,7 @@ mod tests {
                   kernel: [Fixed(7), Fixed(7)]
                   gamma_scale: 1
                   batchwise: true
-                  couple_channels: true
+                  couple_channels: false
                   partial_edge_blocks: false
                   noise_cfg: NoiseConfig {
                       distribution: Distribution::Default
