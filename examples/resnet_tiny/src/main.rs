@@ -21,12 +21,9 @@ use bimm_firehose_image::{ColorType, ImageShape};
 use burn::backend::{Autodiff, Cuda};
 use burn::data::dataloader::{DataLoaderBuilder, Dataset};
 use burn::data::dataset::transform::SamplerDataset;
-use burn::grad_clipping::GradientClippingConfig;
-use burn::lr_scheduler::cosine::CosineAnnealingLrSchedulerConfig;
-use burn::module::Module;
 use burn::nn::loss::CrossEntropyLossConfig;
 use burn::optim::AdamWConfig;
-use burn::prelude::{Backend, Int, Tensor};
+use burn::prelude::{Backend, Int, Module, Tensor};
 use burn::record::CompactRecorder;
 use burn::tensor::backend::AutodiffBackend;
 use burn::train::metric::{
@@ -36,6 +33,10 @@ use burn::train::metric::{
 use burn::train::{ClassificationOutput, LearnerBuilder};
 use burn::train::{TrainOutput, TrainStep, ValidStep};
 use clap::{Parser, arg};
+use core::clone::Clone;
+use core::default::Default;
+use core::iter::Iterator;
+use core::option::Option;
 use rand::{Rng, rng};
 use std::sync::Arc;
 
@@ -54,7 +55,7 @@ pub struct Args {
     seed: u64,
 
     /// Batch size for processing
-    #[arg(short, long, default_value_t = 32)]
+    #[arg(short, long, default_value_t = 512)]
     batch_size: usize,
 
     /// Number of workers for data loading.
@@ -78,7 +79,7 @@ pub struct Args {
     drop_block_rate: f64,
 
     /// Learning rate for the optimizer.
-    #[arg(long, default_value = "1.0e-4")]
+    #[arg(long, default_value = "1.0e-3")]
     learning_rate: f64,
 
     /// Learning rate decay gamma.
@@ -118,9 +119,11 @@ pub fn backend_main<B: AutodiffBackend>(
     args: &Args,
     devices: Vec<B::Device>,
 ) -> anyhow::Result<()> {
-    // let h: usize = 32;
-    // let w: usize = 32;
-    let num_classes: usize = 10;
+    let image_shape = ImageShape {
+        height: 32,
+        width: 32,
+    };
+    let num_classes = 10;
 
     B::seed(args.seed);
 
@@ -128,10 +131,10 @@ pub fn backend_main<B: AutodiffBackend>(
         resnet: ResNetConfig::resnet18(num_classes).init(&devices[0]),
     };
 
-    let optim_config = AdamWConfig::new()
-        .with_weight_decay(0.005)
-        .with_grad_clipping(Some(GradientClippingConfig::Value(0.5)));
+    let optim_config = AdamWConfig::new().with_weight_decay(5e-5);
+    // .with_grad_clipping(Some(GradientClippingConfig::Value(0.5)));
 
+    // let `optim_config` = AdamConfig::new().with_weight_decay(WeightDecayConfig::new(5e-5).into());
     let artifact_dir = args.artifact_dir.as_ref().unwrap().as_ref();
     create_artifact_dir(artifact_dir);
 
@@ -150,10 +153,7 @@ pub fn backend_main<B: AutodiffBackend>(
 
         // Load the image from the path, resize it to 32x32 pixels, and convert it to RGB8.
         ImageLoader::default()
-            .with_resize(ResizeSpec::new(ImageShape {
-                width: 256,
-                height: 256,
-            }))
+            .with_resize(ResizeSpec::new(image_shape))
             .with_recolor(ColorType::Rgb8)
             .to_plan(PATH_COLUMN, IMAGE_COLUMN)
             .apply_to_schema(&mut schema, firehose_env.as_ref())?;
@@ -161,12 +161,12 @@ pub fn backend_main<B: AutodiffBackend>(
         schema
     };
 
-    let train_size: usize;
+    // let train_size: usize;
     let train_dataloader = {
         let ds = path_scanning::image_dataset_for_folder(args.training_root.clone())?;
         let num_samples = (args.oversample_ratio * (ds.len() as f64)).ceil() as usize;
         let ds = SamplerDataset::with_replacement(ds, num_samples);
-        train_size = ds.len();
+        //  train_size = ds.len();
 
         let schema = Arc::new({
             let mut schema = common_schema.clone();
@@ -238,12 +238,14 @@ pub fn backend_main<B: AutodiffBackend>(
         .map_err(|e| anyhow::anyhow!("Failed to initialize learning rate scheduler: {}", e))?;
      */
 
+    /*
     let batches_per_epoch = train_size / args.batch_size;
     let epochs_per_restart = 10;
     let iters_per_restart = batches_per_epoch * epochs_per_restart;
     let lr_scheduler = CosineAnnealingLrSchedulerConfig::new(args.learning_rate, iters_per_restart)
         .init()
         .map_err(|e| anyhow::anyhow!("Failed to initialize learning rate scheduler: {}", e))?;
+     */
 
     let learner = LearnerBuilder::new(artifact_dir)
         .metric_train_numeric(LossMetric::new())
@@ -272,7 +274,7 @@ pub fn backend_main<B: AutodiffBackend>(
         .devices(devices.clone())
         .num_epochs(args.num_epochs)
         .summary()
-        .build(model, optim_config.init(), lr_scheduler);
+        .build(model, optim_config.init(), args.learning_rate);
 
     let model_trained = learner.fit(train_dataloader, validation_dataloader);
 

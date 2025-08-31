@@ -6,6 +6,7 @@
 #[allow(unused_imports)]
 #[macro_use]
 extern crate hamcrest;
+extern crate core;
 
 #[allow(dead_code)]
 pub(crate) mod compat;

@@ -30,7 +30,7 @@ hamcrest = { workspace = true }
 
 [features]
 default = []
-std = []
+# std = []
 cuda = ["burn/cuda"]
 
 [[bench]]

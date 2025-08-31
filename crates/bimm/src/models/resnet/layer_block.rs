@@ -99,7 +99,7 @@ impl LayerBlockConfig {
                 if b == 0 {
                     ResidualBlockConfig::new(in_planes, out_planes, stride, bottleneck)
                 } else {
-                    ResidualBlockConfig::new(out_planes, out_planes, stride, bottleneck)
+                    ResidualBlockConfig::new(out_planes, out_planes, 1, bottleneck)
                 }
             })
             .collect();
@@ -113,7 +113,7 @@ impl LayerBlockConfig {
     ///
     /// A `Result<(), String>`
     pub fn try_validate(&self) -> Result<(), String> {
-        if self.blocks.is_empty() {
+        if self.is_empty() {
             return Err("blocks is empty".to_string());
         }
 
@@ -227,6 +227,29 @@ mod tests {
     use crate::models::resnet::basic_block::BasicBlockConfig;
     use bimm_contracts::assert_shape_contract;
     use burn::backend::NdArray;
+
+    #[test]
+    fn test_layer_block_config_build() {
+        let config = LayerBlockConfig::build(2, 16, 32, 2, false);
+        config.expect_valid();
+        assert_eq!(config.len(), 2);
+        assert_eq!(config.in_planes(), 16);
+        assert_eq!(config.out_planes(), 32);
+        assert_eq!(config.stride(), 2);
+        assert_eq!(config.output_resolution([12, 24]), [6, 12]);
+
+        let block1 = &config.blocks[0];
+        assert_eq!(block1.in_planes(), 16);
+        assert_eq!(block1.out_planes(), 32);
+        assert_eq!(block1.stride(), 2);
+        assert_eq!(block1.output_resolution([12, 24]), [6, 12]);
+
+        let block2 = &config.blocks[1];
+        assert_eq!(block2.in_planes(), 32);
+        assert_eq!(block2.out_planes(), 32);
+        assert_eq!(block2.stride(), 1);
+        assert_eq!(block2.output_resolution([12, 24]), [12, 24]);
+    }
 
     #[test]
     pub fn test_layer_block() {

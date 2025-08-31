@@ -117,10 +117,10 @@ impl ResNetConfig {
                     .with_bias(false),
             ),
             vec![
-                make_block(blocks[0], 1, expansion, 1),
-                make_block(blocks[1], expansion, 2 * expansion, 2),
-                make_block(blocks[2], 2 * expansion, 4 * expansion, 2),
-                make_block(blocks[3], 4 * expansion, 8 * expansion, 2),
+                make_block(0, 1, expansion, 1),
+                make_block(1, expansion, 2 * expansion, 2),
+                make_block(2, 2 * expansion, 4 * expansion, 2),
+                make_block(3, 4 * expansion, 8 * expansion, 2),
             ],
             num_classes,
         )
@@ -129,6 +129,11 @@ impl ResNetConfig {
     /// Create a ResNet-18 model.
     pub fn resnet18(num_classes: usize) -> Self {
         Self::new_basic_config(RESNET18_BLOCKS, num_classes, 1)
+    }
+
+    /// Create a ResNet-34 model.
+    pub fn resnet34(num_classes: usize) -> Self {
+        Self::new_basic_config(RESNET34_BLOCKS, num_classes, 1)
     }
 }
 
