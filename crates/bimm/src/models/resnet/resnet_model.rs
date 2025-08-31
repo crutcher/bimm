@@ -12,6 +12,7 @@ use burn::nn::conv::Conv2dConfig;
 use burn::nn::pool::{AdaptiveAvgPool2d, AdaptiveAvgPool2dConfig, MaxPool2d, MaxPool2dConfig};
 use burn::nn::{Initializer, Linear, LinearConfig, PaddingConfig2d};
 use burn::prelude::{Backend, Config, Tensor};
+use serde::{Deserialize, Serialize};
 
 /// ResNet-18 block depths.
 pub const RESNET18_BLOCKS: [usize; 4] = [2, 2, 2, 2];
@@ -24,6 +25,32 @@ pub const RESNET101_BLOCKS: [usize; 4] = [3, 4, 23, 3];
 /// ResNet-152 block depths.
 pub const RESNET152_BLOCKS: [usize; 4] = [3, 8, 36, 3];
 
+/// [`ResNet`] input convolution configuration.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub enum InputStemConfig {
+    /// Default; single 7x7 convolution with stride 2.
+    #[default]
+    Default,
+
+    /// Three 3x3 convolutions:
+    /// 1. ``stem_width, stride=2``
+    /// 2. ``stem_width, stride=1``
+    /// 3. ``stem_width * 2, stride=1``
+    Deep {
+        /// The width of the stem convolutions.
+        stem_width: usize,
+    },
+
+    /// Three 3x3 convolutions:
+    DeepTiered {
+        /// The width of the stem convolutions.
+        /// 1. ``3 * (stem_width//4), stride=2``
+        /// 2. ``stem_width, stride=1``
+        /// 3. ``stem_width * 2, stride=1``
+        stem_width: usize,
+    },
+}
+
 /// High-level `ResNet` model configuration.
 #[derive(Config, Debug)]
 pub struct ResNetAbstractConfig {
@@ -32,6 +59,10 @@ pub struct ResNetAbstractConfig {
 
     /// Number of classification classes.
     pub num_classes: usize,
+
+    /// Number of channels in stem convolutions.
+    #[config(default = "InputStemConfig::Default")]
+    pub stem_width: InputStemConfig,
 
     /// Model feature expansion rate.
     #[config(default = "1")]
@@ -49,6 +80,13 @@ impl From<ResNetAbstractConfig> for ResNetConfig {
             "ResNet module only supports expansion values [1, 4] for residual blocks"
         );
         let expansion = config.expansion;
+
+        match config.stem_width {
+            InputStemConfig::Default => (),
+            _ => {
+                unimplemented!("ResNet module only supports default stem convolutions")
+            }
+        }
 
         // Residual blocks
         let bottleneck = expansion > 1;
