@@ -107,10 +107,6 @@ pub struct Args {
         default_value = "https://download.pytorch.org/models/resnet18-f37072fd.pth"
     )]
     pretrined_weights: String,
-
-    /// Number of classes in the pretrained model.
-    #[arg(long, default_value = "1000")]
-    pretrained_classes: usize,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -145,7 +141,7 @@ pub fn backend_main<B: AutodiffBackend>(
 
     let weights = cache::fetch_model_weights(&args.pretrined_weights)?;
 
-    let resnet: ResNet<B> = ResNetAbstractConfig::resnet18(args.pretrained_classes)
+    let resnet: ResNet<B> = ResNetAbstractConfig::resnet18(10)
         .to_structure()
         .with_standard_drop_block_prob(0.3)
         .with_stochastic_depth_drop_path_rate(0.2)

@@ -5,7 +5,7 @@ use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig};
 use crate::layers::drop::drop_block::DropBlockOptions;
 use crate::models::resnet::layer_block::{LayerBlock, LayerBlockConfig, LayerBlockMeta};
 use crate::models::resnet::residual_block::ResidualBlockConfig;
-use crate::models::resnet::resnet_io;
+use crate::models::resnet::resnet_io::pytorch_stubs::load_resnet_stub_record;
 use crate::models::resnet::util::CONV_INTO_RELU_INITIALIZER;
 use crate::utility::probability::expect_probability;
 use burn::module::Module;
@@ -322,7 +322,10 @@ impl<B: Backend> ResNet<B> {
         self,
         path: PathBuf,
     ) -> anyhow::Result<ResNet<B>> {
-        resnet_io::load_pytorch_weights(self, path)
+        let device = &self.devices()[0];
+        let record = load_resnet_stub_record::<B>(path, device)?;
+        let resnet = self.with_classes(record.fc.weight.dims()[0]);
+        Ok(record.copy_weights(resnet))
     }
 
     /// Re-initialize the last layer with the specified number of output classes.
