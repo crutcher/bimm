@@ -120,6 +120,18 @@ impl<B: Backend> ResidualBlockStubRecord<B> {
     }
 }
 
+pub fn copy_downsample_weights<B: Backend>(
+    downsample: Option<DownsampleStubRecord<B>>,
+    target: Option<ConvDownsample<B>>,
+) -> Option<ConvDownsample<B>> {
+    match (downsample, target) {
+        (Some(stub), Some(target)) => Some(stub.copy_weights(target)),
+        (None, None) => None,
+        (None, Some(_)) => panic!("None stub cannot be applied to Some<Downsample>"),
+        (Some(_), None) => panic!("Some<Downsample> stub cannot be applied to None"),
+    }
+}
+
 #[derive(Module, Debug)]
 pub struct DownsampleStub<B: Backend> {
     pub conv: Conv2d<B>,
@@ -137,6 +149,17 @@ impl<B: Backend> DownsampleStubRecord<B> {
     }
 }
 
+pub fn copy_conv_norm_weights<B: Backend>(
+    conv: Conv2dRecord<B>,
+    bn: BatchNormRecord<B, 2>,
+    target: ConvNorm2d<B>,
+) -> ConvNorm2d<B> {
+    ConvNorm2d {
+        conv: target.conv.load_record(conv),
+        norm: target.norm.load_record(bn),
+    }
+}
+
 #[derive(Module, Debug)]
 pub struct BasicBlockStub<B: Backend> {
     pub conv1: Conv2d<B>,
@@ -144,18 +167,6 @@ pub struct BasicBlockStub<B: Backend> {
     pub conv2: Conv2d<B>,
     pub bn2: BatchNorm<B, 2>,
     pub downsample: Option<DownsampleStub<B>>,
-}
-
-pub fn copy_downsample_weights<B: Backend>(
-    downsample: Option<DownsampleStubRecord<B>>,
-    target: Option<ConvDownsample<B>>,
-) -> Option<ConvDownsample<B>> {
-    match (downsample, target) {
-        (Some(stub), Some(target)) => Some(stub.copy_weights(target)),
-        (None, None) => None,
-        (None, Some(_)) => panic!("None stub cannot be applied to Some<Downsample>"),
-        (Some(_), None) => panic!("Some<Downsample> stub cannot be applied to None"),
-    }
 }
 
 impl<B: Backend> BasicBlockStubRecord<B> {
@@ -181,17 +192,6 @@ pub struct BottleneckStub<B: Backend> {
     pub conv3: Conv2d<B>,
     pub bn3: BatchNorm<B, 2>,
     pub downsample: Option<DownsampleStub<B>>,
-}
-
-pub fn copy_conv_norm_weights<B: Backend>(
-    conv: Conv2dRecord<B>,
-    bn: BatchNormRecord<B, 2>,
-    target: ConvNorm2d<B>,
-) -> ConvNorm2d<B> {
-    ConvNorm2d {
-        conv: target.conv.load_record(conv),
-        norm: target.norm.load_record(bn),
-    }
 }
 
 impl<B: Backend> BottleneckStubRecord<B> {
