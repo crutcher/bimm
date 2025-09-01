@@ -261,8 +261,11 @@ impl BasicBlockConfig {
 /// Basic Block for `ResNet`.
 #[derive(Module, Debug)]
 pub struct BasicBlock<B: Backend> {
-    expansion_factor: usize,
-    reduction_factor: usize,
+    /// Expansion factor.
+    pub expansion_factor: usize,
+
+    /// Reduction factor.
+    pub reduction_factor: usize,
 
     /// Optional `DownSample` layer; for the residual connection.
     pub downsample: Option<ConvDownsample<B>>,

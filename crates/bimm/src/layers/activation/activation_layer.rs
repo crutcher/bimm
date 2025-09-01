@@ -113,9 +113,65 @@ impl<B: Backend> Activation<B> {
 mod tests {
     use super::*;
     use burn::backend::NdArray;
-    use burn::nn::{HardSigmoidConfig, LeakyReluConfig, PReluConfig, SwiGlu, SwiGluConfig};
+    use burn::nn::{
+        HardSigmoidConfig, LeakyReluConfig, Linear, LinearConfig, PReluConfig, SwiGlu, SwiGluConfig,
+    };
 
     type TestBackend = NdArray<f32>;
+
+    #[derive(Config, Debug)]
+    pub struct TestConfig {
+        fc: LinearConfig,
+        act: ActivationConfig,
+    }
+
+    impl TestConfig {
+        pub fn init<B: Backend>(
+            self,
+            device: &B::Device,
+        ) -> TestModule<B> {
+            let fc = self.fc.init(device);
+            let act = self.act.init(device);
+            TestModule { fc, act }
+        }
+    }
+
+    #[derive(Module, Debug)]
+    pub struct TestModule<B: Backend> {
+        fc: Linear<B>,
+        act: Activation<B>,
+    }
+
+    impl<B: Backend> TestModule<B> {
+        pub fn forward(
+            &self,
+            input: Tensor<B, 2>,
+        ) -> Tensor<B, 2> {
+            let output = self.fc.forward(input);
+            self.act.forward(output)
+        }
+    }
+
+    #[test]
+    fn test_embedded_roundtrip() {
+        let device = Default::default();
+        let config = TestConfig {
+            fc: LinearConfig::new(2, 2),
+            act: ActivationConfig::Gelu,
+        };
+
+        let source_module: TestModule<TestBackend> = config.clone().init(&device);
+
+        let input = Tensor::from_data([[1.0, 2.0], [3.0, 4.0]], &device);
+        let output1 = source_module.forward(input.clone());
+
+        let record = source_module.into_record();
+
+        let reload_module: TestModule<TestBackend> = config.init(&device).load_record(record);
+        let output2 = reload_module.forward(input.clone());
+
+        output1.to_data().assert_eq(&output2.to_data(), true);
+    }
 
     fn make_input<B: Backend>(device: &B::Device) -> Tensor<B, 2> {
         Tensor::from_data([[-1.0, -0.5, 0.0], [1.0, 0.5, 0.0]], device)
@@ -134,7 +190,11 @@ mod tests {
         expected: Tensor<B, D>,
         device: &B::Device,
     ) {
-        let act = config.init(device);
+        let act1 = config.init(device);
+        let record: ActivationRecord<B> = act1.into_record();
+
+        let act = config.init(device).load_record(record);
+
         let output = act.forward(input);
         expect_tensor(output, expected);
     }

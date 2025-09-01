@@ -5,6 +5,7 @@ use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig};
 use crate::layers::drop::drop_block::DropBlockOptions;
 use crate::models::resnet::layer_block::{LayerBlock, LayerBlockConfig, LayerBlockMeta};
 use crate::models::resnet::residual_block::ResidualBlockConfig;
+use crate::models::resnet::resnet_io;
 use crate::models::resnet::util::CONV_INTO_RELU_INITIALIZER;
 use crate::utility::probability::expect_probability;
 use burn::module::Module;
@@ -13,6 +14,7 @@ use burn::nn::pool::{AdaptiveAvgPool2d, AdaptiveAvgPool2dConfig, MaxPool2d, MaxP
 use burn::nn::{Initializer, Linear, LinearConfig, PaddingConfig2d};
 use burn::prelude::{Backend, Config, Tensor};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 /// ResNet-18 block depths.
 pub const RESNET18_BLOCKS: [usize; 4] = [2, 2, 2, 2];
@@ -278,14 +280,20 @@ impl ResNetConfig {
 /// `ResNet` model.
 #[derive(Module, Debug)]
 pub struct ResNet<B: Backend> {
-    input_conv_norm: ConvNorm2d<B>,
-    input_act: Activation<B>,
-    input_pool: MaxPool2d,
+    /// Input conv/norm.
+    pub input_conv_norm: ConvNorm2d<B>,
+    /// Input activation.
+    pub input_act: Activation<B>,
+    /// Input pool.
+    pub input_pool: MaxPool2d,
 
-    layers: Vec<LayerBlock<B>>,
+    /// Layers.
+    pub layers: Vec<LayerBlock<B>>,
 
-    output_pool: AdaptiveAvgPool2d,
-    output_fc: Linear<B>,
+    /// Head pooling.
+    pub output_pool: AdaptiveAvgPool2d,
+    /// Head classifier.
+    pub output_fc: Linear<B>,
 }
 
 impl<B: Backend> ResNet<B> {
@@ -307,5 +315,13 @@ impl<B: Backend> ResNet<B> {
         // Reshape [B, C, 1, 1] -> [B, C]
         let x = x.flatten(1, 3);
         self.output_fc.forward(x)
+    }
+
+    /// Load weights from a `PyTorch` weights path.
+    pub fn load_pytorch_weights(
+        self,
+        path: PathBuf,
+    ) -> anyhow::Result<ResNet<B>> {
+        resnet_io::load_pytorch_weights(self, path)
     }
 }

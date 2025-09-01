@@ -1,0 +1,25 @@
+[package]
+name = "resnet_pretrained"
+publish = false
+rust-version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+bimm = { version = "0.3.2", path = "../../crates/bimm" }
+
+burn = { workspace = true, features = ["network", "train", "autodiff", "cuda", "fusion", "vision", "dataset"] }
+burn-import = { workspace = true }
+dirs = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+
+clap = { workspace = true, features = ["derive"] }
+
+
+[features]
+nightly = []

@@ -269,9 +269,14 @@ impl BottleneckBlockConfig {
 /// Basic Block for `ResNet`.
 #[derive(Module, Debug)]
 pub struct BottleneckBlock<B: Backend> {
-    base_width: usize,
-    expansion_factor: usize,
-    reduction_factor: usize,
+    /// Base width.
+    pub base_width: usize,
+
+    /// Expansion factor.
+    pub expansion_factor: usize,
+
+    /// Reduction factor.
+    pub reduction_factor: usize,
 
     /// Optional `DownSample` layer; for the residual connection.
     pub downsample: Option<ConvDownsample<B>>,

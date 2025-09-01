@@ -100,7 +100,8 @@ impl ConvDownsampleConfig {
 /// ``[batch_size, out_channels, out_height, out_width]`` tensors.
 #[derive(Module, Debug)]
 pub struct ConvDownsample<B: Backend> {
-    conv_norm: ConvNorm2d<B>,
+    /// Embedded conv/norm.
+    pub conv_norm: ConvNorm2d<B>,
 }
 
 impl<B: Backend> ConvDownsampleMeta for ConvDownsample<B> {
