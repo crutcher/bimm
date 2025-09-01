@@ -20,9 +20,10 @@ use bimm_firehose_image::burn_support::{ImageToTensorData, stack_tensor_data_col
 use bimm_firehose_image::loader::{ImageLoader, ResizeSpec};
 use bimm_firehose_image::{ColorType, ImageShape};
 use burn::backend::{Autodiff, Cuda};
-use burn::data::dataloader::DataLoaderBuilder;
+use burn::data::dataloader::{DataLoaderBuilder, Dataset};
 use burn::data::dataset::transform::ShuffledDataset;
 use burn::grad_clipping::GradientClippingConfig;
+use burn::lr_scheduler::cosine::CosineAnnealingLrSchedulerConfig;
 use burn::nn::loss::CrossEntropyLossConfig;
 use burn::optim::AdamConfig;
 use burn::optim::decay::WeightDecayConfig;
@@ -161,13 +162,6 @@ pub fn backend_main<B: AutodiffBackend>(
         .init(device)
         .load_pytorch_weights(weights)?
         .with_classes(num_classes)
-        .map_layers(|layers| {
-            layers
-                .into_iter()
-                .zip([0usize, 0, 1, 1])
-                .map(|(l, s)| l.extend(s))
-                .collect()
-        })
         .with_standard_drop_block_prob(args.drop_block_prob)
         .with_stochastic_depth_drop_path_rate(args.drop_path_prob);
 
@@ -203,13 +197,14 @@ pub fn backend_main<B: AutodiffBackend>(
         schema
     };
 
-    // let train_size: usize;
+    let train_size: usize;
     let train_dataloader = {
         let ds = path_scanning::image_dataset_for_folder(args.training_root.clone())?;
+
         let ds = ShuffledDataset::with_seed(ds, args.seed);
         // let num_samples = (args.oversample_ratio * (ds.len() as f64)).ceil() as usize;
         // let ds = SamplerDataset::with_replacement(ds, num_samples);
-        //  train_size = ds.len();
+        train_size = ds.len();
 
         let schema = Arc::new({
             let mut schema = common_schema.clone();
@@ -281,17 +276,14 @@ pub fn backend_main<B: AutodiffBackend>(
     let lr_scheduler = ExponentialLrSchedulerConfig::new(args.learning_rate, args.lr_gamma)
         .init()
         .map_err(|e| anyhow::anyhow!("Failed to initialize learning rate scheduler: {}", e))?;
-
      */
 
-    /*
     let batches_per_epoch = train_size / args.batch_size;
     let epochs_per_restart = 10;
     let iters_per_restart = batches_per_epoch * epochs_per_restart;
     let lr_scheduler = CosineAnnealingLrSchedulerConfig::new(args.learning_rate, iters_per_restart)
         .init()
         .map_err(|e| anyhow::anyhow!("Failed to initialize learning rate scheduler: {}", e))?;
-    */
 
     let learner = LearnerBuilder::new(artifact_dir)
         .metric_train_numeric(LossMetric::new())
@@ -320,7 +312,7 @@ pub fn backend_main<B: AutodiffBackend>(
         .devices(devices.clone())
         .num_epochs(args.num_epochs)
         .summary()
-        .build(model, optim_config.init(), args.learning_rate);
+        .build(model, optim_config.init(), lr_scheduler);
 
     let model_trained = learner.fit(train_dataloader, validation_dataloader);
 
