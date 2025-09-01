@@ -29,11 +29,14 @@ use burn::optim::decay::WeightDecayConfig;
 use burn::prelude::{Backend, Int, Module, Tensor};
 use burn::record::CompactRecorder;
 use burn::tensor::backend::AutodiffBackend;
+use burn::train::metric::store::{Aggregate, Direction, Split};
 use burn::train::metric::{
     AccuracyMetric, CpuMemory, CpuUse, CudaMetric, LearningRateMetric, LossMetric,
     TopKAccuracyMetric,
 };
-use burn::train::{ClassificationOutput, LearnerBuilder};
+use burn::train::{
+    ClassificationOutput, LearnerBuilder, MetricEarlyStoppingStrategy, StoppingCondition,
+};
 use burn::train::{TrainOutput, TrainStep, ValidStep};
 use clap::{Parser, arg};
 use core::clone::Clone;
@@ -107,6 +110,18 @@ pub struct Args {
         default_value = "https://download.pytorch.org/models/resnet18-f37072fd.pth"
     )]
     pretrined_weights: String,
+
+    /// Drop Block Prob
+    #[arg(long, default_value = "0.0")]
+    drop_block_prob: f64,
+
+    /// Drop Path Prob
+    #[arg(long, default_value = "0.0")]
+    drop_path_prob: f64,
+
+    /// Early stopping patience
+    #[arg(long, default_value = "6")]
+    patience: usize,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -143,8 +158,8 @@ pub fn backend_main<B: AutodiffBackend>(
 
     let resnet: ResNet<B> = ResNetAbstractConfig::resnet18(10)
         .to_structure()
-        .with_standard_drop_block_prob(0.3)
-        .with_stochastic_depth_drop_path_rate(0.3)
+        .with_standard_drop_block_prob(args.drop_block_prob)
+        .with_stochastic_depth_drop_path_rate(args.drop_path_prob)
         .init(device)
         .load_pytorch_weights(weights)?
         .with_classes(num_classes);
@@ -286,15 +301,15 @@ pub fn backend_main<B: AutodiffBackend>(
         .metric_valid_numeric(CpuMemory::new())
         .metric_train_numeric(LearningRateMetric::new())
         .with_file_checkpointer(CompactRecorder::new())
-        /*
         .early_stopping(MetricEarlyStoppingStrategy::new(
             &LossMetric::<B>::new(),
             Aggregate::Mean,
             Direction::Lowest,
             Split::Valid,
-            StoppingCondition::NoImprovementSince { n_epochs: 6 },
+            StoppingCondition::NoImprovementSince {
+                n_epochs: args.patience,
+            },
         ))
-         */
         .devices(devices.clone())
         .num_epochs(args.num_epochs)
         .summary()
