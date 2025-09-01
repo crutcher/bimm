@@ -14,9 +14,6 @@ anyhow = { workspace = true }
 bimm = { version = "0.3.2", path = "../../crates/bimm" }
 
 burn = { workspace = true, features = ["network", "train", "autodiff", "cuda", "fusion", "vision", "dataset"] }
-burn-import = { workspace = true }
-dirs = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
 
 clap = { workspace = true, features = ["derive"] }
 

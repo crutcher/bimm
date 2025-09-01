@@ -319,6 +319,7 @@ dependencies = [
  "burn",
  "burn-import",
  "criterion",
+ "dirs",
  "hamcrest",
  "indoc",
  "num-traits",
@@ -4771,10 +4772,7 @@ dependencies = [
  "anyhow",
  "bimm",
  "burn",
- "burn-import",
  "clap",
- "dirs",
- "serde",
 ]
 
 [[package]]

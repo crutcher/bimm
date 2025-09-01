@@ -324,4 +324,15 @@ impl<B: Backend> ResNet<B> {
     ) -> anyhow::Result<ResNet<B>> {
         resnet_io::load_pytorch_weights(self, path)
     }
+
+    /// Re-initialize the last layer with the specified number of output classes.
+    pub fn with_classes(
+        mut self,
+        num_classes: usize,
+    ) -> Self {
+        let [d_input, _d_output] = self.output_fc.weight.dims();
+        self.output_fc =
+            LinearConfig::new(d_input, num_classes).init(&self.output_fc.weight.device());
+        self
+    }
 }

@@ -1,6 +1,7 @@
 #![recursion_limit = "256"]
 extern crate core;
 
+use bimm::cache;
 use bimm::models::resnet::resnet_model::{ResNet, ResNetAbstractConfig};
 use bimm_firehose::burn::batcher::{
     BatcherInputAdapter, BatcherOutputAdapter, FirehoseExecutorBatcher,
@@ -23,7 +24,7 @@ use burn::data::dataloader::DataLoaderBuilder;
 use burn::data::dataset::transform::ShuffledDataset;
 use burn::grad_clipping::GradientClippingConfig;
 use burn::nn::loss::CrossEntropyLossConfig;
-use burn::optim::SgdConfig;
+use burn::optim::AdamConfig;
 use burn::optim::decay::WeightDecayConfig;
 use burn::prelude::{Backend, Int, Module, Tensor};
 use burn::record::CompactRecorder;
@@ -99,6 +100,17 @@ pub struct Args {
     /// Root directory of the validation dataset.
     #[arg(long)]
     validation_root: String,
+
+    /// Url of the pretrained weights.
+    #[arg(
+        long,
+        default_value = "https://download.pytorch.org/models/resnet18-f37072fd.pth"
+    )]
+    pretrined_weights: String,
+
+    /// Number of classes in the pretrained model.
+    #[arg(long, default_value = "1000")]
+    pretrained_classes: usize,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -129,20 +141,24 @@ pub fn backend_main<B: AutodiffBackend>(
 
     B::seed(args.seed);
 
-    let model: Model<B> = Model {
-        resnet: ResNetAbstractConfig::resnet101(num_classes)
-            .to_structure()
-            .with_standard_drop_block_prob(0.3)
-            .with_stochastic_depth_drop_path_rate(0.2)
-            .init(&devices[0]),
-    };
+    let device = &devices[0];
 
-    let optim_config = SgdConfig::new()
-        .with_weight_decay(WeightDecayConfig::new(1e-3).into())
-        .with_gradient_clipping(Some(GradientClippingConfig::Value(1.0)));
-    // .with_grad_clipping(Some(GradientClippingConfig::Value(0.5)));
+    let weights = cache::fetch_model_weights(&args.pretrined_weights)?;
 
-    // let `optim_config` = AdamConfig::new().with_weight_decay(WeightDecayConfig::new(5e-5).into());
+    let resnet: ResNet<B> = ResNetAbstractConfig::resnet18(args.pretrained_classes)
+        .to_structure()
+        .with_standard_drop_block_prob(0.3)
+        .with_stochastic_depth_drop_path_rate(0.2)
+        .init(device)
+        .load_pytorch_weights(weights)?
+        .with_classes(num_classes);
+
+    let model: Model<B> = Model { resnet };
+
+    let optim_config = AdamConfig::new()
+        .with_weight_decay(WeightDecayConfig::new(5e-5).into())
+        .with_grad_clipping(Some(GradientClippingConfig::Value(1.0)));
+
     let artifact_dir = args.artifact_dir.as_ref().unwrap().as_ref();
     create_artifact_dir(artifact_dir);
 

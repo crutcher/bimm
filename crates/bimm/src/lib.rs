@@ -17,5 +17,6 @@ pub(crate) mod testing;
 
 pub mod layers;
 
+pub mod cache;
 pub mod models;
 pub mod utility;

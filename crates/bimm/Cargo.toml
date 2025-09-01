@@ -15,6 +15,7 @@ workspace = true
 bimm-contracts = { workspace = true, features = ["burn"] }
 
 burn = { workspace = true, features = ["network"] }
+dirs = { workspace = true }
 burn-import = { workspace = true }
 
 serde = { workspace = true, features = ["derive"] }
