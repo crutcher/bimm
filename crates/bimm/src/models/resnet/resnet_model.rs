@@ -398,11 +398,15 @@ impl<B: Backend> ResNet<B> {
         if drop_prob > 0.0 {
             blocks[k - 2] = DropBlockOptions::default()
                 .with_drop_prob(drop_prob)
+                // This is non-standard
+                .with_couple_channels(true)
                 .with_block_size(5)
                 .with_gamma_scale(0.25)
                 .into();
             blocks[k - 1] = DropBlockOptions::default()
                 .with_drop_prob(drop_prob)
+                // This is non-standard
+                .with_couple_channels(true)
                 .with_block_size(3)
                 .with_gamma_scale(1.0)
                 .into();

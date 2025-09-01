@@ -313,8 +313,8 @@ impl<B: Backend> LayerBlock<B> {
         size: usize,
     ) -> Self {
         let device = &self.devices()[0];
-        let source_cfg = self.blocks.last().unwrap().to_config();
         let mut blocks = self.blocks;
+        let source_cfg = blocks.last().unwrap().to_config();
         let mut idx = 1;
         for _ in 0..size {
             blocks.insert(idx, source_cfg.clone().init(device));

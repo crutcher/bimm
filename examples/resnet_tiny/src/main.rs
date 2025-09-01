@@ -112,11 +112,11 @@ pub struct Args {
     pretrined_weights: String,
 
     /// Drop Block Prob
-    #[arg(long, default_value = "0.3")]
+    #[arg(long, default_value = "0.25")]
     drop_block_prob: f64,
 
     /// Drop Path Prob
-    #[arg(long, default_value = "0.1")]
+    #[arg(long, default_value = "0.15")]
     drop_path_prob: f64,
 
     /// Early stopping patience
@@ -164,7 +164,7 @@ pub fn backend_main<B: AutodiffBackend>(
         .map_layers(|layers| {
             layers
                 .into_iter()
-                .zip([1usize, 1, 2, 1])
+                .zip([0usize, 0, 1, 1])
                 .map(|(l, s)| l.extend(s))
                 .collect()
         })
@@ -175,7 +175,7 @@ pub fn backend_main<B: AutodiffBackend>(
 
     let optim_config = AdamConfig::new()
         .with_weight_decay(WeightDecayConfig::new(5e-5).into())
-        .with_grad_clipping(Some(GradientClippingConfig::Value(1.0)));
+        .with_grad_clipping(Some(GradientClippingConfig::Norm(3.0)));
 
     let artifact_dir = args.artifact_dir.as_ref().unwrap().as_ref();
     create_artifact_dir(artifact_dir);
@@ -365,7 +365,7 @@ impl<B: Backend> Model<B> {
         let output = self.resnet.forward(images);
 
         let loss = CrossEntropyLossConfig::new()
-            // .with_smoothing(Some(0.1))
+            .with_smoothing(Some(0.1))
             .init(&output.device())
             .forward(output.clone(), targets.clone());
 
