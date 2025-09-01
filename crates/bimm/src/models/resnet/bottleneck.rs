@@ -470,6 +470,48 @@ impl<B: Backend> BottleneckBlock<B> {
 
         x
     }
+
+    /// Construct a [`BottleneckBlockConfig`] from this [`BottleneckBlock`].
+    pub fn to_config(&self) -> BottleneckBlockConfig {
+        BottleneckBlockConfig::new(self.in_planes(), self.planes())
+            .with_cardinality(self.cardinality())
+            .with_base_width(self.base_width())
+            .with_expansion_factor(self.expansion_factor())
+            .with_reduction_factor(self.reduction_factor())
+            .with_stride(self.stride())
+            .with_dilation(self.dilation())
+            .with_activation(self.act1.to_config())
+    }
+
+    /// Set the drop path probability.
+    pub fn with_drop_path_prob(
+        self,
+        drop_path_prob: f64,
+    ) -> Self {
+        let drop_path_prob = expect_probability(drop_path_prob);
+        Self {
+            drop_path: if drop_path_prob == 0.0 {
+                None
+            } else {
+                DropPathConfig::new()
+                    .with_drop_prob(drop_path_prob)
+                    .init()
+                    .into()
+            },
+            ..self
+        }
+    }
+
+    /// Set the drop block behavior.
+    pub fn with_drop_block(
+        self,
+        drop_block: Option<DropBlockOptions>,
+    ) -> Self {
+        Self {
+            drop_block: drop_block.map(|options| DropBlock2dConfig::from(options).init()),
+            ..self
+        }
+    }
 }
 
 #[cfg(test)]

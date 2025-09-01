@@ -166,6 +166,18 @@ pub enum ResidualBlock<B: Backend> {
     Bottleneck(BottleneckBlock<B>),
 }
 
+impl<B: Backend> From<BasicBlock<B>> for ResidualBlock<B> {
+    fn from(block: BasicBlock<B>) -> Self {
+        Self::Basic(block)
+    }
+}
+
+impl<B: Backend> From<BottleneckBlock<B>> for ResidualBlock<B> {
+    fn from(block: BottleneckBlock<B>) -> Self {
+        Self::Bottleneck(block)
+    }
+}
+
 impl<B: Backend> ResidualBlockMeta for ResidualBlock<B> {
     fn in_planes(&self) -> usize {
         match self {
@@ -206,6 +218,37 @@ impl<B: Backend> ResidualBlock<B> {
         match self {
             Self::Basic(block) => block.forward(input),
             Self::Bottleneck(block) => block.forward(input),
+        }
+    }
+
+    /// Set the drop path probability.
+    pub fn with_drop_path_prob(
+        self,
+        drop_path_prob: f64,
+    ) -> Self {
+        let drop_path_prob = expect_probability(drop_path_prob);
+        match self {
+            Self::Basic(block) => block.with_drop_path_prob(drop_path_prob).into(),
+            Self::Bottleneck(block) => block.with_drop_path_prob(drop_path_prob).into(),
+        }
+    }
+
+    /// Set drop block options.
+    pub fn with_drop_block(
+        self,
+        options: Option<DropBlockOptions>,
+    ) -> Self {
+        match self {
+            Self::Basic(config) => config.with_drop_block(options).into(),
+            Self::Bottleneck(config) => config.with_drop_block(options).into(),
+        }
+    }
+
+    /// Create a config from this module.
+    pub fn to_config(&self) -> ResidualBlockConfig {
+        match self {
+            Self::Basic(block) => block.to_config().into(),
+            Self::Bottleneck(block) => block.to_config().into(),
         }
     }
 }

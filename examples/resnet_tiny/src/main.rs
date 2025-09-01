@@ -61,7 +61,7 @@ pub struct Args {
     seed: u64,
 
     /// Batch size for processing
-    #[arg(short, long, default_value_t = 512)]
+    #[arg(short, long, default_value_t = 256)]
     batch_size: usize,
 
     /// Number of workers for data loading.
@@ -112,11 +112,11 @@ pub struct Args {
     pretrined_weights: String,
 
     /// Drop Block Prob
-    #[arg(long, default_value = "0.0")]
+    #[arg(long, default_value = "0.3")]
     drop_block_prob: f64,
 
     /// Drop Path Prob
-    #[arg(long, default_value = "0.0")]
+    #[arg(long, default_value = "0.1")]
     drop_path_prob: f64,
 
     /// Early stopping patience
@@ -158,11 +158,18 @@ pub fn backend_main<B: AutodiffBackend>(
 
     let resnet: ResNet<B> = ResNetAbstractConfig::resnet18(10)
         .to_structure()
-        .with_standard_drop_block_prob(args.drop_block_prob)
-        .with_stochastic_depth_drop_path_rate(args.drop_path_prob)
         .init(device)
         .load_pytorch_weights(weights)?
-        .with_classes(num_classes);
+        .with_classes(num_classes)
+        .map_layers(|layers| {
+            layers
+                .into_iter()
+                .zip([1usize, 1, 2, 1])
+                .map(|(l, s)| l.extend(s))
+                .collect()
+        })
+        .with_standard_drop_block_prob(args.drop_block_prob)
+        .with_stochastic_depth_drop_path_rate(args.drop_path_prob);
 
     let model: Model<B> = Model { resnet };
 

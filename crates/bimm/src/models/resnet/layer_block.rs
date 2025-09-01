@@ -260,6 +260,71 @@ impl<B: Backend> LayerBlock<B> {
 
         x
     }
+
+    /// Apply a mapping over the blocks.
+    pub fn map_blocks<F>(
+        self,
+        f: &mut F,
+    ) -> Self
+    where
+        F: FnMut(usize, ResidualBlock<B>) -> ResidualBlock<B>,
+    {
+        Self {
+            blocks: self
+                .blocks
+                .into_iter()
+                .enumerate()
+                .map(|(idx, block)| f(idx, block))
+                .collect(),
+        }
+    }
+
+    /// Update the drop path probability.
+    pub fn with_drop_path_prob(
+        self,
+        prob: f64,
+    ) -> Self {
+        let prob = expect_probability(prob);
+        self.map_blocks(&mut |_, block| block.with_drop_path_prob(prob))
+    }
+
+    /// Update the drop block options.
+    pub fn with_drop_block<O>(
+        self,
+        options: O,
+    ) -> Self
+    where
+        O: Into<Option<DropBlockOptions>>,
+    {
+        let options = options.into();
+        self.map_blocks(&mut |_, block| block.with_drop_block(options.clone()))
+    }
+
+    /// Extend the layer block.
+    ///
+    /// Duplicates the config of the last layer `size` times, interleaved into the layers
+    /// after the first.
+    ///
+    /// # Arguments
+    ///
+    /// - `size`: additional layers to add.
+    pub fn extend(
+        self,
+        size: usize,
+    ) -> Self {
+        let device = &self.devices()[0];
+        let source_cfg = self.blocks.last().unwrap().to_config();
+        let mut blocks = self.blocks;
+        let mut idx = 1;
+        for _ in 0..size {
+            blocks.insert(idx, source_cfg.clone().init(device));
+            idx += 2;
+            if idx >= blocks.len() {
+                idx = 1;
+            }
+        }
+        Self { blocks, ..self }
+    }
 }
 
 #[cfg(test)]

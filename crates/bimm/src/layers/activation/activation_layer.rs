@@ -34,6 +34,30 @@ pub enum ActivationConfig {
     HardSigmoid(HardSigmoidConfig),
 }
 
+impl From<LeakyReluConfig> for ActivationConfig {
+    fn from(config: LeakyReluConfig) -> Self {
+        Self::LeakyRelu(config)
+    }
+}
+
+impl From<PReluConfig> for ActivationConfig {
+    fn from(config: PReluConfig) -> Self {
+        Self::PRelu(config)
+    }
+}
+
+impl From<SwiGluConfig> for ActivationConfig {
+    fn from(config: SwiGluConfig) -> Self {
+        Self::SwiGlu(config)
+    }
+}
+
+impl From<HardSigmoidConfig> for ActivationConfig {
+    fn from(config: HardSigmoidConfig) -> Self {
+        Self::HardSigmoid(config)
+    }
+}
+
 impl Default for ActivationConfig {
     fn default() -> Self {
         Self::Relu
@@ -105,6 +129,33 @@ impl<B: Backend> Activation<B> {
             Activation::HardSigmoid(layer) => layer.forward(input),
             Activation::Sigmoid(layer) => layer.forward(input),
             Activation::Tanh(layer) => layer.forward(input),
+        }
+    }
+
+    /// Build a [`ActivationConfig`] for this module.
+    pub fn to_config(&self) -> ActivationConfig {
+        match self {
+            Activation::Relu(_) => ActivationConfig::Relu,
+            Activation::LeakyRelu(layer) => LeakyReluConfig::new()
+                .with_negative_slope(layer.negative_slope)
+                .into(),
+            Activation::Gelu(_) => ActivationConfig::Gelu,
+            Activation::PRelu(layer) => PReluConfig::new()
+                .with_alpha(layer.alpha_value)
+                .with_num_parameters(layer.num_params())
+                .into(),
+            Activation::SwiGlu(layer) => {
+                let [d_output, d_input] = layer.linear_inner.weight.shape().dims();
+                SwiGluConfig::new(d_input, d_output)
+                    .with_bias(layer.linear_inner.bias.is_some())
+                    .into()
+            }
+            Activation::HardSigmoid(layer) => HardSigmoidConfig::new()
+                .with_alpha(layer.alpha)
+                .with_beta(layer.beta)
+                .into(),
+            Activation::Sigmoid(_) => ActivationConfig::Sigmoid,
+            Activation::Tanh(_) => ActivationConfig::Tanh,
         }
     }
 }
