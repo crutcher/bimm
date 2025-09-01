@@ -58,7 +58,7 @@ pub struct Args {
     seed: u64,
 
     /// Batch size for processing
-    #[arg(short, long, default_value_t = 32)]
+    #[arg(short, long, default_value_t = 512)]
     batch_size: usize,
 
     /// Number of workers for data loading.
@@ -144,7 +144,7 @@ pub fn backend_main<B: AutodiffBackend>(
     let resnet: ResNet<B> = ResNetAbstractConfig::resnet18(10)
         .to_structure()
         .with_standard_drop_block_prob(0.3)
-        .with_stochastic_depth_drop_path_rate(0.2)
+        .with_stochastic_depth_drop_path_rate(0.3)
         .init(device)
         .load_pytorch_weights(weights)?
         .with_classes(num_classes);

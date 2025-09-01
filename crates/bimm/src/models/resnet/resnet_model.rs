@@ -90,16 +90,13 @@ impl From<ResNetAbstractConfig> for ResNetConfig {
             }
         }
 
-        // Residual blocks
-        let bottleneck = expansion > 1;
-
         let make_block = |idx: usize, in_factor: usize, out_factor: usize, stride: usize| {
             LayerBlockConfig::build(
                 config.layers[idx],
                 64 * in_factor,
                 64 * out_factor,
                 stride,
-                bottleneck,
+                config.bottleneck,
             )
         };
 
@@ -129,12 +126,12 @@ impl ResNetAbstractConfig {
 
     /// Create a ResNet-18 model.
     pub fn resnet18(num_classes: usize) -> Self {
-        Self::new(RESNET18_BLOCKS, num_classes).with_bottleneck(true)
+        Self::new(RESNET18_BLOCKS, num_classes) // .with_bottleneck(true)
     }
 
     /// Create a ResNet-34 model.
     pub fn resnet34(num_classes: usize) -> Self {
-        Self::new(RESNET34_BLOCKS, num_classes).with_bottleneck(true)
+        Self::new(RESNET34_BLOCKS, num_classes)
     }
 
     /// Create a ResNet-34 model.
