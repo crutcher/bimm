@@ -324,11 +324,11 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "cuda")]
     #[test]
     fn test_residual_block_bottleneck_block() {
-        use burn::backend::Cuda;
-        type B = Cuda;
+        // FIXME: Conv2d with groups is broken in 0.18.0; but fixed in 0.19.0
+        use burn::backend::Wgpu;
+        type B = Wgpu;
         let device = Default::default();
 
         let batch_size = 2;

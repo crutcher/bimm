@@ -323,7 +323,7 @@ impl<B: Backend> LayerBlock<B> {
                 idx = 1;
             }
         }
-        Self { blocks, ..self }
+        Self { blocks }
     }
 }
 

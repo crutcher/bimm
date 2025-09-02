@@ -25,7 +25,7 @@ num-traits = { workspace = true }
 
 
 [dev-dependencies]
-burn = { workspace = true, features = ["autodiff", "ndarray"] }
+burn = { workspace = true, features = ["autodiff", "ndarray", "wgpu"] }
 indoc = { workspace = true }
 criterion = { workspace = true }
 
@@ -35,7 +35,6 @@ hamcrest = { workspace = true }
 [features]
 default = []
 # std = []
-cuda = ["burn/cuda"]
 
 [[bench]]
 name = "drop_block"
