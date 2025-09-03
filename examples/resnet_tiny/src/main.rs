@@ -13,10 +13,10 @@ use bimm_firehose::core::{
     FirehoseRowBatch, FirehoseRowReader, FirehoseRowWriter, FirehoseTableSchema,
 };
 use bimm_firehose::ops::init_default_operator_environment;
-use bimm_firehose_image::augmentation::AugmentImageOperation;
 use bimm_firehose_image::augmentation::control::with_prob::WithProbStage;
 use bimm_firehose_image::augmentation::orientation::flip::HorizontalFlipStage;
-use bimm_firehose_image::burn_support::{ImageToTensorData, stack_tensor_data_column};
+use bimm_firehose_image::augmentation::AugmentImageOperation;
+use bimm_firehose_image::burn_support::{stack_tensor_data_column, ImageToTensorData};
 use bimm_firehose_image::loader::{ImageLoader, ResizeSpec};
 use bimm_firehose_image::{ColorType, ImageShape};
 use burn::backend::{Autodiff, Cuda};
@@ -25,8 +25,8 @@ use burn::data::dataset::transform::ShuffledDataset;
 use burn::grad_clipping::GradientClippingConfig;
 use burn::lr_scheduler::cosine::CosineAnnealingLrSchedulerConfig;
 use burn::nn::loss::CrossEntropyLossConfig;
-use burn::optim::AdamConfig;
 use burn::optim::decay::WeightDecayConfig;
+use burn::optim::AdamConfig;
 use burn::prelude::{Backend, Int, Module, Tensor};
 use burn::record::CompactRecorder;
 use burn::tensor::backend::AutodiffBackend;
@@ -39,12 +39,12 @@ use burn::train::{
     ClassificationOutput, LearnerBuilder, MetricEarlyStoppingStrategy, StoppingCondition,
 };
 use burn::train::{TrainOutput, TrainStep, ValidStep};
-use clap::{Parser, arg};
+use clap::{arg, Parser};
 use core::clone::Clone;
 use core::default::Default;
 use core::iter::Iterator;
 use core::option::Option;
-use rand::{Rng, rng};
+use rand::{rng, Rng};
 use std::sync::Arc;
 
 const PATH_COLUMN: &str = "path";
@@ -110,7 +110,7 @@ pub struct Args {
         long,
         default_value = "https://download.pytorch.org/models/resnet18-f37072fd.pth"
     )]
-    pretrined_weights: String,
+    pretrained_weights: String,
 
     /// Drop Block Prob
     #[arg(long, default_value = "0.25")]
@@ -155,7 +155,7 @@ pub fn backend_main<B: AutodiffBackend>(
 
     let device = &devices[0];
 
-    let weights = cache::fetch_model_weights(&args.pretrined_weights)?;
+    let weights = cache::fetch_model_weights(&args.pretrained_weights)?;
 
     let resnet: ResNet<B> = ResNetAbstractConfig::resnet18(10)
         .to_structure()
