@@ -4794,16 +4794,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "resnet_pretrained"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "bimm",
- "burn",
- "clap",
-]
-
-[[package]]
 name = "resnet_tiny"
 version = "0.0.0"
 dependencies = [

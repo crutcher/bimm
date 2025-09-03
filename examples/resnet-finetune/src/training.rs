@@ -107,6 +107,7 @@ pub fn train<B: AutodiffBackend>(
 
     // Config
     let config = TrainingConfig::new(CLASSES.len())
+        .with_learning_rate(args.learning_rate)
         .with_num_epochs(args.num_epochs)
         .with_batch_size(args.batch_size);
 
