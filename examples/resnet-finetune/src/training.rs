@@ -1,13 +1,14 @@
-use crate::Args;
 use crate::data::{ClassificationBatch, ClassificationBatcher};
-use crate::dataset::{CLASSES, PlanetLoader};
+use crate::dataset::{PlanetLoader, CLASSES};
+use crate::Args;
 use bimm::cache;
 use bimm::models::resnet::resnet_model::{ResNet, ResNetAbstractConfig};
 use burn::data::dataloader::DataLoaderBuilder;
+use burn::data::dataset::transform::ShuffledDataset;
 use burn::data::dataset::vision::ImageFolderDataset;
 use burn::nn::loss::BinaryCrossEntropyLossConfig;
-use burn::optim::AdamConfig;
 use burn::optim::decay::WeightDecayConfig;
+use burn::optim::AdamConfig;
 use burn::prelude::{Backend, Config, Int, Module, Tensor};
 use burn::record::CompactRecorder;
 use burn::tensor::backend::AutodiffBackend;
@@ -130,7 +131,7 @@ pub fn train<B: AutodiffBackend>(
         .batch_size(config.batch_size)
         .shuffle(config.seed)
         .num_workers(config.num_workers)
-        .build(train);
+        .build(ShuffledDataset::with_seed(train, config.seed));
 
     let dataloader_test = DataLoaderBuilder::new(batcher_valid)
         .batch_size(config.batch_size)
