@@ -44,8 +44,8 @@ pub fn multi_hot<B: Backend>(
     )
 }
 
-/// Normalizer with ImageNet values as it helps accelerate training since we are fine-tuning from
-/// ImageNet pre-trained weights and the model expects the data to be in this normalized range.
+/// Normalizer with `ImageNet` values as it helps accelerate training since we are fine-tuning from
+/// `ImageNet` pre-trained weights and the model expects the data to be in this normalized range.
 #[derive(Clone)]
 pub struct Normalizer<B: Backend> {
     pub mean: Tensor<B, 4>,
@@ -60,19 +60,25 @@ impl<B: Backend> Normalizer<B> {
         Self { mean, std }
     }
 
-    /// Normalizes the input image according to the ImageNet dataset.
+    /// Normalizes the input image according to the `ImageNet` dataset.
     ///
     /// The input image should be in the range [0, 1].
     /// The output image will be in the range [-1, 1].
     ///
     /// The normalization is done according to the following formula:
     /// `input = (input - mean) / std`
-    pub fn normalize(&self, input: Tensor<B, 4>) -> Tensor<B, 4> {
+    pub fn normalize(
+        &self,
+        input: Tensor<B, 4>,
+    ) -> Tensor<B, 4> {
         (input - self.mean.clone()) / self.std.clone()
     }
 
     /// Returns a new normalizer on the given device.
-    pub fn to_device(&self, device: &B::Device) -> Self {
+    pub fn to_device(
+        &self,
+        device: &B::Device,
+    ) -> Self {
         Self {
             mean: self.mean.clone().to_device(device),
             std: self.std.clone().to_device(device),
@@ -100,7 +106,11 @@ impl<B: Backend> ClassificationBatcher<B> {
 }
 
 impl<B: Backend> Batcher<B, ImageDatasetItem, ClassificationBatch<B>> for ClassificationBatcher<B> {
-    fn batch(&self, items: Vec<ImageDatasetItem>, device: &B::Device) -> ClassificationBatch<B> {
+    fn batch(
+        &self,
+        items: Vec<ImageDatasetItem>,
+        device: &B::Device,
+    ) -> ClassificationBatch<B> {
         fn image_as_vec_u8(item: ImageDatasetItem) -> Vec<u8> {
             // Convert Vec<PixelDepth> to Vec<u8> (Planet images are u8)
             item.image

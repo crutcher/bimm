@@ -1,13 +1,13 @@
-use crate::data::{ClassificationBatch, ClassificationBatcher};
-use crate::dataset::{PlanetLoader, CLASSES};
 use crate::Args;
+use crate::data::{ClassificationBatch, ClassificationBatcher};
+use crate::dataset::{CLASSES, PlanetLoader};
 use bimm::cache;
 use bimm::models::resnet::resnet_model::{ResNet, ResNetAbstractConfig};
 use burn::data::dataloader::DataLoaderBuilder;
 use burn::data::dataset::vision::ImageFolderDataset;
 use burn::nn::loss::BinaryCrossEntropyLossConfig;
-use burn::optim::decay::WeightDecayConfig;
 use burn::optim::AdamConfig;
+use burn::optim::decay::WeightDecayConfig;
 use burn::prelude::{Backend, Config, Int, Module, Tensor};
 use burn::record::CompactRecorder;
 use burn::tensor::backend::AutodiffBackend;
@@ -105,7 +105,9 @@ pub fn train<B: AutodiffBackend>(
     create_artifact_dir(artifact_dir);
 
     // Config
-    let config = TrainingConfig::new(CLASSES.len()).with_batch_size(args.batch_size);
+    let config = TrainingConfig::new(CLASSES.len())
+        .with_num_epochs(args.num_epochs)
+        .with_batch_size(args.batch_size);
 
     let optimizer = AdamConfig::new()
         .with_weight_decay(Some(WeightDecayConfig::new(config.weight_decay)))

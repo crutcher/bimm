@@ -8,10 +8,57 @@ mod training;
 
 use crate::dataset::download;
 use crate::training::train;
-use burn::backend::Autodiff;
+use burn::backend::{Autodiff, Cuda};
 use burn::tensor::backend::Backend;
-use clap::{arg, Parser};
+use clap::{Parser, arg};
 use core::clone::Clone;
+
+/*
+Reference:
+```
+| Split | Metric                         | Min.     | Epoch    | Max.     | Epoch    |
+|-------|--------------------------------|----------|----------|----------|----------|
+| Train | Hamming Score @ Threshold(0.5) | 91.311   | 1        | 95.277   | 5        |
+| Train | Loss                           | 0.122    | 5        | 0.250    | 1        |
+| Valid | Hamming Score @ Threshold(0.5) | 88.490   | 1        | 93.843   | 3        |
+| Valid | Loss                           | 0.168    | 3        | 0.512    | 1        |
+```
+
+```
+$ cargo run -p resnet-finetune --release -- --drop-path-prob 0.1 --drop-block-prob 0.1
+| Split | Metric                         | Min.     | Epoch    | Max.     | Epoch    |
+|-------|--------------------------------|----------|----------|----------|----------|
+| Train | Hamming Score @ Threshold(0.5) | 89.345   | 1        | 92.513   | 4        |
+| Train | Loss                           | 0.207    | 4        | 0.304    | 1        |
+| Valid | Hamming Score @ Threshold(0.5) | 88.902   | 3        | 93.784   | 5        |
+| Valid | Loss                           | 0.180    | 5        | 0.486    | 1        |
+
+```
+
+```
+$ cargo run -p resnet-finetune --release -- --drop-path-prob 0.0 --drop-block-prob 0.0
+
+| Split | Metric                         | Min.     | Epoch    | Max.     | Epoch    |
+|-------|--------------------------------|----------|----------|----------|----------|
+| Train | Hamming Score @ Threshold(0.5) | 91.437   | 1        | 94.454   | 4        |
+| Train | Loss                           | 0.144    | 5        | 0.238    | 1        |
+| Valid | Hamming Score @ Threshold(0.5) | 79.569   | 1        | 93.353   | 5        |
+| Valid | Loss                           | 0.181    | 3        | 1.060    | 1        |
+```
+
+
+This version:
+- drop_block_prob = 0.25
+- drop_path_prob = 0.15
+ ```
+| Split | Metric                         | Min.     | Epoch    | Max.     | Epoch    |
+|-------|--------------------------------|----------|----------|----------|----------|
+| Train | Hamming Score @ Threshold(0.5) | 89.941   | 1        | 92.597   | 5        |
+| Train | Loss                           | 0.205    | 5        | 0.307    | 1        |
+| Valid | Hamming Score @ Threshold(0.5) | 88.843   | 2        | 93.314   | 5        |
+| Valid | Loss                           | 0.176    | 5        | 0.482    | 2        |
+```
+ */
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -39,7 +86,7 @@ pub struct Args {
     num_workers: Option<usize>,
 
     /// Number of epochs to train the model.
-    #[arg(long, default_value = "100")]
+    #[arg(long, default_value = "5")]
     num_epochs: usize,
 
     /// Drop Block Prob
@@ -49,10 +96,6 @@ pub struct Args {
     /// Drop Path Prob
     #[arg(long, default_value = "0.15")]
     drop_path_prob: f64,
-
-    /// Early stopping patience
-    #[arg(long, default_value = "6")]
-    patience: usize,
 }
 
 #[allow(dead_code)]
@@ -61,7 +104,10 @@ const ARTIFACT_DIR: &str = "/tmp/resnet-finetune";
 fn main() {
     let args = Args::parse();
 
-    wgpu::run(&args);
+    let _source_tree = download();
+
+    let device = Default::default();
+    train::<Autodiff<Cuda>>(&args, &device);
 }
 
 #[allow(dead_code)]
@@ -69,18 +115,6 @@ fn run<B: Backend>(
     args: &Args,
     device: &B::Device,
 ) {
-    let _source_tree = download();
-    println!("{:?}", _source_tree);
-
-    train::<Autodiff<B>>(&args, device);
+    train::<Autodiff<B>>(args, device);
     // infer::<B>(ARTIFACT_DIR, device, 0.5);
-}
-
-mod wgpu {
-    use super::*;
-    use burn::backend::wgpu::{Wgpu, WgpuDevice};
-
-    pub fn run(args: &Args) {
-        super::run::<Wgpu>(args, &WgpuDevice::default());
-    }
 }

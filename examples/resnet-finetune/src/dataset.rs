@@ -1,8 +1,8 @@
 use burn::data::dataset::vision::{ImageFolderDataset, ImageLoaderError};
 use burn::data::network::downloader;
 use flate2::bufread::GzDecoder;
-use rand::prelude::{SliceRandom, StdRng};
 use rand::SeedableRng;
+use rand::prelude::{SliceRandom, StdRng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};

@@ -13,7 +13,7 @@ workspace = true
 anyhow = { workspace = true }
 bimm = { version = "0.3.2", path = "../../crates/bimm" }
 
-burn = { workspace = true, features = ["network", "train", "autodiff", "vision"] }
+burn = { workspace = true, features = ["network", "train", "autodiff", "vision", "cuda"] }
 
 clap = { workspace = true, features = ["derive"] }
 
@@ -26,6 +26,5 @@ tar = { workspace = true }
 
 
 [features]
-default = ["wgpu"]
-wgpu = ["burn/wgpu"]
+default = []
 
