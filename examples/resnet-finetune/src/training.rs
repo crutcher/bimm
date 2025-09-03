@@ -1,14 +1,14 @@
-use crate::data::{ClassificationBatch, ClassificationBatcher};
-use crate::dataset::{PlanetLoader, CLASSES};
 use crate::Args;
+use crate::data::{ClassificationBatch, ClassificationBatcher};
+use crate::dataset::{CLASSES, PlanetLoader};
 use bimm::cache;
 use bimm::models::resnet::resnet_model::{ResNet, ResNetAbstractConfig};
 use burn::data::dataloader::DataLoaderBuilder;
 use burn::data::dataset::transform::ShuffledDataset;
 use burn::data::dataset::vision::ImageFolderDataset;
 use burn::nn::loss::BinaryCrossEntropyLossConfig;
-use burn::optim::decay::WeightDecayConfig;
 use burn::optim::AdamConfig;
+use burn::optim::decay::WeightDecayConfig;
 use burn::prelude::{Backend, Config, Int, Module, Tensor};
 use burn::record::CompactRecorder;
 use burn::tensor::backend::AutodiffBackend;

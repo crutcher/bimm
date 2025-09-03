@@ -10,7 +10,7 @@ use crate::dataset::download;
 use crate::training::train;
 use burn::backend::{Autodiff, Cuda};
 use burn::tensor::backend::Backend;
-use clap::{arg, Parser};
+use clap::{Parser, arg};
 use core::clone::Clone;
 
 /*
@@ -22,7 +22,16 @@ tracel-ai/models reference:
 | Valid | Hamming Score @ Threshold(0.5) | 88.490   | 1        | 93.843   | 3        |
 | Valid | Loss                           | 0.168    | 3        | 0.512    | 1        |
 
-$ --drop-path-prob 0.1 --drop-block-prob 0.2 --num-epochs 20 --batch-size=32
+
+$ --drop-path-prob=0.1 --drop-block-prob=0.2 --num-epochs=30 --batch-size=32 --learning-rate=1e-4
+| Split | Metric                         | Min.     | Epoch    | Max.     | Epoch    |
+|-------|--------------------------------|----------|----------|----------|----------|
+| Train | Hamming Score @ Threshold(0.5) | 82.958   | 1        | 97.916   | 28       |
+| Train | Loss                           | 0.072    | 28       | 0.515    | 1        |
+| Valid | Hamming Score @ Threshold(0.5) | 91.765   | 1        | 95.706   | 12       |
+| Valid | Loss                           | 0.123    | 17       | 0.411    | 1        |
+
+$ --drop-path-prob=0.1 --drop-block-prob=0.2 --num-epochs=20 --batch-size=32
 | Split | Metric                         | Min.     | Epoch    | Max.     | Epoch    |
 |-------|--------------------------------|----------|----------|----------|----------|
 | Train | Hamming Score @ Threshold(0.5) | 88.437   | 1        | 96.176   | 20       |

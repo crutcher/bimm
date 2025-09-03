@@ -1,26 +1,21 @@
-# swin_tiny example
+# resnet-finetune example
 
-This example shows how to train a basic ResNet model
-for image classification.
-
-## Installing the Dataset
-
-See:
-
-* https://github.com/BayesWatch/cinic-10
-* https://datashare.ed.ac.uk/handle/10283/3192
-
-1. Download the dataset, and unpack it.
-2. Set the environment variable `CINIC10_PATH` to the path of the unpacked dataset.
+The dataload on this example is base on the tracel-ai models repository:
+https://github.com/tracel-ai/models/blob/main/resnet-burn/examples/finetune/examples/finetune.rs
 
 ## Running the Example
+
+This will download both model weights and a fine-tune dataset.
 
 Run the training:
 
 ```bash
-cargo run --release -p resnet_tiny -- \
-  --training-root $CINIC10_PATH/train \
-  --validation-root $CINIC10_PATH/val 
+cargo run --release -p resnet_finetune -- \
+  --drop-path-prob=0.1 \
+  --drop-block-prob=0.2 \
+  --num-epochs=20 \
+  --batch-size=32 \
+  --learning-rate=1e-4
 ```
 
 
