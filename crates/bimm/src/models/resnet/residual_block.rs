@@ -324,6 +324,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "wgpu")]
     #[test]
     fn test_residual_block_bottleneck_block() {
         // FIXME: Conv2d with groups is broken in 0.18.0; but fixed in 0.19.0

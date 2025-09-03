@@ -35,6 +35,7 @@ hamcrest = { workspace = true }
 [features]
 default = []
 # std = []
+wgpu = ["burn/wgpu"]
 
 [[bench]]
 name = "drop_block"
