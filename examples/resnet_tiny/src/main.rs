@@ -110,7 +110,7 @@ pub struct Args {
         long,
         default_value = "https://download.pytorch.org/models/resnet18-f37072fd.pth"
     )]
-    pretrined_weights: String,
+    pretrained_weights: String,
 
     /// Drop Block Prob
     #[arg(long, default_value = "0.25")]
@@ -155,7 +155,7 @@ pub fn backend_main<B: AutodiffBackend>(
 
     let device = &devices[0];
 
-    let weights = cache::fetch_model_weights(&args.pretrined_weights)?;
+    let weights = cache::fetch_model_weights(&args.pretrained_weights)?;
 
     let resnet: ResNet<B> = ResNetAbstractConfig::resnet18(10)
         .to_structure()

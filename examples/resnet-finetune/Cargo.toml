@@ -1,5 +1,5 @@
 [package]
-name = "resnet_pretrained"
+name = "resnet-finetune"
 publish = false
 rust-version.workspace = true
 edition.workspace = true
@@ -13,10 +13,18 @@ workspace = true
 anyhow = { workspace = true }
 bimm = { version = "0.3.2", path = "../../crates/bimm" }
 
-burn = { workspace = true, features = ["network", "train", "autodiff", "cuda", "fusion", "vision", "dataset"] }
+burn = { workspace = true, features = ["network", "train", "autodiff", "vision", "cuda"] }
 
 clap = { workspace = true, features = ["derive"] }
 
+# Dataset files
+csv = { workspace = true }
+flate2 = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true, features = ["std", "derive"] }
+tar = { workspace = true }
+
 
 [features]
-nightly = []
+default = []
+

@@ -563,6 +563,7 @@ mod tests {
         assert_eq!(block.output_resolution([16, 16]), [16, 16]);
     }
 
+    #[cfg(feature = "wgpu")]
     #[test]
     fn test_conv2d_example_metal() {
         // FIXME: Conv2d with groups is broken in 0.18.0; but fixed in 0.19.0
@@ -581,6 +582,7 @@ mod tests {
         assert_eq!(&result.shape().dims, &[2, 32, 64, 64]);
     }
 
+    #[cfg(feature = "wgpu")]
     #[test]
     fn test_basic_block_forward_same_channels_no_downsample_autodiff() {
         // FIXME: Conv2d with groups is broken in 0.18.0; but fixed in 0.19.0
@@ -614,6 +616,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "wgpu")]
     #[test]
     fn test_basic_block_forward_downsample_drop_block_drop_path_autodiff() {
         // FIXME: Conv2d with groups is broken in 0.18.0; but fixed in 0.19.0

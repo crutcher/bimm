@@ -1,4 +1,4 @@
-# swin_tiny example
+# resnet_tiny example
 
 This example shows how to train a basic ResNet model
 for image classification.
