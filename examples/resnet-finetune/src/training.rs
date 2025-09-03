@@ -135,12 +135,12 @@ pub fn train<B: AutodiffBackend>(
         .num_workers(config.num_workers)
         .build(valid);
 
-    let weights = cache::fetch_model_weights(&args.pretrained_weights)?;
+    let weights_path = cache::fetch_model_weights(&args.pretrained_weights)?;
 
     let model: ResNet<B> = ResNetAbstractConfig::resnet18(10)
         .to_structure()
         .init(device)
-        .load_pytorch_weights(args.pretrained_weights.clone().into())
+        .load_pytorch_weights(weights_path)
         .expect("Model should be loaded successfully")
         .with_classes(CLASSES.len())
         .with_standard_drop_block_prob(args.drop_block_prob)
