@@ -31,7 +31,7 @@ pub struct Args {
     artifact_dir: String,
 
     /// Batch size for processing
-    #[arg(short, long, default_value_t = 8)]
+    #[arg(short, long, default_value_t = 24)]
     batch_size: usize,
 
     /// Number of workers for data loading.
