@@ -6,7 +6,7 @@ use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::config::Config;
 use burn::module::Module;
 use burn::nn::conv::{Conv2d, Conv2dConfig};
-use burn::nn::{BatchNorm, BatchNormConfig};
+use burn::nn::{BatchNorm, BatchNormConfig, Initializer};
 use burn::prelude::{Backend, Tensor};
 
 /// [`ConvNorm2d`] Meta.
@@ -65,6 +65,16 @@ impl ConvNorm2dConfig {
             conv: self.conv.init(device),
 
             norm: BatchNormConfig::new(self.conv.channels[1]).init(device),
+        }
+    }
+
+    /// Set the initializer.
+    pub fn with_initializer(
+        self,
+        initializer: Initializer,
+    ) -> Self {
+        Self {
+            conv: self.conv.with_initializer(initializer),
         }
     }
 }

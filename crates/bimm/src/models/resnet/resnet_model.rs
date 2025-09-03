@@ -13,7 +13,6 @@ use burn::nn::conv::Conv2dConfig;
 use burn::nn::pool::{AdaptiveAvgPool2d, AdaptiveAvgPool2dConfig, MaxPool2d, MaxPool2dConfig};
 use burn::nn::{Initializer, Linear, LinearConfig, PaddingConfig2d};
 use burn::prelude::{Backend, Config, Tensor};
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 /// ResNet-18 block depths.
@@ -27,32 +26,6 @@ pub const RESNET101_BLOCKS: [usize; 4] = [3, 4, 23, 3];
 /// ResNet-152 block depths.
 pub const RESNET152_BLOCKS: [usize; 4] = [3, 8, 36, 3];
 
-/// [`ResNet`] input convolution configuration.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub enum InputStemConfig {
-    /// Default; single 7x7 convolution with stride 2.
-    #[default]
-    Default,
-
-    /// Three 3x3 convolutions:
-    /// 1. ``stem_width, stride=2``
-    /// 2. ``stem_width, stride=1``
-    /// 3. ``stem_width * 2, stride=1``
-    Deep {
-        /// The width of the stem convolutions.
-        stem_width: usize,
-    },
-
-    /// Three 3x3 convolutions:
-    DeepTiered {
-        /// The width of the stem convolutions.
-        /// 1. ``3 * (stem_width//4), stride=2``
-        /// 2. ``stem_width, stride=1``
-        /// 3. ``stem_width * 2, stride=1``
-        stem_width: usize,
-    },
-}
-
 /// High-level `ResNet` model configuration.
 #[derive(Config, Debug)]
 pub struct ResNetAbstractConfig {
@@ -63,8 +36,9 @@ pub struct ResNetAbstractConfig {
     pub num_classes: usize,
 
     /// Number of channels in stem convolutions.
-    #[config(default = "InputStemConfig::Default")]
-    pub stem_width: InputStemConfig,
+    /// TODO: Replace with a `ResNetStem` module.
+    #[config(default = "64")]
+    pub stem_width: usize,
 
     /// Model feature expansion rate.
     #[config(default = "1")]
@@ -83,13 +57,6 @@ impl From<ResNetAbstractConfig> for ResNetConfig {
         );
         let expansion = config.expansion;
 
-        match config.stem_width {
-            InputStemConfig::Default => (),
-            _ => {
-                unimplemented!("ResNet module only supports default stem convolutions")
-            }
-        }
-
         let make_block = |idx: usize, in_factor: usize, out_factor: usize, stride: usize| {
             LayerBlockConfig::build(
                 config.layers[idx],
@@ -102,7 +69,7 @@ impl From<ResNetAbstractConfig> for ResNetConfig {
 
         ResNetConfig::new(
             ConvNorm2dConfig::from(
-                Conv2dConfig::new([3, 64], [7, 7])
+                Conv2dConfig::new([3, config.stem_width], [7, 7])
                     .with_stride([2, 2])
                     .with_padding(PaddingConfig2d::Explicit(3, 3))
                     .with_bias(false),
