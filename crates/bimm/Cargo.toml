@@ -25,7 +25,7 @@ num-traits = { workspace = true }
 
 
 [dev-dependencies]
-burn = { workspace = true, features = ["autodiff", "ndarray", "wgpu"] }
+burn = { workspace = true, features = ["autodiff", "ndarray"] }
 indoc = { workspace = true }
 criterion = { workspace = true }
 
