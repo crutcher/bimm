@@ -43,6 +43,36 @@ See the [CONTRIBUTING](CONTRIBUTING.md) guide for build and contribution instruc
     * [bimm::models::swin](crates/bimm/src/models/swin/mod.rs) - The SWIN Family.
         * [bimm::models::swin::v2](crates/bimm/src/models/swin/v2/mod.rs) - The SWIN-V2 Model.
 
+#### Example
+
+Example of building a pretrained ResNet-18 module:
+
+```rust,no_run
+use bimm::cache::fetch_model_weights;
+use bimm::models::resnet::{ResNet, ResNetAbstractConfig};
+use burn::backend::NdArray;
+
+let device = Default::default();
+
+let source =
+    "https://download.pytorch.org/models/resnet18-f37072fd.pth";
+let source_classes = 1000;
+let weights_path= fetch_model_weights(source).unwrap();
+
+let my_classes = 10;
+
+let model: ResNet<NdArray> = ResNetAbstractConfig::resnet18(source_classes)
+    .to_structure()
+    .init(&device)
+    .load_pytorch_weights(weights_path)
+    .expect("Model should be loaded successfully")
+    .with_classes(my_classes)
+    // Enable (drop_block_prob) stochastic block drops for training:
+    .with_stochastic_drop_block(0.2)
+    // Enable (drop_path_prob) stochastic depth for training:
+    .with_stochastic_path_depth(0.1);
+```
+
 ### [bimm-contracts](https://github.com/crutcher/bimm-contracts) - a crate for static shape contracts for tensors.
 
 [![Crates.io Version](https://img.shields.io/crates/v/bimm-contracts)](https://crates.io/crates/bimm-contracts)
