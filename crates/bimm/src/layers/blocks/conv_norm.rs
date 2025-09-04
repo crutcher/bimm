@@ -116,7 +116,9 @@ impl<B: Backend> ConvNorm2d<B> {
     pub fn zero_init_norm(&mut self) {
         self.norm.gamma = self.norm.gamma.clone().map(|p| p.slice_fill([..], 0.0));
     }
+
     /// Forward Pass.
+    #[tracing::instrument]
     pub fn forward(
         &self,
         input: Tensor<B, 4>,

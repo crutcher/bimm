@@ -1,4 +1,4 @@
-# Burn Image Models
+# bimm - Burn Image Models
 
 [![Crates.io Version](https://img.shields.io/crates/v/bimm)](https://crates.io/crates/bimm)
 [![docs.rs](https://img.shields.io/docsrs/bimm)](https://docs.rs/bimm/latest/)

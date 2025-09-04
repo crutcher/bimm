@@ -253,6 +253,7 @@ pub struct ResNet<B: Backend> {
 
 impl<B: Backend> ResNet<B> {
     /// `ResNet` forward pass.
+    #[tracing::instrument]
     pub fn forward(
         &self,
         input: Tensor<B, 4>,

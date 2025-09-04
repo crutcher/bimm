@@ -17,6 +17,9 @@ burn = { workspace = true, features = ["network", "train", "autodiff", "vision",
 
 clap = { workspace = true, features = ["derive"] }
 
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
 # Dataset files
 csv = { workspace = true }
 flate2 = { workspace = true }

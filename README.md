@@ -1,4 +1,4 @@
-# Burn Image Models
+# bimm - Burn Image Models
 
 [![Coverage Status](https://coveralls.io/repos/github/crutcher/bimm/badge.svg?branch=main)](https://coveralls.io/github/crutcher/bimm?branch=main)
 

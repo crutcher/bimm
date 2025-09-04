@@ -211,6 +211,7 @@ impl<B: Backend> ResidualBlock<B> {
     /// # Returns
     ///
     /// A ``[batch, out_planes=planes*expansion_factor, out_height, out_width]`` tensor;
+    #[tracing::instrument]
     pub fn forward(
         &self,
         input: Tensor<B, 4>,

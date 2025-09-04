@@ -116,6 +116,7 @@ pub enum Activation<B: Backend> {
 
 impl<B: Backend> Activation<B> {
     /// Forward pass.
+    #[tracing::instrument]
     pub fn forward<const D: usize>(
         &self,
         input: Tensor<B, D>,

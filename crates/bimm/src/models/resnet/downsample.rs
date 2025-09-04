@@ -128,6 +128,7 @@ impl<B: Backend> ConvDownsample<B> {
     /// # Returns
     ///
     /// A ``[batch_size, out_channels, h_out, w_out]`` tensor.
+    #[tracing::instrument]
     pub fn forward(
         &self,
         input: Tensor<B, 4>,

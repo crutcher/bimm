@@ -10,9 +10,10 @@ use crate::dataset::download;
 use crate::training::train;
 use burn::backend::{Autodiff, Cuda};
 use burn::tensor::backend::Backend;
-use clap::{Parser, arg};
+use clap::{arg, Parser};
 use core::clone::Clone;
-
+use tracing::Level;
+use tracing_subscriber::FmtSubscriber;
 /*
 tracel-ai/models reference:
 | Split | Metric                         | Min.     | Epoch    | Max.     | Epoch    |
@@ -127,6 +128,16 @@ const ARTIFACT_DIR: &str = "/tmp/resnet-finetune";
 
 fn main() {
     let args = Args::parse();
+
+    // a builder for `FmtSubscriber`.
+    let subscriber = FmtSubscriber::builder()
+        // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
+        // will be written to stdout.
+        .with_max_level(Level::TRACE)
+        // completes the builder.
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
     let _source_tree = download();
 

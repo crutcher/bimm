@@ -229,6 +229,7 @@ impl<B: Backend> LayerBlockMeta for LayerBlock<B> {
 
 impl<B: Backend> LayerBlock<B> {
     /// Apply the layer block.
+    #[tracing::instrument]
     pub fn forward(
         &self,
         input: Tensor<B, 4>,
