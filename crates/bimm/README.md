@@ -34,6 +34,33 @@ let model: ResNet<B> = ResNetAbstractConfig::resnet18(source_classes)
     .with_stochastic_path_depth(0.1);
 ```
 
+* [bimm::cache](https://docs.rs/bimm/latest/bimm/cache) - weight loading cache.
+* [bimm::layers](https://docs.rs/bimm/latest/bimm/layers) - reusable neural network modules.
+    * [bimm::layers::activation](https://docs.rs/bimm/latest/bimm/layers/activation) - activation
+      layers.
+        * [bimm::layers::activation::Activation](https://docs.rs/bimm/latest/bimm/layers/activation/enum.Activation.html)
+            - activation layer abstraction wrapper.
+    * [bimm::layers::blocks](https://docs.rs/bimm/latest/bimm/layers/blocks) - miscellaneous
+      blocks.
+        * [bimm::layers::blocks::conv_norm](https://docs.rs/bimm/latest/bimm/layers/blocks/conv_norm) -
+          ``Conv2d + BatchNorm2d`` block.
+    * [bimm::layers::drop](https://docs.rs/bimm/latest/bimm/layers/drop) - dropout layers.
+        * [bimm::layers::drop::drop_block](https://docs.rs/bimm/latest/bimm/layers/drop/drop_block) -
+          2d drop
+          block / spatial dropout.
+        * [bimm::layers::drop::drop_path](https://docs.rs/bimm/latest/bimm/layers/drop/drop_path) -
+          drop
+          path /
+          stochastic depth.
+    * [bimm::layers::patching](https://docs.rs/bimm/latest/bimm/layers/patching) - patching layers.
+        * [bimm::layers::patching::patch_embed](https://docs.rs/bimm/latest/bimm/layers/patching/patch_embed) -
+          2d patch embedding layer.
+* [bimm::models](https://docs.rs/bimm/latest/bimm/models) - complete model families.
+    * [bimm::models::resnet](https://docs.rs/bimm/latest/bimm/models/resnet) - `ResNet`
+    * [bimm::models::swin](https://docs.rs/bimm/latest/bimm/models/swin) - The SWIN Family.
+        * [bimm::models::swin::v2](https://docs.rs/bimm/latest/bimm/models/swin/v2) - The
+          SWIN-V2 Model.
+
 #### Recent Changes
 
 * **0.3.3**

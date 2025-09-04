@@ -22,7 +22,7 @@ See the [CONTRIBUTING](CONTRIBUTING.md) guide for build and contribution instruc
 [![docs.rs](https://img.shields.io/docsrs/bimm)](https://docs.rs/bimm/latest/bimm/)
 
 * [bimm::cache](crates/bimm/src/cache) - weight loading cache.
-* [bimm::layers] - reusable neural network modules.
+* [bimm::layers](crates/bimm/src/layers) - reusable neural network modules.
     * [bimm::layers::activation](crates/bimm/src/layers/activation) - activation layers.
         * [bimm::layers::activation::Activation](crates/bimm/src/layers/activation/activation_wrapper.rs)
             - activation layer abstraction wrapper.
