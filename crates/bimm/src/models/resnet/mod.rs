@@ -9,9 +9,8 @@
 //! ```rust,no_run
 //! use bimm::cache::fetch_model_weights;
 //! use bimm::models::resnet::{ResNet, ResNetAbstractConfig};
-//! use burn::backend::Wgpu;
+//! use burn::backend::NdArray;
 //!
-//! type B = Wgpu;
 //! let device = Default::default();
 //!
 //! let source =
@@ -21,7 +20,7 @@
 //!
 //! let my_classes = 10;
 //!
-//! let model: ResNet<B> = ResNetAbstractConfig::resnet18(source_classes)
+//! let model: ResNet<NdArray> = ResNetAbstractConfig::resnet18(source_classes)
 //!     .to_structure()
 //!     .init(&device)
 //!     .load_pytorch_weights(weights_path)

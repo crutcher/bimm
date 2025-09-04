@@ -318,7 +318,6 @@ dependencies = [
  "bimm-contracts",
  "burn",
  "burn-import",
- "burn-ndarray",
  "criterion",
  "dirs",
  "hamcrest",
@@ -354,7 +353,6 @@ version = "0.3.3"
 dependencies = [
  "anyhow",
  "burn",
- "burn-ndarray",
  "globwalk",
  "indoc",
  "inventory",
@@ -372,7 +370,6 @@ dependencies = [
  "anyhow",
  "bimm-firehose",
  "burn",
- "burn-ndarray",
  "image",
  "image-compare",
  "indoc",

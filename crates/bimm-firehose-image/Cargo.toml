@@ -14,7 +14,7 @@ workspace = true
 [dependencies]
 bimm-firehose = { version = "0.3.3", path = "../bimm-firehose" }
 
-burn = { workspace = true, features = ["dataset", "vision"] }
+burn = { workspace = true, features = ["dataset", "vision", "ndarray"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 
@@ -31,8 +31,5 @@ image = { workspace = true, features = ["jpeg", "png", "gif", "serde"] }
 image-compare = { workspace = true }
 
 [dev-dependencies]
-burn = { workspace = true, features = ["dataset", "vision", "ndarray"] }
-burn-ndarray = { workspace = true }
-
 tempfile = { workspace = true }
 
