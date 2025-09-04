@@ -1,4 +1,51 @@
 //! # Input Stems
+//!
+//! This is incompletely implemented.
+//!
+//! The target surface is this pile from ``class ResNet`` in ``timm``:
+//! ```python,ignore
+//! # Stem
+//! deep_stem = 'deep' in stem_type
+//! inplanes = stem_width * 2 if deep_stem else 64
+//! if deep_stem:
+//!     stem_chs = (stem_width, stem_width)
+//!     if 'tiered' in stem_type:
+//!         stem_chs = (3 * (stem_width // 4), stem_width)
+//!     self.conv1 = nn.Sequential(*[
+//!         nn.Conv2d(in_chans, stem_chs[0], 3, stride=2, padding=1, bias=False),
+//!         norm_layer(stem_chs[0]),
+//!         act_layer(inplace=True),
+//!         nn.Conv2d(stem_chs[0], stem_chs[1], 3, stride=1, padding=1, bias=False),
+//!         norm_layer(stem_chs[1]),
+//!         act_layer(inplace=True),
+//!         nn.Conv2d(stem_chs[1], inplanes, 3, stride=1, padding=1, bias=False)
+//!     ])
+//! else:
+//!    self.conv1 = nn.Conv2d(in_chans, inplanes, kernel_size=7, stride=2, padding=3, bias=False)
+//!    self.bn1 = norm_layer(inplanes)
+//!    self.act1 = act_layer(inplace=True)
+//!    self.feature_info = [dict(num_chs=inplanes, reduction=2, module='act1')]
+//!
+//! # Stem pooling. The name 'maxpool' remains for weight compatibility.
+//! if replace_stem_pool:
+//!     self.maxpool = nn.Sequential(*filter(None, [
+//!         nn.Conv2d(inplanes, inplanes, 3, stride=1 if aa_layer else 2, padding=1, bias=False),
+//!         create_aa(aa_layer, channels=inplanes, stride=2) if aa_layer is not None else None,
+//!         norm_layer(inplanes),
+//!         act_layer(inplace=True),
+//!     ]))
+//! else:
+//!     if aa_layer is not None:
+//!         if issubclass(aa_layer, nn.AvgPool2d):
+//!             self.maxpool = aa_layer(2)
+//!     else:
+//!         self.maxpool = nn.Sequential(*[
+//!             nn.MaxPool2d(kernel_size=3, stride=1, padding=1),
+//!             aa_layer(channels=inplanes, stride=2)
+//!         ])
+//!     else:
+//!         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+//! ```
 use crate::layers::activation::{Activation, ActivationConfig};
 use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig, ConvNorm2dMeta};
 use crate::models::resnet::util::CONV_INTO_RELU_INITIALIZER;

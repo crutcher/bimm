@@ -147,8 +147,8 @@ pub fn train<B: AutodiffBackend>(
         .load_pytorch_weights(weights_path)
         .expect("Model should be loaded successfully")
         .with_classes(CLASSES.len())
-        .with_standard_drop_block_prob(args.drop_block_prob)
-        .with_stochastic_depth_drop_path_rate(args.drop_path_prob);
+        .with_stochastic_drop_block(args.drop_block_prob)
+        .with_stochastic_path_depth(args.drop_path_prob);
 
     // Learner config
     let learner = LearnerBuilder::new(artifact_dir)

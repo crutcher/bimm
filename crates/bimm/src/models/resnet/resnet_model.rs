@@ -73,7 +73,8 @@ impl From<ResNetAbstractConfig> for ResNetConfig {
                     .with_stride([2, 2])
                     .with_padding(PaddingConfig2d::Explicit(3, 3))
                     .with_bias(false),
-            ),
+            )
+            .with_initializer(CONV_INTO_RELU_INITIALIZER.clone()),
             vec![
                 make_block(0, 1, expansion, 1),
                 make_block(1, expansion, 2 * expansion, 2),
@@ -94,16 +95,6 @@ impl ResNetAbstractConfig {
     /// Create a ResNet-18 model.
     pub fn resnet18(num_classes: usize) -> Self {
         Self::new(RESNET18_BLOCKS, num_classes) // .with_bottleneck(true)
-    }
-
-    /// Create a ResNet-34 model.
-    pub fn resnet34(num_classes: usize) -> Self {
-        Self::new(RESNET34_BLOCKS, num_classes)
-    }
-
-    /// Create a ResNet-34 model.
-    pub fn resnet101(num_classes: usize) -> Self {
-        Self::new(RESNET101_BLOCKS, num_classes).with_bottleneck(true)
     }
 }
 
@@ -304,7 +295,7 @@ impl<B: Backend> ResNet<B> {
     }
 
     /// Update the config with stochastic depth.
-    pub fn with_stochastic_depth_drop_path_rate(
+    pub fn with_stochastic_path_depth(
         self,
         drop_path_rate: f64,
     ) -> Self {
@@ -355,7 +346,7 @@ impl<B: Backend> ResNet<B> {
     }
 
     /// Apply the given standard drop block probability scheme.
-    pub fn with_standard_drop_block_prob(
+    pub fn with_stochastic_drop_block(
         self,
         drop_prob: f64,
     ) -> Self {

@@ -162,8 +162,8 @@ pub fn backend_main<B: AutodiffBackend>(
         .init(device)
         .load_pytorch_weights(weights)?
         .with_classes(num_classes)
-        .with_standard_drop_block_prob(args.drop_block_prob)
-        .with_stochastic_depth_drop_path_rate(args.drop_path_prob);
+        .with_stochastic_drop_block(args.drop_block_prob)
+        .with_stochastic_path_depth(args.drop_path_prob);
 
     let model: Model<B> = Model { resnet };
 
