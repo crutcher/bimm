@@ -4,24 +4,15 @@
 
 ## Overview
 
-This is a Rust crate for image models, inspired by the Python `timm` package.
+This is a repository for burn image models; inspired by the Python `timm` package.
 
-It is *very* early in development, and is not yet ready for production use.
-The Burn ecosystem is still missing a number of image-model related features,
-particularly in the area of image datasets and transforms.
+The future feature list is:
 
-## Active Surface
+* `timm` => `bimm`
 
-Image models require complex data loading and augmentation pipelines,
-and the current active surface is focused on building a SQL-inspired
-table + operations framework for modular data pipeline construction.
+## Contributing
 
-This is being done in the [bimm-firehose](crates/bimm-firehose) crate,
-which will be a general-purpose data loading and augmentation framework,
-but is not yet ready for use.
-
-A functional demo of `firehose` integration is available in the
-[swin_tiny](examples/swin_tiny/src/main.rs) example.
+See the [CONTRIBUTING](CONTRIBUTING.md) guide for build and contribution instructions.
 
 ## Crates
 
@@ -30,23 +21,101 @@ A functional demo of `firehose` integration is available in the
 [![Crates.io Version](https://img.shields.io/crates/v/bimm)](https://crates.io/crates/bimm)
 [![docs.rs](https://img.shields.io/docsrs/bimm)](https://docs.rs/bimm/latest/bimm/)
 
-This crate provides a collection of image models, and their constituent sub-components.
+* [bimm::cache](crates/bimm/src/cache) - weight loading cache.
+* [bimm::layers] - reusable neural network modules.
+    * [bimm::layers::activation](crates/bimm/src/layers/activation) - activation layers.
+        * [bimm::layers::activation::Activation](crates/bimm/src/layers/activation/activation_wrapper.rs)
+            - activation layer abstraction wrapper.
+    * [bimm::layers::blocks](crates/bimm/src/layers/blocks) - miscellaneous blocks.
+        * [bimm::layers::blocks::conv_norm](crates/bimm/src/layers/blocks/conv_norm.rs) -
+          ``Conv2d + BatchNorm2d`` block.
+    * [bimm::layers::drop](crates/bimm/src/layers/drop) - dropout layers.
+        * [bimm::layers::drop::drop_block](crates/bimm/src/layers/drop/drop_block.rs) - 2d drop
+          block / spatial dropout.
+        * [bimm::layers::drop::drop_path](crates/bimm/src/layers/drop/drop_path.rs) - drop
+          path /
+          stochastic depth.
+    * [bimm::layers::patching](crates/bimm/src/layers/patching) - patching layers.
+        * [bimm::layers::patching::patch_embed](crates/bimm/src/layers/patching/patch_embed.rs) -
+          2d patch embedding layer.
+* [bimm::models](crates/bimm/src/models) - complete model families.
+    * [bimm::models::resnet](crates/bimm/src/models/resnet/mod.rs) - `ResNet`
+    * [bimm::models::swin](crates/bimm/src/models/swin/mod.rs) - The SWIN Family.
+        * [bimm::models::swin::v2](crates/bimm/src/models/swin/v2/mod.rs) - The SWIN-V2 Model.
 
-The goal is to incrementally clone `timm`'s coverage of the SOTA image models,
-while focusing on decomposing the models into reusable, fully tested components.
+### [bimm-contracts](https://github.com/crutcher/bimm-contracts) - a crate for static shape contracts for tensors.
 
-Currently, this has `SWIN Transformer V2`.
+[![Crates.io Version](https://img.shields.io/crates/v/bimm-contracts)](https://crates.io/crates/bimm-contracts)
+[![docs.rs](https://img.shields.io/docsrs/bimm-contracts)](https://docs.rs/bimm-contracts/latest/bimm-contracts/)
 
-The current work surface is focused on extending the dataloader framework to support
-more flexible image datasets and transforms, and the kind of composable image augmentation
-that is common in the torch ecosystem library.
+This crate is now hosted in its own repository:
+[bimm-contracts](https://github.com/crutcher/bimm-contracts)
+
+This crate provides a stand-alone library for defining and enforcing tensor shape contracts
+in-line with the Burn framework modules and methods.
+
+```rust
+use bimm_contracts::{unpack_shape_contract, shape_contract, run_periodically};
+
+pub fn window_partition<B: Backend, K>(
+    tensor: Tensor<B, 4, K>,
+    window_size: usize,
+) -> Tensor<B, 4, K>
+where
+    K: BasicOps<B>,
+{
+    let [b, h_wins, w_wins, c] = unpack_shape_contract!(
+        [
+            "batch",
+            "height" = "h_wins" * "window_size",
+            "width" = "w_wins" * "window_size",
+            "channels"
+        ],
+        &tensor,
+        &["batch", "h_wins", "w_wins", "channels"],
+        &[("window_size", window_size)],
+    );
+
+    let tensor = tensor
+        .reshape([b, h_wins, window_size, w_wins, window_size, c])
+        .swap_dims(2, 3)
+        .reshape([b * h_wins * w_wins, window_size, window_size, c]);
+
+    // Run an amortized check on the output shape.
+    //
+    // `run_periodically!{}` runs the first 10 times,
+    // then on an incrementally lengthening schedule,
+    // until it reaches its default period of 1000.
+    //
+    // Due to amortization, in release builds, this averages ~4ns:
+    assert_shape_contract_periodically!(
+        [
+            "batch" * "h_wins" * "w_wins",
+            "window_size",
+            "window_size",
+            "channels"
+        ],
+        &tensor,
+        &[
+            ("batch", b),
+            ("h_wins", h_wins),
+            ("w_wins", w_wins),
+            ("window_size", window_size),
+            ("channels", c),
+        ]
+    );
+
+    tensor
+}
+```
 
 ### [bimm-firehose](crates/bimm-firehose) - a data loading and augmentation framework.
 
 [![Crates.io Version](https://img.shields.io/crates/v/bimm-firehose)](https://crates.io/crates/bimm-firehose)
 [![docs.rs](https://img.shields.io/docsrs/bimm-firehose)](https://docs.rs/bimm/latest/bimm-firehose/)
 
-This crate provides a SQL-inspired table + operations framework for modular data pipeline construction.
+This crate provides a SQL-inspired table + operations framework for modular data pipeline
+construction.
 
 It's still very much a work in progress, and any issues/design bugs reported
 are very appreciated.
@@ -54,18 +123,6 @@ are very appreciated.
 This crate provides a set of image-specific operations for `bimm-firehose`.
 
 Add-on crates:
+
 * [bimm-firehose-image](crates/bimm-firehose-image)
 
-## External Related Crates
-
-### [bimm-contracts](https://github.com/crutcher/bimm-contracts) - a crate for static shape contracts for tensors.
-
-[![Crates.io Version](https://img.shields.io/crates/v/bimm-contracts)](https://crates.io/crates/bimm-contracts)
-[![docs.rs](https://img.shields.io/docsrs/bimm-contracts)](https://docs.rs/bimm-contracts/latest/bimm-contracts/)
-
-This crate provides a stand-alone library for defining and enforcing tensor shape contracts
-in-line with the Burn framework modules and methods.
-
-## Contributing
-
-See the [CONTRIBUTING](CONTRIBUTING.md) guide for build and contribution instructions.

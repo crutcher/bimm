@@ -1,4 +1,4 @@
 //! # Activation Layers
 
-mod activation_layer;
-pub use activation_layer::*;
+mod activation_wrapper;
+pub use activation_wrapper::*;
