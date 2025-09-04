@@ -32,5 +32,7 @@ image-compare = { workspace = true }
 
 [dev-dependencies]
 burn = { workspace = true, features = ["dataset", "vision", "ndarray"] }
+# fix ndarray parallel feature
+rayon = { workspace = true }
 
 tempfile = { workspace = true }

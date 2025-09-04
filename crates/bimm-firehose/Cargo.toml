@@ -13,6 +13,9 @@ workspace = true
 
 [dependencies]
 burn = { workspace = true, features = ["dataset", "vision"] }
+# fix ndarray parallel feature
+rayon = { workspace = true }
+
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 

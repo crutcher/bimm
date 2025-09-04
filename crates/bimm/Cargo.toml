@@ -26,6 +26,9 @@ num-traits = { workspace = true }
 
 [dev-dependencies]
 burn = { workspace = true, features = ["autodiff", "ndarray"] }
+# fix ndarray parallel feature
+rayon = { workspace = true }
+
 indoc = { workspace = true }
 criterion = { workspace = true }
 
