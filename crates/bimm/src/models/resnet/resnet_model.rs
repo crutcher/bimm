@@ -1,4 +1,17 @@
 //! # `ResNet` Core Model
+//!
+//! [`ResNet`] is the core `ResNet` module.
+//!
+//! [`ResNetAbstractConfig`] implements [`Config`], and provides
+//! a high-level configuration interface.
+//! It provides [`ResNetAbstractConfig::to_structure`] to convert
+//! to a [`ResNetConfig`].
+//!
+//! [`ResNetConfig`] implements [`Config`], and provides
+//! [`ResNetConfig::init`] to initialize a [`ResNet`].
+//!
+//! [`ResNet`] implements [`Module`], and provides
+//! [`ResNet::forward`].
 
 use crate::layers::activation::{Activation, ActivationConfig};
 use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig};

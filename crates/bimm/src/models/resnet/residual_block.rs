@@ -1,5 +1,22 @@
 //! # Residual Block Wrapper
-
+//!
+//! [`ResidualBlock`] is a abstraction wrapper around either:
+//! * [`BasicBlock`] - the basic `ResNet` conv block, or
+//! * [`BottleneckBlock`] - the bottleneck variant `ResNet` conv block.
+//!
+//! [`ResidualBlockMeta`] defines a common meta api shared by:
+//! * [`ResidualBlock`], and
+//! * [`ResidualBlockConfig`]
+//!
+//! [`ResidualBlockConfig`] implements [`Config`], and provides an
+//! [`ResidualBlockConfig::init`] constructor pathway to [`ResidualBlock`].
+//!
+//! [`ResidualBlock`] implements [`Module`],
+//! and provides [`ResidualBlock::forward`].
+//!
+//! [`ResidualBlock`] can also be constructed via:
+//! * [`From<BasicBlock<B>>`](`BasicBlock`),
+//! * [`From<BottleneckBlock<B>>`](`BottleneckBlock`).
 use crate::layers::drop::drop_block::DropBlockOptions;
 use crate::models::resnet::basic_block::{BasicBlock, BasicBlockConfig, BasicBlockMeta};
 use crate::models::resnet::bottleneck::{
@@ -11,6 +28,8 @@ use burn::config::Config;
 use burn::prelude::{Backend, Module, Tensor};
 
 /// [`ResidualBlock`] Meta API.
+///
+/// Defines a shared API for [`ResidualBlock`] and [`ResidualBlockConfig`].
 pub trait ResidualBlockMeta {
     /// The number of input feature planes.
     fn in_planes(&self) -> usize;
@@ -47,6 +66,8 @@ pub trait ResidualBlockMeta {
 }
 
 /// [`ResidualBlock`] Config.
+///
+/// Implements [`ResidualBlockMeta`].
 #[derive(Config, Debug)]
 pub enum ResidualBlockConfig {
     /// A `ResNet` [`BasicBlock`].

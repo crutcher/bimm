@@ -1,4 +1,15 @@
-//! # Bottleneck Block for `ResNet`
+//! # Basic Block for `ResNet`
+//!
+//! [`BasicBlock`] is the core `ResNet` convolution unit.
+//!
+//! [`BasicBlockMeta`] defines a common meta API for [`BasicBlock`]
+//! and [`BasicBlockConfig`].
+//!
+//! [`BasicBlockConfig`] implements [`Config`], and provides
+//! [`BasicBlockConfig::init`] to initialize a [`BasicBlock`].
+//!
+//! [`BasicBlock`] implements [`Module`], and provides
+//! [`BasicBlock::forward`].
 
 use crate::layers::activation::{Activation, ActivationConfig};
 use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig, ConvNorm2dMeta};

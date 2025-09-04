@@ -1,6 +1,15 @@
 //! # `ResNet` Layer Block
 //!
-//! Collects a series of [`ResidualBlock`]s into a single module.
+//! A [`LayerBlock`] is a sequence of [`ResidualBlock`]s.
+//!
+//! [`LayerBlockMeta`] defines a common meta API for [`LayerBlock`]
+//! and [`LayerBlockConfig`].
+//!
+//! [`LayerBlockConfig`] implements [`Config`], and provides
+//! [`LayerBlockConfig::init`] to initialize a [`LayerBlock`].
+//!
+//! [`LayerBlock`] implements [`Module`], and provides
+//! [`LayerBlock::forward`].
 
 use crate::layers::drop::drop_block::DropBlockOptions;
 use crate::models::resnet::residual_block::{

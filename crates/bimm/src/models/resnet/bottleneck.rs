@@ -1,4 +1,15 @@
-//! # Basic Block for `ResNet`
+//! # Bottleneck Block for `ResNet`
+//!
+//! [`BottleneckBlock`] is the bottleneck form of the core `ResNet` convolution unit.
+//!
+//! [`BottleneckBlockMeta`] defines a common meta API for [`BottleneckBlock`]
+//! and [`BottleneckBlockConfig`].
+//!
+//! [`BottleneckBlockConfig`] implements [`Config`], and provides
+//! [`BottleneckBlockConfig::init`] to initialize a [`BottleneckBlock`].
+//!
+//! [`BottleneckBlock`] implements [`Module`], and provides
+//! [`BottleneckBlock::forward`].
 
 use crate::layers::activation::{Activation, ActivationConfig};
 use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig, ConvNorm2dMeta};
