@@ -99,7 +99,7 @@ mod tests {
                       "name": "image",
                       "description": "Image loaded from disk.",
                       "data_type": {
-                        "type_name": "image::dynimage::DynamicImage"
+                        "type_name": "image::images::dynimage::DynamicImage"
                       }
                     },
                     {
