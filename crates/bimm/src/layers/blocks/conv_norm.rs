@@ -27,7 +27,7 @@ pub trait ConvNorm2dMeta {
 /// [`ConvNorm2d`] Config.
 #[derive(Config, Debug)]
 pub struct ConvNorm2dConfig {
-    /// The [`Conv2D`] config.
+    /// The [`Conv2d`] config.
     pub conv: Conv2dConfig,
 }
 

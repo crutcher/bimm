@@ -54,7 +54,7 @@ use burn::nn::Initializer;
 use burn::prelude::{Backend, Module};
 use burn::tensor::Tensor;
 
-/// [`ShallowStem`] Meta API.
+/// [`Stem`] Meta API.
 pub trait StemMeta {
     /// The number of input channels.
     fn in_planes(&self) -> usize;
@@ -66,7 +66,7 @@ pub trait StemMeta {
     fn stride(&self) -> [usize; 2];
 }
 
-/// [`ResNetStem`] configuration.
+/// [`Stem`] configuration.
 #[derive(Debug, Clone, Default)]
 pub enum StemAbstractConfig {
     /// Default; single 7x7 convolution with stride 2.

@@ -128,7 +128,7 @@ pub struct BottleneckBlockConfig {
     #[config(default = "ActivationConfig::Relu")]
     pub activation: ActivationConfig,
 
-    /// The [`Conv2D`] initializer.
+    /// The [`ConvNorm2d`] initializer.
     ///
     /// This should be set to a value tuned by the relationship
     /// with `activation`.

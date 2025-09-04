@@ -3,7 +3,7 @@
 //!
 //! These are stub modules to smooth over loading issues with the current version
 //! of `burn-import`. There is insufficient information in loaded weights to
-//! derive information about stateless modules (such as [`Activation::Relu`].
+//! derive information about stateless modules (such as ``Activation::Relu``).
 use crate::layers::blocks::conv_norm::ConvNorm2d;
 use crate::models::resnet::basic_block::BasicBlock;
 use crate::models::resnet::bottleneck::BottleneckBlock;

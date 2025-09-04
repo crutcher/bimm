@@ -55,7 +55,7 @@ pub struct ConvDownsampleConfig {
     #[config(default = 1)]
     stride: usize,
 
-    /// The [`Conv2D`] initializer.
+    /// The [`ConvNorm2d`] initializer.
     #[config(default = "CONV_INTO_RELU_INITIALIZER.clone()")]
     pub initializer: Initializer,
 }

@@ -1,10 +1,23 @@
 #![warn(missing_docs)]
 //!# bimm - Burn Image Models
 //!
-//! ## Models
+//! ## Notable Components
 //!
-//! * [`models::resnet`] - preview of ResNet-18
-//! * [`models::swin`] - preview of SWIN-V2
+//! * [`cache`] - weight loading cache.
+//! * [`layers`] - reusable neural network modules.
+//!   * [`layers::activation`] - activation layers.
+//!     * [`layers::activation::Activation`] - activation layer abstraction wrapper.
+//!   * [`layers::blocks`] - miscellaneous blocks.
+//!     * [`layers::blocks::conv_norm`] - ``Conv2d + BatchNorm2d`` block.
+//!   * [`layers::drop`] - dropout layers.
+//!     * [`layers::drop::drop_block`] - 2d drop block / spatial dropout.
+//!     * [`layers::drop::drop_path`] - drop path / stochastic depth.
+//!   * [`layers::patching`] - patching layers.
+//!     * [`layers::patching::patch_embed`] - 2d patch embedding layer.
+//! * [`models`] - complete model families.
+//!   * [`models::resnet`] - `ResNet`
+//!   * [`models::swin`] - The SWIN Family.
+//!     * [`models::swin::v2`] - The SWIN-V2 Model.
 
 extern crate core;
 /// Test-only macro import.

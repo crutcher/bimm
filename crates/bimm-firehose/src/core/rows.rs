@@ -497,12 +497,6 @@ impl FirehoseRowBatch {
     ///
     /// Panics if the starting point is greater than the end point or if
     /// the end point is greater than the length of the vector.
-    ///
-    /// # Leaking
-    ///
-    /// If the returned iterator goes out of scope without being dropped (due to
-    /// [`mem::forget`], for example), the vector may have lost and leaked
-    /// elements arbitrarily, including elements outside the range.
     pub fn drain_rows<R>(
         &mut self,
         range: R,
