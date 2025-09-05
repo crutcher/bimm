@@ -22,9 +22,10 @@
 //!     ])
 //! else:
 //!    self.conv1 = nn.Conv2d(in_chans, inplanes, kernel_size=7, stride=2, padding=3, bias=False)
-//!    self.bn1 = norm_layer(inplanes)
-//!    self.act1 = act_layer(inplace=True)
-//!    self.feature_info = [dict(num_chs=inplanes, reduction=2, module='act1')]
+//!
+//! self.bn1 = norm_layer(inplanes)
+//! self.act1 = act_layer(inplace=True)
+//! self.feature_info = [dict(num_chs=inplanes, reduction=2, module='act1')]
 //!
 //! # Stem pooling. The name 'maxpool' remains for weight compatibility.
 //! if replace_stem_pool:
