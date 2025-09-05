@@ -47,6 +47,19 @@
 //!     else:
 //!         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 //! ```
+//!
+//! ConvNormAct:
+//!   conv
+//!   norm
+//!   act
+//!
+//! Stem:
+//!   head: vec<(ConvNormAct)>
+//!   tail: Union[
+//!     Conv/[AA]?/Norm/Act |
+//!     [Max|AvgPool]? [AA]?
+//!   ]
+//!
 use crate::layers::activation::{Activation, ActivationConfig};
 use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig, ConvNorm2dMeta};
 use crate::models::resnet::util::CONV_INTO_RELU_INITIALIZER;
