@@ -48,13 +48,13 @@
 //!         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 //! ```
 //!
-//! ConvNormAct:
+//! `ConvNormAct`:
 //!   conv
 //!   norm
 //!   act
 //!
 //! Stem:
-//!   head: vec<(ConvNormAct)>
+//!   head: vec<(`ConvNormAct`)>
 //!   tail: Union[
 //!     Conv/[AA]?/Norm/Act |
 //!     [Max|AvgPool]? [AA]?

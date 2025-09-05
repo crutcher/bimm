@@ -13,10 +13,10 @@ use bimm_firehose::core::{
     FirehoseRowBatch, FirehoseRowReader, FirehoseRowWriter, FirehoseTableSchema,
 };
 use bimm_firehose::ops::init_default_operator_environment;
+use bimm_firehose_image::augmentation::AugmentImageOperation;
 use bimm_firehose_image::augmentation::control::with_prob::WithProbStage;
 use bimm_firehose_image::augmentation::orientation::flip::HorizontalFlipStage;
-use bimm_firehose_image::augmentation::AugmentImageOperation;
-use bimm_firehose_image::burn_support::{stack_tensor_data_column, ImageToTensorData};
+use bimm_firehose_image::burn_support::{ImageToTensorData, stack_tensor_data_column};
 use bimm_firehose_image::loader::{ImageLoader, ResizeSpec};
 use bimm_firehose_image::{ColorType, ImageShape};
 use burn::backend::{Autodiff, Cuda};
@@ -25,8 +25,8 @@ use burn::data::dataset::transform::ShuffledDataset;
 use burn::grad_clipping::GradientClippingConfig;
 use burn::lr_scheduler::cosine::CosineAnnealingLrSchedulerConfig;
 use burn::nn::loss::CrossEntropyLossConfig;
-use burn::optim::decay::WeightDecayConfig;
 use burn::optim::AdamConfig;
+use burn::optim::decay::WeightDecayConfig;
 use burn::prelude::{Backend, Int, Module, Tensor};
 use burn::record::CompactRecorder;
 use burn::tensor::backend::AutodiffBackend;
@@ -39,12 +39,12 @@ use burn::train::{
     ClassificationOutput, LearnerBuilder, MetricEarlyStoppingStrategy, StoppingCondition,
 };
 use burn::train::{TrainOutput, TrainStep, ValidStep};
-use clap::{arg, Parser};
+use clap::{Parser, arg};
 use core::clone::Clone;
 use core::default::Default;
 use core::iter::Iterator;
 use core::option::Option;
-use rand::{rng, Rng};
+use rand::{Rng, rng};
 use std::sync::Arc;
 
 const PATH_COLUMN: &str = "path";
@@ -165,7 +165,7 @@ pub fn backend_main<B: AutodiffBackend>(
         .map_layers(|layers| {
             layers
                 .into_iter()
-                .zip([1, 1, 2, 1].into_iter())
+                .zip([1, 1, 2, 1])
                 .map(|(layer, depth)| layer.extend(depth))
                 .collect()
         })
