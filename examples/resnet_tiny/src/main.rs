@@ -54,6 +54,7 @@ const IMAGE_COLUMN: &str = "image";
 const AUG_COLUMN: &str = "aug";
 const DATA_COLUMN: &str = "data";
 
+// $ --drop-path-prob=0.1 --drop-block-prob=0.2 --num-epochs=30 --batch-size=32 --learning-rate=1e-4
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
@@ -113,11 +114,11 @@ pub struct Args {
     pretrained_weights: String,
 
     /// Drop Block Prob
-    #[arg(long, default_value = "0.25")]
+    #[arg(long, default_value = "0.2")]
     drop_block_prob: f64,
 
     /// Drop Path Prob
-    #[arg(long, default_value = "0.15")]
+    #[arg(long, default_value = "0.1")]
     drop_path_prob: f64,
 
     /// Early stopping patience
