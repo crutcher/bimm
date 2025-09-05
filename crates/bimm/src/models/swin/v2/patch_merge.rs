@@ -1,3 +1,4 @@
+//! # Patch Merging
 use crate::models::swin::v2::windowing::{window_partition, window_reverse};
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::config::Config;

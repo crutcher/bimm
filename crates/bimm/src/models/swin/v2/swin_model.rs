@@ -1,3 +1,4 @@
+//! # Top-Level Swin Transformer v2 model components.
 use crate::layers::drop::rate_table::DropPathRateDepthTable;
 use crate::layers::patching::patch_embed::{PatchEmbed, PatchEmbedConfig, PatchEmbedMeta};
 use crate::models::swin::v2::block_sequence::{

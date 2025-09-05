@@ -2,9 +2,7 @@
 extern crate core;
 
 use bimm::layers::drop::drop_block::{DropBlock2d, DropBlock2dConfig, DropBlockOptions};
-use bimm::models::swin::v2::transformer::{
-    LayerConfig, SwinTransformerV2, SwinTransformerV2Config,
-};
+use bimm::models::swin::v2::swin_model::{LayerConfig, SwinTransformerV2, SwinTransformerV2Config};
 use bimm_firehose::burn::batcher::{
     BatcherInputAdapter, BatcherOutputAdapter, FirehoseExecutorBatcher,
 };

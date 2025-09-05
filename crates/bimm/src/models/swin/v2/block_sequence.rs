@@ -1,3 +1,4 @@
+//! # Swin Transformer Block Sequence
 use crate::models::swin::v2::swin_block::{
     ShiftedWindowTransformerBlock, ShiftedWindowTransformerBlockConfig,
     ShiftedWindowTransformerBlockMeta,

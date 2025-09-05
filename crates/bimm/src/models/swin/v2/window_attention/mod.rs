@@ -1,3 +1,4 @@
+//! Window attention operations for Swin Transformer v2.
 mod attention_mask;
 mod pos_bias;
 mod pos_grid;
