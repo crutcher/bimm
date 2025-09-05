@@ -1,7 +1,6 @@
 //! # Operational Block for Swin Transformer v2.
-use crate::models::swin::v2::window_attention::sw_attn_mask;
 use crate::models::swin::v2::window_attention::{
-    WindowAttention, WindowAttentionConfig, WindowAttentionMeta,
+    WindowAttention, WindowAttentionConfig, WindowAttentionMeta, sw_attn_mask,
 };
 use crate::models::swin::v2::windowing::{window_partition, window_reverse};
 use burn::config::Config;
