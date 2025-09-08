@@ -9,7 +9,7 @@ use burn::nn::{Dropout, DropoutConfig, LayerNorm, LayerNormConfig, Linear, Linea
 use burn::prelude::{Backend, Tensor};
 use burn::tensor::BasicOps;
 
-use crate::layers::activation::{Activation, ActivationConfig};
+use crate::compat::activation_wrapper::{Activation, ActivationConfig};
 use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
 use bimm_contracts::{assert_shape_contract_periodically, define_shape_contract};
 

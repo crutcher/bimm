@@ -1,4 +1,4 @@
-use crate::layers::activation::ActivationConfig;
+use crate::compat::activation_wrapper::ActivationConfig;
 use crate::models::swin::v2::window_attention::{
     OffsetGridRelativePositionBias, RelativePositionBiasConfig, RelativePositionBiasMeta,
     apply_attention_mask,

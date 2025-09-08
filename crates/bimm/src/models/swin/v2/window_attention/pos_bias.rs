@@ -1,4 +1,4 @@
-use crate::layers::activation::{Activation, ActivationConfig};
+use crate::compat::activation_wrapper::{Activation, ActivationConfig};
 use crate::models::swin::v2::window_attention::{
     window_attention_relative_position_index, window_log1p_relative_offset_grid,
 };

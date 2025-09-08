@@ -11,15 +11,17 @@
 //! [`CNABasicBlock`] implements [`Module`], and provides
 //! [`CNABasicBlock::forward`].
 
-use crate::layers::activation::ActivationConfig;
-use crate::layers::blocks::cna_block::{CNA2d, CNA2dConfig, CNA2dMeta};
+use crate::compat::activation_wrapper::ActivationConfig;
+use crate::compat::normalization_wrapper::NormalizationConfig;
+use crate::layers::blocks::cna_block::{AbstractCNA2dConfig, CNA2d, CNA2dConfig, CNA2dMeta};
 use crate::layers::drop::drop_block::{DropBlock2d, DropBlock2dConfig, DropBlockOptions};
 use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
 use crate::models::resnet::downsample::{ConvDownsample, ConvDownsampleConfig};
-use crate::models::resnet::util::{CONV_INTO_RELU_INITIALIZER, stride_div_output_resolution};
+use crate::models::resnet::util::stride_div_output_resolution;
 use crate::utility::probability::expect_probability;
+use burn::nn::BatchNormConfig;
+use burn::nn::PaddingConfig2d;
 use burn::nn::conv::Conv2dConfig;
-use burn::nn::{Initializer, PaddingConfig2d};
 use burn::prelude::{Backend, Config, Module, Tensor};
 
 /// [`CNABasicBlock`] Meta trait.
@@ -135,20 +137,16 @@ pub struct CNABasicBlockConfig {
     #[config(default = "None")]
     pub drop_block: Option<DropBlockOptions>,
 
-    /// The activation layer config.
+    /// [`Normalization`] config.
+    ///
+    /// The feature size of this config will be replaced
+    /// with the appropriate feature size for the input layer.
+    #[config(default = "NormalizationConfig::Batch(BatchNormConfig::new(0))")]
+    pub normalization: NormalizationConfig,
+
+    /// [`Activation`] layer config.
     #[config(default = "ActivationConfig::Relu")]
     pub activation: ActivationConfig,
-
-    /// The [`ConvNorm2d`] initializer.
-    ///
-    /// This should be set to a value tuned by the relationship
-    /// with `activation`.
-    #[config(default = "CONV_INTO_RELU_INITIALIZER.clone()")]
-    pub initializer: Initializer,
-
-    /// Whether to zero initialize the last norm layer.
-    #[config(default = "true")]
-    pub zero_init_last: bool,
 }
 
 impl CNABasicBlockMeta for CNABasicBlockConfig {
@@ -210,27 +208,31 @@ impl CNABasicBlockConfig {
             // TODO: mechanism to select different pool operations.
             ConvDownsampleConfig::new(self.in_planes(), self.out_planes())
                 .with_stride(self.stride())
-                .with_initializer(self.initializer.clone())
                 .into()
         } else {
             None
         };
 
-        let cna1: CNA2dConfig = Conv2dConfig::new([in_planes, first_planes], [3, 3])
-            .with_stride([stride, stride])
-            .with_dilation([first_dilation, first_dilation])
-            .with_padding(PaddingConfig2d::Explicit(first_dilation, first_dilation))
-            .with_groups(self.cardinality())
-            .with_bias(false)
-            .with_initializer(self.initializer.clone())
-            .into();
+        let cna_builder = AbstractCNA2dConfig {
+            norm: self.normalization.clone(),
+            act: self.activation.clone(),
+        };
 
-        let cna2: CNA2dConfig = Conv2dConfig::new([first_planes, out_planes], [3, 3])
-            .with_dilation([dilation, dilation])
-            .with_padding(PaddingConfig2d::Explicit(dilation, dilation))
-            .with_bias(false)
-            .with_initializer(self.initializer.clone())
-            .into();
+        let cna1: CNA2dConfig = cna_builder.build_config(
+            Conv2dConfig::new([in_planes, first_planes], [3, 3])
+                .with_stride([stride, stride])
+                .with_dilation([first_dilation, first_dilation])
+                .with_padding(PaddingConfig2d::Explicit(first_dilation, first_dilation))
+                .with_groups(self.cardinality())
+                .with_bias(false),
+        );
+
+        let cna2: CNA2dConfig = cna_builder.build_config(
+            Conv2dConfig::new([first_planes, out_planes], [3, 3])
+                .with_dilation([dilation, dilation])
+                .with_padding(PaddingConfig2d::Explicit(dilation, dilation))
+                .with_bias(false),
+        );
 
         CNABasicBlock {
             expansion_factor: self.expansion_factor,
@@ -240,14 +242,13 @@ impl CNABasicBlockConfig {
 
             // Group 1
             cna1: cna1.init(device),
+            cna2: cna2.init(device),
+
             drop_block: self
                 .drop_block
                 .as_ref()
                 .map(|options| DropBlock2dConfig::from(options.clone()).init()),
             ae: None,
-
-            // Group 2
-            cna2: cna2.init(device),
             se: None,
             drop_path: if drop_path_prob != 0.0 {
                 DropPathConfig::new()
@@ -461,6 +462,7 @@ impl<B: Backend> CNABasicBlock<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::compat::activation_wrapper::ActivationConfig;
     use bimm_contracts::assert_shape_contract;
     use burn::backend::{Autodiff, NdArray};
 

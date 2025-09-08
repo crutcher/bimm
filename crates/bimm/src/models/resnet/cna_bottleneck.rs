@@ -1,4 +1,4 @@
-//! # CNABottleneck Block for `ResNet`
+//! # `CNABottleneck` Block for `ResNet`
 //!
 //! [`CNABottleneckBlock`] is the bottleneck form of the core `ResNet` convolution unit.
 //!
@@ -11,15 +11,16 @@
 //! [`CNABottleneckBlock`] implements [`Module`], and provides
 //! [`CNABottleneckBlock::forward`].
 
-use crate::layers::activation::ActivationConfig;
-use crate::layers::blocks::cna_block::{CNA2d, CNA2dConfig, CNA2dMeta};
+use crate::compat::activation_wrapper::ActivationConfig;
+use crate::compat::normalization_wrapper::NormalizationConfig;
+use crate::layers::blocks::cna_block::{AbstractCNA2dConfig, CNA2d, CNA2dConfig, CNA2dMeta};
 use crate::layers::drop::drop_block::{DropBlock2d, DropBlock2dConfig, DropBlockOptions};
 use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
 use crate::models::resnet::downsample::{ConvDownsample, ConvDownsampleConfig};
-use crate::models::resnet::util::{stride_div_output_resolution, CONV_INTO_RELU_INITIALIZER};
+use crate::models::resnet::util::stride_div_output_resolution;
 use crate::utility::probability::expect_probability;
 use burn::nn::conv::Conv2dConfig;
-use burn::nn::{Initializer, PaddingConfig2d};
+use burn::nn::{BatchNormConfig, PaddingConfig2d};
 use burn::prelude::{Backend, Config, Module, Tensor};
 
 /// [`CNABottleneckBlock`] Meta trait.
@@ -52,7 +53,7 @@ pub trait CNABottleneckBlockMeta {
         self.width() / self.reduction_factor()
     }
 
-    /// CNABottleneck width.
+    /// `CNABottleneck` width.
     ///
     /// ``planes * (base_width / 64) * cardinality``
     fn width(&self) -> usize {
@@ -135,20 +136,16 @@ pub struct CNABottleneckBlockConfig {
     #[config(default = "None")]
     pub drop_block: Option<DropBlockOptions>,
 
-    /// The activation layer config.
+    /// [`Normalization`] config.
+    ///
+    /// The feature size of this config will be replaced
+    /// with the appropriate feature size for the input layer.
+    #[config(default = "NormalizationConfig::Batch(BatchNormConfig::new(0))")]
+    pub normalization: NormalizationConfig,
+
+    /// [`Activation`] layer config.
     #[config(default = "ActivationConfig::Relu")]
     pub activation: ActivationConfig,
-
-    /// The [`ConvNorm2d`] initializer.
-    ///
-    /// This should be set to a value tuned by the relationship
-    /// with `activation`.
-    #[config(default = "CONV_INTO_RELU_INITIALIZER.clone()")]
-    pub initializer: Initializer,
-
-    /// Whether to zero initialize the last norm layer.
-    #[config(default = "true")]
-    pub zero_init_last: bool,
 }
 
 impl CNABottleneckBlockMeta for CNABottleneckBlockConfig {
@@ -210,27 +207,30 @@ impl CNABottleneckBlockConfig {
             // TODO: mechanism to select different pool operations.
             ConvDownsampleConfig::new(in_planes, out_planes)
                 .with_stride(stride)
-                .with_initializer(self.initializer.clone())
                 .into()
         } else {
             None
         };
 
-        let cna1: CNA2dConfig = Conv2dConfig::new([in_planes, first_planes], [1, 1])
-            .with_bias(false)
-            .into();
+        let cna_builder = AbstractCNA2dConfig {
+            norm: self.normalization.clone(),
+            act: self.activation.clone(),
+        };
 
-        let cna2: CNA2dConfig = Conv2dConfig::new([first_planes, width], [3, 3])
-            .with_stride([stride, stride])
-            .with_dilation([dilation, dilation])
-            .with_padding(PaddingConfig2d::Explicit(dilation, dilation))
-            .with_groups(self.cardinality())
-            .with_bias(false)
-            .into();
+        let cna1: CNA2dConfig = cna_builder
+            .build_config(Conv2dConfig::new([in_planes, first_planes], [1, 1]).with_bias(false));
 
-        let cna3: CNA2dConfig = Conv2dConfig::new([width, out_planes], [1, 1])
-            .with_bias(false)
-            .into();
+        let cna2: CNA2dConfig = cna_builder.build_config(
+            Conv2dConfig::new([first_planes, width], [3, 3])
+                .with_stride([stride, stride])
+                .with_dilation([dilation, dilation])
+                .with_padding(PaddingConfig2d::Explicit(dilation, dilation))
+                .with_groups(self.cardinality())
+                .with_bias(false),
+        );
+
+        let cna3: CNA2dConfig = cna_builder
+            .build_config(Conv2dConfig::new([width, out_planes], [1, 1]).with_bias(false));
 
         CNABottleneckBlock {
             base_width: self.base_width,
@@ -239,21 +239,14 @@ impl CNABottleneckBlockConfig {
 
             downsample: downsample.as_ref().map(|c| c.init(device)),
 
-            cna1: cna1
-                .with_intitializer(self.initializer.clone())
-                .init(device),
-            cna2: cna2
-                .with_intitializer(self.initializer.clone())
-                .init(device),
-            cna3: cna3
-                .with_intitializer(self.initializer.clone())
-                .init(device),
+            cna1: cna1.init(device),
+            cna2: cna2.init(device),
+            cna3: cna3.init(device),
 
             drop_block: self
                 .drop_block
                 .as_ref()
                 .map(|options| DropBlock2dConfig::from(options.clone()).init()),
-
             ae: None,
 
             se: None,
@@ -284,11 +277,11 @@ pub struct CNABottleneckBlock<B: Backend> {
     /// Optional `DownSample` layer; for the residual connection.
     pub downsample: Option<ConvDownsample<B>>,
 
-    /// The first `CNA2d` layer.
+    /// First conv/norm/act layer.
     pub cna1: CNA2d<B>,
-    /// The second `CNA2d` layer.
+    /// Second conv/norm/act layer.
     pub cna2: CNA2d<B>,
-    /// The third `CNA2d` layer.
+    /// Third conv/norm/act layer.
     pub cna3: CNA2d<B>,
 
     /// Optional `DropBlock` layer.
@@ -399,7 +392,6 @@ impl<B: Backend> CNABottleneckBlock<B> {
         #[cfg(debug_assertions)]
         bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &identity, &out_bindings);
 
-        // Group 1
         let x = self.cna1.forward(input);
 
         #[cfg(debug_assertions)]
@@ -414,30 +406,20 @@ impl<B: Backend> CNABottleneckBlock<B> {
             ],
         );
 
-        // Group 2
         let x = self.cna2.hook_forward(x, |x| match &self.drop_block {
             Some(drop_block) => drop_block.forward(x),
             None => x,
         });
-        #[cfg(debug_assertions)]
-        bimm_contracts::assert_shape_contract_periodically!(
-            ["batch", "width", "out_height", "out_width"],
-            &x,
-            &[
-                ("batch", batch),
-                ("width", self.width()),
-                ("out_height", out_height),
-                ("out_width", out_width),
-            ],
-        );
 
         let x = match &self.ae {
             Some(_) => unimplemented!("anti-aliasing is not implemented"),
             None => x,
         };
 
-        // Group 3
-        let x = self.cna3.hook_forward(x, |x| {
+        self.cna3.hook_forward(x, |x| {
+            #[cfg(debug_assertions)]
+            bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
+
             let x = match &self.se {
                 Some(_) => unimplemented!("attention is not implemented"),
                 None => x,
@@ -448,12 +430,7 @@ impl<B: Backend> CNABottleneckBlock<B> {
             };
 
             x + identity
-        });
-
-        #[cfg(debug_assertions)]
-        bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
-
-        x
+        })
     }
 
     /// Set the drop path probability.

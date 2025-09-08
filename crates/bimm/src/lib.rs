@@ -5,8 +5,8 @@
 //!
 //! * [`cache`] - weight loading cache.
 //! * [`layers`] - reusable neural network modules.
-//!   * [`layers::activation`] - activation layers.
-//!     * [`layers::activation::Activation`] - activation layer abstraction wrapper.
+//!   * [`compat::activation`] - activation layers.
+//!     * [`compat::activation_wrapper::Activation`] - activation layer abstraction wrapper.
 //!   * [`layers::blocks`] - miscellaneous blocks.
 //!     * [`layers::blocks::conv_norm`] - ``Conv2d + BatchNorm2d`` block.
 //!   * [`layers::drop`] - dropout layers.
@@ -27,7 +27,7 @@ extern crate core;
 extern crate hamcrest;
 
 #[allow(dead_code)]
-pub(crate) mod compat;
+pub mod compat;
 
 #[cfg(test)]
 #[allow(dead_code)]
