@@ -11,7 +11,7 @@
 //! [`BottleneckBlock`] implements [`Module`], and provides
 //! [`BottleneckBlock::forward`].
 
-use crate::layers::activation::{Activation, ActivationConfig};
+use crate::compat::activation_wrapper::{Activation, ActivationConfig};
 use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig, ConvNorm2dMeta};
 use crate::layers::drop::drop_block::{DropBlock2d, DropBlock2dConfig, DropBlockOptions};
 use crate::layers::drop::drop_path::{DropPath, DropPathConfig};

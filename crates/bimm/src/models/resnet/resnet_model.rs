@@ -13,7 +13,7 @@
 //! [`ResNet`] implements [`Module`], and provides
 //! [`ResNet::forward`].
 
-use crate::layers::activation::{Activation, ActivationConfig};
+use crate::compat::activation_wrapper::{Activation, ActivationConfig};
 use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig};
 use crate::layers::drop::drop_block::DropBlockOptions;
 use crate::models::resnet::layer_block::{LayerBlock, LayerBlockConfig, LayerBlockMeta};

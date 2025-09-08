@@ -1,15 +1,15 @@
-//! # Basic Block for `ResNet`
+//! # `CNABottleneck` Block for `ResNet`
 //!
-//! [`CNABasicBlock`] is the core `ResNet` convolution unit.
+//! [`CNABottleneckBlock`] is the bottleneck form of the core `ResNet` convolution unit.
 //!
-//! [`CNABasicBlockMeta`] defines a common meta API for [`CNABasicBlock`]
-//! and [`CNABasicBlockConfig`].
+//! [`CNABottleneckBlockMeta`] defines a common meta API for [`CNABottleneckBlock`]
+//! and [`CNABottleneckBlockConfig`].
 //!
-//! [`CNABasicBlockConfig`] implements [`Config`], and provides
-//! [`CNABasicBlockConfig::init`] to initialize a [`CNABasicBlock`].
+//! [`CNABottleneckBlockConfig`] implements [`Config`], and provides
+//! [`CNABottleneckBlockConfig::init`] to initialize a [`CNABottleneckBlock`].
 //!
-//! [`CNABasicBlock`] implements [`Module`], and provides
-//! [`CNABasicBlock::forward`].
+//! [`CNABottleneckBlock`] implements [`Module`], and provides
+//! [`CNABottleneckBlock::forward`].
 
 use crate::compat::activation_wrapper::ActivationConfig;
 use crate::compat::normalization_wrapper::NormalizationConfig;
@@ -19,21 +19,17 @@ use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
 use crate::models::resnet::downsample::{ConvDownsample, ConvDownsampleConfig};
 use crate::models::resnet::util::stride_div_output_resolution;
 use crate::utility::probability::expect_probability;
-use burn::nn::BatchNormConfig;
-use burn::nn::PaddingConfig2d;
 use burn::nn::conv::Conv2dConfig;
+use burn::nn::{BatchNormConfig, PaddingConfig2d};
 use burn::prelude::{Backend, Config, Module, Tensor};
 
-/// [`CNABasicBlock`] Meta trait.
-pub trait CNABasicBlockMeta {
-    /// The size of the in channels dimension.
+/// [`CNABottleneckBlock`] Meta trait.
+pub trait CNABottleneckBlockMeta {
+    /// The number of input feature planes.
     fn in_planes(&self) -> usize;
 
     /// Dilation rate for conv layers.
     fn dilation(&self) -> usize;
-
-    /// Optional dilation rate for the first conv.
-    fn first_dilation(&self) -> Option<usize>;
 
     /// Configures the size of `first_planes` and `out_planes`.
     fn planes(&self) -> usize;
@@ -41,20 +37,30 @@ pub trait CNABasicBlockMeta {
     /// Groups of the conv filters.
     fn cardinality(&self) -> usize;
 
-    /// Control factor for `out_planes()`
-    fn expansion_factor(&self) -> usize;
+    /// Control factor for `width()`.
+    fn base_width(&self) -> usize;
 
     /// Control factor for `first_planes()`
     fn reduction_factor(&self) -> usize;
+
+    /// Control factor for `out_planes()`
+    fn expansion_factor(&self) -> usize;
 
     /// First conv/norm layer output channels.
     ///
     /// ``first_planes = planes // reduction_factor``
     fn first_planes(&self) -> usize {
-        self.planes() / self.reduction_factor()
+        self.width() / self.reduction_factor()
     }
 
-    /// The size of the out channels dimension.
+    /// `CNABottleneck` width.
+    ///
+    /// ``planes * (base_width / 64) * cardinality``
+    fn width(&self) -> usize {
+        self.planes() * (self.base_width() / 64) * self.cardinality()
+    }
+
+    /// The number of output feature planes.
     ///
     /// ``out_planes = planes * expansion_factor``
     fn out_planes(&self) -> usize {
@@ -87,27 +93,24 @@ pub trait CNABasicBlockMeta {
     ) -> [usize; 2] {
         stride_div_output_resolution(input_resolution, self.stride())
     }
-
-    /// Effective first dilation.
-    ///
-    /// Resolves `first_dilation()` vrs `dilation()`.
-    fn effective_first_dilation(&self) -> usize {
-        self.first_dilation().unwrap_or(self.dilation())
-    }
 }
 
-/// [`CNABasicBlock`] Config.
+/// [`CNABottleneckBlock`] Config.
 #[derive(Config, Debug)]
-pub struct CNABasicBlockConfig {
+pub struct CNABottleneckBlockConfig {
     /// The size of the in channels dimension.
     pub in_planes: usize,
 
-    /// Configures the `out_planes` as a function of `expansion_factor`.
+    /// Configures the size of `first_planes` and `out_planes`.
     pub planes: usize,
 
     /// Groups of the conv filters.
-    #[config(default = "1")]
+    #[config(default = "4")]
     pub cardinality: usize,
+
+    /// Base width used to determine the number of output channels.
+    #[config(default = "64")]
+    pub base_width: usize,
 
     /// Control factor for `out_planes()`
     #[config(default = 1)]
@@ -124,10 +127,6 @@ pub struct CNABasicBlockConfig {
     /// Dilation rate for conv layers.
     #[config(default = 1)]
     pub dilation: usize,
-
-    /// Optional dilation rate for the first conv.
-    #[config(default = "None")]
-    pub first_dilation: Option<usize>,
 
     /// Drop path probability.
     #[config(default = "0.0")]
@@ -149,17 +148,13 @@ pub struct CNABasicBlockConfig {
     pub activation: ActivationConfig,
 }
 
-impl CNABasicBlockMeta for CNABasicBlockConfig {
+impl CNABottleneckBlockMeta for CNABottleneckBlockConfig {
     fn in_planes(&self) -> usize {
         self.in_planes
     }
 
     fn dilation(&self) -> usize {
         self.dilation
-    }
-
-    fn first_dilation(&self) -> Option<usize> {
-        self.first_dilation
     }
 
     fn planes(&self) -> usize {
@@ -170,12 +165,16 @@ impl CNABasicBlockMeta for CNABasicBlockConfig {
         self.cardinality
     }
 
-    fn expansion_factor(&self) -> usize {
-        self.expansion_factor
+    fn base_width(&self) -> usize {
+        self.base_width
     }
 
     fn reduction_factor(&self) -> usize {
         self.reduction_factor
+    }
+
+    fn expansion_factor(&self) -> usize {
+        self.expansion_factor
     }
 
     fn stride(&self) -> usize {
@@ -183,31 +182,31 @@ impl CNABasicBlockMeta for CNABasicBlockConfig {
     }
 }
 
-impl CNABasicBlockConfig {
-    /// Initialize a [`CNABasicBlock`].
+impl CNABottleneckBlockConfig {
+    /// Initialize a [`CNABottleneckBlock`].
     pub fn init<B: Backend>(
         self,
         device: &B::Device,
-    ) -> CNABasicBlock<B> {
+    ) -> CNABottleneckBlock<B> {
         let drop_path_prob = expect_probability(self.drop_path_prob);
 
         let in_planes = self.in_planes();
-        let first_planes = self.first_planes();
+        let width = self.width();
+        let first_planes = width / self.reduction_factor;
         let out_planes = self.out_planes();
 
-        let first_dilation = self.effective_first_dilation();
         let dilation = self.dilation();
 
         let stride = self.stride();
 
         // TODO: conditional stride logic for anti-aliasing.
-        // use_aa = aa_layer is not None and (stride == 2 or first_dilation != dilation)
+        // use_aa = aa_layer is not None and stride == 2
         // stride = 1 if use_aa else stride
 
         let downsample = if stride != 1 || in_planes != out_planes {
             // TODO: mechanism to select different pool operations.
-            ConvDownsampleConfig::new(self.in_planes(), self.out_planes())
-                .with_stride(self.stride())
+            ConvDownsampleConfig::new(in_planes, out_planes)
+                .with_stride(stride)
                 .into()
         } else {
             None
@@ -218,37 +217,38 @@ impl CNABasicBlockConfig {
             act: self.activation.clone(),
         };
 
-        let cna1: CNA2dConfig = cna_builder.build_config(
-            Conv2dConfig::new([in_planes, first_planes], [3, 3])
+        let cna1: CNA2dConfig = cna_builder
+            .build_config(Conv2dConfig::new([in_planes, first_planes], [1, 1]).with_bias(false));
+
+        let cna2: CNA2dConfig = cna_builder.build_config(
+            Conv2dConfig::new([first_planes, width], [3, 3])
                 .with_stride([stride, stride])
-                .with_dilation([first_dilation, first_dilation])
-                .with_padding(PaddingConfig2d::Explicit(first_dilation, first_dilation))
+                .with_dilation([dilation, dilation])
+                .with_padding(PaddingConfig2d::Explicit(dilation, dilation))
                 .with_groups(self.cardinality())
                 .with_bias(false),
         );
 
-        let cna2: CNA2dConfig = cna_builder.build_config(
-            Conv2dConfig::new([first_planes, out_planes], [3, 3])
-                .with_dilation([dilation, dilation])
-                .with_padding(PaddingConfig2d::Explicit(dilation, dilation))
-                .with_bias(false),
-        );
+        let cna3: CNA2dConfig = cna_builder
+            .build_config(Conv2dConfig::new([width, out_planes], [1, 1]).with_bias(false));
 
-        CNABasicBlock {
+        CNABottleneckBlock {
+            base_width: self.base_width,
             expansion_factor: self.expansion_factor,
             reduction_factor: self.reduction_factor,
 
-            downsample: downsample.as_ref().map(|cfg| cfg.init(device)),
+            downsample: downsample.as_ref().map(|c| c.init(device)),
 
-            // Group 1
             cna1: cna1.init(device),
             cna2: cna2.init(device),
+            cna3: cna3.init(device),
 
             drop_block: self
                 .drop_block
                 .as_ref()
                 .map(|options| DropBlock2dConfig::from(options.clone()).init()),
             ae: None,
+
             se: None,
             drop_path: if drop_path_prob != 0.0 {
                 DropPathConfig::new()
@@ -264,7 +264,10 @@ impl CNABasicBlockConfig {
 
 /// Basic Block for `ResNet`.
 #[derive(Module, Debug)]
-pub struct CNABasicBlock<B: Backend> {
+pub struct CNABottleneckBlock<B: Backend> {
+    /// Base width.
+    pub base_width: usize,
+
     /// Expansion factor.
     pub expansion_factor: usize,
 
@@ -274,10 +277,12 @@ pub struct CNABasicBlock<B: Backend> {
     /// Optional `DownSample` layer; for the residual connection.
     pub downsample: Option<ConvDownsample<B>>,
 
-    /// First Conv/Norm/Act Block.
+    /// First conv/norm/act layer.
     pub cna1: CNA2d<B>,
-    /// Second Conv/Norm/Act Block.
+    /// Second conv/norm/act layer.
     pub cna2: CNA2d<B>,
+    /// Third conv/norm/act layer.
+    pub cna3: CNA2d<B>,
 
     /// Optional `DropBlock` layer.
     pub drop_block: Option<DropBlock2d>,
@@ -294,51 +299,53 @@ pub struct CNABasicBlock<B: Backend> {
     pub drop_path: Option<DropPath>,
 }
 
-impl<B: Backend> CNABasicBlockMeta for CNABasicBlock<B> {
+impl<B: Backend> CNABottleneckBlockMeta for CNABottleneckBlock<B> {
     fn in_planes(&self) -> usize {
         self.cna1.in_channels()
     }
 
     fn dilation(&self) -> usize {
-        self.cna1.conv.dilation[0]
-    }
-
-    fn first_dilation(&self) -> Option<usize> {
-        let d1 = self.cna1.conv.dilation[0];
-        let d2 = self.cna2.conv.dilation[0];
-        if d1 == d2 { None } else { Some(d1) }
+        self.cna3.conv.dilation[0]
     }
 
     fn planes(&self) -> usize {
-        self.cna1.out_channels() / self.expansion_factor()
+        self.out_planes() / self.expansion_factor()
     }
 
     fn cardinality(&self) -> usize {
-        self.cna1.groups()
+        self.cna2.groups()
     }
 
-    fn expansion_factor(&self) -> usize {
-        self.expansion_factor
+    fn base_width(&self) -> usize {
+        self.base_width
     }
 
     fn reduction_factor(&self) -> usize {
         self.reduction_factor
     }
 
+    fn expansion_factor(&self) -> usize {
+        self.expansion_factor
+    }
+
     fn first_planes(&self) -> usize {
         self.cna1.out_channels()
     }
 
+    fn width(&self) -> usize {
+        self.cna3.in_channels()
+    }
+
     fn out_planes(&self) -> usize {
-        self.cna2.out_channels()
+        self.cna3.out_channels()
     }
 
     fn stride(&self) -> usize {
-        self.cna1.stride()[0]
+        self.cna2.stride()[0]
     }
 }
 
-impl<B: Backend> CNABasicBlock<B> {
+impl<B: Backend> CNABottleneckBlock<B> {
     /// Forward Pass.
     ///
     /// # Arguments
@@ -347,13 +354,13 @@ impl<B: Backend> CNABasicBlock<B> {
     ///
     /// # Returns
     ///
-    /// A ``[batch, out_planes=planes*expansion_factor, out_height, out_width]`` tensor.
+    /// A ``[batch, out_planes=planes*expansion_factor, out_height, out_width]`` tensor;
     pub fn forward(
         &self,
         input: Tensor<B, 4>,
     ) -> Tensor<B, 4> {
         #[cfg(debug_assertions)]
-        let [batch, out_height, out_width] = bimm_contracts::unpack_shape_contract!(
+        let [batch, in_height, out_height, in_width, out_width] = bimm_contracts::unpack_shape_contract!(
             [
                 "batch",
                 "in_planes",
@@ -361,7 +368,7 @@ impl<B: Backend> CNABasicBlock<B> {
                 "in_width" = "out_width" * "stride"
             ],
             &input,
-            &["batch", "out_height", "out_width"],
+            &["batch", "in_height", "out_height", "in_width", "out_width"],
             &[("in_planes", self.in_planes()), ("stride", self.stride())],
         );
 
@@ -385,31 +392,34 @@ impl<B: Backend> CNABasicBlock<B> {
         #[cfg(debug_assertions)]
         bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &identity, &out_bindings);
 
-        // Group 1
-        let x = self.cna1.hook_forward(input, |x| match &self.drop_block {
-            Some(drop_block) => drop_block.forward(x),
-            None => x,
-        });
+        let x = self.cna1.forward(input);
 
         #[cfg(debug_assertions)]
         bimm_contracts::assert_shape_contract_periodically!(
-            ["batch", "first_planes", "out_height", "out_width"],
+            ["batch", "first_planes", "in_height", "in_width"],
             &x,
             &[
                 ("batch", batch),
                 ("first_planes", self.first_planes()),
-                ("out_height", out_height),
-                ("out_width", out_width),
-            ]
+                ("in_height", in_height),
+                ("in_width", in_width),
+            ],
         );
+
+        let x = self.cna2.hook_forward(x, |x| match &self.drop_block {
+            Some(drop_block) => drop_block.forward(x),
+            None => x,
+        });
 
         let x = match &self.ae {
             Some(_) => unimplemented!("anti-aliasing is not implemented"),
             None => x,
         };
 
-        // Group 2
-        let x = self.cna2.hook_forward(x, |x| {
+        self.cna3.hook_forward(x, |x| {
+            #[cfg(debug_assertions)]
+            bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
+
             let x = match &self.se {
                 Some(_) => unimplemented!("attention is not implemented"),
                 None => x,
@@ -420,12 +430,7 @@ impl<B: Backend> CNABasicBlock<B> {
             };
 
             x + identity
-        });
-
-        #[cfg(debug_assertions)]
-        bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
-
-        x
+        })
     }
 
     /// Set the drop path probability.
@@ -462,15 +467,13 @@ impl<B: Backend> CNABasicBlock<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compat::activation_wrapper::ActivationConfig;
-    use bimm_contracts::assert_shape_contract;
-    use burn::backend::{Autodiff, NdArray};
+    use burn::backend::NdArray;
 
     #[test]
     fn test_basic_block_config() {
         let in_channels = 16;
         let out_channels = 32;
-        let config = CNABasicBlockConfig::new(in_channels, out_channels);
+        let config = CNABottleneckBlockConfig::new(in_channels, out_channels);
         assert_eq!(config.in_planes(), in_channels);
         assert_eq!(config.out_planes(), out_channels);
         assert_eq!(config.stride(), 1);
@@ -488,7 +491,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "7 !~ in_height=(out_height*stride)")]
     fn test_downsample_config_panic() {
-        let config = CNABasicBlockConfig::new(16, 32).with_stride(2);
+        let config = CNABottleneckBlockConfig::new(16, 32).with_stride(2);
         assert_eq!(config.stride(), 2);
         config.output_resolution([7, 7]);
     }
@@ -501,8 +504,8 @@ mod tests {
         let in_channels = 2;
         let out_channels = in_channels;
 
-        let block: CNABasicBlock<B> =
-            CNABasicBlockConfig::new(in_channels, out_channels).init(&device);
+        let block: CNABottleneckBlock<B> =
+            CNABottleneckBlockConfig::new(in_channels, out_channels).init(&device);
 
         assert_eq!(block.in_planes(), in_channels);
         assert_eq!(block.out_planes(), out_channels);
@@ -510,9 +513,33 @@ mod tests {
         assert_eq!(block.output_resolution([16, 16]), [16, 16]);
     }
 
+    #[cfg(feature = "wgpu")]
+    #[test]
+    fn test_conv2d_example_metal() {
+        // FIXME: Conv2d with groups is broken in 0.18.0; but fixed in 0.19.0
+        type B = burn::backend::Wgpu;
+        let device = Default::default();
+
+        let input: Tensor<B, 4> = Tensor::ones([2, 32, 64, 64], &device);
+
+        let layer = Conv2dConfig::new([32, 32], [3, 3])
+            .with_padding(PaddingConfig2d::Explicit(1, 1))
+            .with_groups(4)
+            .with_bias(false)
+            .init(&device);
+
+        let result = layer.forward(input);
+        assert_eq!(&result.shape().dims, &[2, 32, 64, 64]);
+    }
+
+    #[cfg(feature = "wgpu")]
     #[test]
     fn test_basic_block_forward_same_channels_no_downsample_autodiff() {
-        type B = Autodiff<NdArray<f32>>;
+        // FIXME: Conv2d with groups is broken in 0.18.0; but fixed in 0.19.0
+        use bimm_contracts::assert_shape_contract;
+        use burn::backend::{Autodiff, Wgpu};
+        type B = Autodiff<Wgpu>;
+
         let device = Default::default();
 
         let batch_size = 2;
@@ -521,7 +548,8 @@ mod tests {
         let in_height = 8;
         let in_width = 8;
 
-        let block: CNABasicBlock<B> = CNABasicBlockConfig::new(in_planes, planes).init(&device);
+        let block: CNABottleneckBlock<B> =
+            CNABottleneckBlockConfig::new(in_planes, planes).init(&device);
         let out_planes = block.out_planes();
 
         let input = Tensor::ones([batch_size, in_planes, in_height, in_width], &device);
@@ -539,9 +567,14 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "wgpu")]
     #[test]
     fn test_basic_block_forward_downsample_drop_block_drop_path_autodiff() {
-        type B = Autodiff<NdArray<f32>>;
+        // FIXME: Conv2d with groups is broken in 0.18.0; but fixed in 0.19.0
+        use bimm_contracts::assert_shape_contract;
+        use burn::backend::{Autodiff, Wgpu};
+        type B = Autodiff<Wgpu>;
+
         let device = Default::default();
 
         let batch_size = 2;
@@ -550,7 +583,7 @@ mod tests {
         let in_height = 8;
         let in_width = 8;
 
-        let block: CNABasicBlock<B> = CNABasicBlockConfig::new(in_planes, planes)
+        let block: CNABottleneckBlock<B> = CNABottleneckBlockConfig::new(in_planes, planes)
             .with_drop_path_prob(0.1)
             .with_drop_block(Some(DropBlockOptions::default()))
             .with_stride(2)

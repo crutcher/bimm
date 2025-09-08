@@ -4,18 +4,16 @@
 //! * a [`Conv2d`] layer,
 //! * a [`BatchNorm`] layer,
 //! * a [`Application`] layer.
-//! a [`Conv2d`] layer followed by a [`BatchNorm`] layer.
 //!
 //! With support for hooking the forward method,
 //! to run code between the norm and application layers.
 
-use crate::layers::activation::{Activation, ActivationConfig};
-use crate::models::resnet::util::CONV_INTO_RELU_INITIALIZER;
+use crate::compat::activation_wrapper::{Activation, ActivationConfig};
+use crate::compat::normalization_wrapper::{Normalization, NormalizationConfig};
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::config::Config;
 use burn::module::Module;
 use burn::nn::conv::{Conv2d, Conv2dConfig};
-use burn::nn::{BatchNorm, BatchNormConfig, Initializer};
 use burn::prelude::{Backend, Tensor};
 
 /// [`CNA2d`] Meta.
@@ -33,19 +31,48 @@ pub trait CNA2dMeta {
     fn stride(&self) -> &[usize; 2];
 }
 
+/// Abstract policy for [`CNA2d`] Config.
+///
+/// Defines a norm and act layer,
+/// and can be lifted to a [`CNA2dConfig`]
+/// to match a [`Conv2dConfig`].
+#[derive(Config, Debug)]
+pub struct AbstractCNA2dConfig {
+    /// The [`Normalization`] config.
+    pub norm: NormalizationConfig,
+
+    /// Activation Config.
+    #[config(default = "ActivationConfig::Relu")]
+    pub act: ActivationConfig,
+}
+
+impl AbstractCNA2dConfig {
+    /// Merge with a [`Conv2dConfig`] to construct a [`CNA2dConfig`].
+    pub fn build_config(
+        &self,
+        conv: Conv2dConfig,
+    ) -> CNA2dConfig {
+        CNA2dConfig {
+            conv,
+            norm: self.norm.clone(),
+            act: self.act.clone(),
+        }
+        .match_norm_features()
+    }
+}
+
 /// [`CNA2d`] Config.
 #[derive(Config, Debug)]
 pub struct CNA2dConfig {
     /// The [`Conv2d`] config.
     pub conv: Conv2dConfig,
 
+    /// The [`Normalization`] config.
+    pub norm: NormalizationConfig,
+
     /// Activation Config.
     #[config(default = "ActivationConfig::Relu")]
     pub act: ActivationConfig,
-
-    /// Convolution override initializer.
-    #[config(default = "CONV_INTO_RELU_INITIALIZER.clone()")]
-    pub intitializer: Initializer,
 }
 
 impl CNA2dMeta for CNA2dConfig {
@@ -66,26 +93,28 @@ impl CNA2dMeta for CNA2dConfig {
     }
 }
 
-impl From<Conv2dConfig> for CNA2dConfig {
-    fn from(conv: Conv2dConfig) -> Self {
-        Self::new(conv)
-    }
-}
-
 impl CNA2dConfig {
     /// Initialize a [`CNA2d`].
+    ///
+    /// Auto-matches the norm layer input channels
+    /// to the conv layer's output channels.
     pub fn init<B: Backend>(
         self,
         device: &B::Device,
     ) -> CNA2d<B> {
-        let out_channels = self.conv.channels[1];
+        let cfg = self.match_norm_features();
         CNA2d {
-            conv: self.conv.with_initializer(self.intitializer).init(device),
-
-            norm: BatchNormConfig::new(out_channels).init(device),
-
-            act: self.act.init(device),
+            conv: cfg.conv.init(device),
+            norm: cfg.norm.init(device),
+            act: cfg.act.init(device),
         }
+    }
+
+    /// Adjust the norm features to match the conv output.
+    pub fn match_norm_features(self) -> Self {
+        let features = self.out_channels();
+        let norm = self.norm.match_feature_size(features);
+        Self { norm, ..self }
     }
 }
 
@@ -96,7 +125,7 @@ pub struct CNA2d<B: Backend> {
     pub conv: Conv2d<B>,
 
     /// Internal Norm Layer.
-    pub norm: BatchNorm<B, 2>,
+    pub norm: Normalization<B>,
 
     /// Activation layer.
     pub act: Activation<B>,
@@ -121,15 +150,6 @@ impl<B: Backend> CNA2dMeta for CNA2d<B> {
 }
 
 impl<B: Backend> CNA2d<B> {
-    /// Zero initialize the norm layer's weights.
-    ///
-    /// This is used by / referenced in upstream `ResNet` init.
-    ///
-    /// TODO: Track down the paper that recommends this.
-    pub fn zero_init_norm(&mut self) {
-        self.norm.gamma = self.norm.gamma.clone().map(|p| p.slice_fill([..], 0.0));
-    }
-
     /// Forward Pass.
     pub fn forward(
         &self,
@@ -201,7 +221,7 @@ impl<B: Backend> CNA2d<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use burn::nn::PaddingConfig2d;
+    use burn::nn::{BatchNormConfig, PaddingConfig2d};
 
     #[test]
     fn test_conv_norm_config() {
@@ -210,7 +230,10 @@ mod tests {
             .with_padding(PaddingConfig2d::Explicit(1, 1))
             .with_bias(false);
 
-        let config: CNA2dConfig = inner_config.clone().into();
+        let config: CNA2dConfig = CNA2dConfig::new(
+            inner_config.clone(),
+            NormalizationConfig::Batch(BatchNormConfig::new(0)),
+        );
 
         assert_eq!(&config.conv.channels, &inner_config.channels);
         assert_eq!(&config.conv.kernel_size, &inner_config.kernel_size);

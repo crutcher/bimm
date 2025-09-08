@@ -32,8 +32,8 @@ criterion = { workspace = true }
 
 
 [features]
-default = []
-# std = []
+default = ["std"]
+std = []
 wgpu = ["burn/wgpu"]
 
 [[bench]]
