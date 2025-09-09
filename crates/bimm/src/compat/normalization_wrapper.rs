@@ -6,7 +6,13 @@
 //! * [`Instance`] - [`InstanceNorm`]
 //! * [`Layer`] - [`LayerNorm`]
 //!
+//! ## ['`RmsNorm`'] is not supported.
+//!
+//! * In v0.18.0, this fails to implement Debug.
+//! * In v0.19.0-dev, this does.
+//!
 //! The enum is non-exhaustive, to prepare for future additions.
+
 use burn::nn::{
     BatchNorm, BatchNormConfig, GroupNorm, GroupNormConfig, InstanceNorm, InstanceNormConfig,
     LayerNorm, LayerNormConfig,
@@ -14,6 +20,11 @@ use burn::nn::{
 use burn::prelude::{Backend, Config, Module, Tensor};
 
 /// ['Normalization'] Configuration.
+///
+/// ## ['`RmsNorm`'] is not supported.
+///
+/// * In v0.18.0, this fails to implement Debug.
+/// * In v0.19.0-dev, this does.
 ///
 /// The enum is non-exhaustive to prepare for future additions.
 #[derive(Config, Debug)]
@@ -30,10 +41,6 @@ pub enum NormalizationConfig {
 
     /// ['`LayerNorm`'] Configuration.
     Layer(LayerNormConfig),
-    // ['RmsNorm'] Configuration.
-    // In v0.18.0, this fails to implement Debug.
-    // In v0.19.0-dev, this does.
-    // Rms(RmsNormConfig),
 }
 
 impl From<BatchNormConfig> for NormalizationConfig {
@@ -60,55 +67,57 @@ impl From<LayerNormConfig> for NormalizationConfig {
     }
 }
 
-/*
-impl From<RmsNormConfig> for NormalizationConfig {
-    fn from(config: RmsNormConfig) -> Self {
-        Self::Rms(config)
-    }
-}
- */
-
 impl NormalizationConfig {
-    /// Adjust a norm config to the feature size.
-    pub fn match_feature_size(
-        self,
-        features: usize,
-    ) -> Self {
-        match self {
-            NormalizationConfig::Batch(config) => {
-                let mut config = config;
-                config.num_features = features;
-                config.into()
-            }
-            NormalizationConfig::Group(config) => {
-                let mut config = config;
-                config.num_channels = features;
-                config.into()
-            }
-            NormalizationConfig::Instance(config) => {
-                let mut config = config;
-                config.num_channels = features;
-                config.into()
-            }
-            NormalizationConfig::Layer(config) => {
-                let mut config = config;
-                config.d_model = features;
-                config.into()
-            }
-        }
-    }
-
     /// Initialize a ['Norm'] layer.
     pub fn init<B: Backend>(
         &self,
         device: &B::Device,
     ) -> Normalization<B> {
         match self {
-            NormalizationConfig::Batch(config) => Normalization::Batch(config.init(device)),
-            NormalizationConfig::Group(config) => Normalization::Group(config.init(device)),
-            NormalizationConfig::Instance(config) => Normalization::Instance(config.init(device)),
-            NormalizationConfig::Layer(config) => Normalization::Layer(config.init(device)),
-            // NormalizationConfig::Rms(config) => Normalization::Rms(config.init(device)),
+            NormalizationConfig::Batch(config) => config.init(device).into(),
+            NormalizationConfig::Group(config) => config.init(device).into(),
+            NormalizationConfig::Instance(config) => config.init(device).into(),
+            NormalizationConfig::Layer(config) => config.init(device).into(),
+            // NormalizationConfig::Rms(config) => config.init(device).into(),
+        }
+    }
+
+    /// Adjust a norm config to the feature size.
+    pub fn with_num_features(
+        self,
+        num_features: usize,
+    ) -> Self {
+        match self {
+            NormalizationConfig::Batch(config) => BatchNormConfig {
+                num_features,
+                ..config
+            }
+            .into(),
+            NormalizationConfig::Group(config) => GroupNormConfig {
+                num_channels: num_features,
+                ..config
+            }
+            .into(),
+            NormalizationConfig::Instance(config) => InstanceNormConfig {
+                num_channels: num_features,
+                ..config
+            }
+            .into(),
+            NormalizationConfig::Layer(config) => LayerNormConfig {
+                d_model: num_features,
+                ..config
+            }
+            .into(),
+        }
+    }
+
+    /// Get the number of features.
+    pub fn num_features(&self) -> usize {
+        match self {
+            NormalizationConfig::Batch(config) => config.num_features,
+            NormalizationConfig::Group(config) => config.num_channels,
+            NormalizationConfig::Instance(config) => config.num_channels,
+            NormalizationConfig::Layer(config) => config.d_model,
         }
     }
 }
@@ -120,6 +129,9 @@ impl NormalizationConfig {
 /// * [`Group`] - [`GroupNorm`]
 /// * [`Instance`] - [`InstanceNorm`]
 /// * [`Layer`] - [`LayerNorm`]
+/// * ['`RmsNorm`'] - Not Supported.
+///   * In v0.18.0, this fails to implement Debug.
+///   * In v0.19.0-dev, this does.
 ///
 /// The enum is non-exhaustive, to prepare for future additions.
 #[derive(Module, Debug)]
@@ -136,10 +148,30 @@ pub enum Normalization<B: Backend> {
 
     /// [`LayerNorm`] layer.
     Layer(LayerNorm<B>),
-    // ['RmsNorm'] layer.
-    // In v0.18.0, this fails to implement Debug.
-    // In v0.19.0-dev, this does.
-    // Rms(RmsNorm<B>),
+}
+
+impl<B: Backend> From<BatchNorm<B, 2>> for Normalization<B> {
+    fn from(layer: BatchNorm<B, 2>) -> Self {
+        Self::Batch(layer)
+    }
+}
+
+impl<B: Backend> From<GroupNorm<B>> for Normalization<B> {
+    fn from(layer: GroupNorm<B>) -> Self {
+        Self::Group(layer)
+    }
+}
+
+impl<B: Backend> From<InstanceNorm<B>> for Normalization<B> {
+    fn from(layer: InstanceNorm<B>) -> Self {
+        Self::Instance(layer)
+    }
+}
+
+impl<B: Backend> From<LayerNorm<B>> for Normalization<B> {
+    fn from(layer: LayerNorm<B>) -> Self {
+        Self::Layer(layer)
+    }
 }
 
 impl<B: Backend> Normalization<B> {
@@ -153,11 +185,21 @@ impl<B: Backend> Normalization<B> {
         input: Tensor<B, D>,
     ) -> Tensor<B, D> {
         match self {
-            Normalization::Batch(batch_norm) => batch_norm.forward(input),
-            Normalization::Group(group_norm) => group_norm.forward(input),
-            Normalization::Instance(instance_norm) => instance_norm.forward(input),
-            Normalization::Layer(layer_norm) => layer_norm.forward(input),
-            // Normalization::Rms(rms_norm) => rms_norm.forward(input),
+            Normalization::Batch(norm) => norm.forward(input),
+            Normalization::Group(norm) => norm.forward(input),
+            Normalization::Instance(norm) => norm.forward(input),
+            Normalization::Layer(norm) => norm.forward(input),
+            // Normalization::Rms(norm) => norm.forward(input),
+        }
+    }
+
+    /// Get the number of features.
+    pub fn num_features(&self) -> usize {
+        match self {
+            Normalization::Batch(norm) => norm.gamma.shape().dims[0],
+            Normalization::Group(norm) => norm.num_channels,
+            Normalization::Instance(norm) => norm.num_channels,
+            Normalization::Layer(norm) => norm.gamma.shape().dims[0],
         }
     }
 }
@@ -255,28 +297,4 @@ mod tests {
 
         output.to_data().assert_eq(&expected.to_data(), true);
     }
-
-    /*
-    #[test]
-    fn test_rms_norm() {
-        type B = Autodiff<NdArray<f32>>;
-        let device = Default::default();
-
-        let num_features = 12;
-        let input: Tensor<B, 4> = Tensor::ones([2, 3, 4, num_features], &device);
-
-        let config: NormalizationConfig = RmsNormConfig::new(num_features).into();
-
-        let layer: Normalization<B> = config.init(&device);
-
-        let expected = match &layer {
-            Normalization::Rms(inner) => inner.forward(input.clone()),
-            _ => panic!("Unexpected layer type"),
-        };
-
-        let output = layer.forward(input);
-
-        output.to_data().assert_eq(&expected.to_data(), true);
-    }
-     */
 }
