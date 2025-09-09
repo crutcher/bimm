@@ -76,7 +76,7 @@ pub struct CNA2dConfig {
     /// The [`Normalization`] config.
     pub norm: NormalizationConfig,
 
-    /// Activation Config.
+    /// The [`Activation`] config.
     #[config(default = "ActivationConfig::Relu")]
     pub act: ActivationConfig,
 }
