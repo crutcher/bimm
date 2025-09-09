@@ -1,19 +1,19 @@
 //! # `ResNet` Layer Block
 //!
-//! A [`LayerBlock`] is a sequence of [`ResidualBlock`]s.
+//! A [`CNALayerBlock`] is a sequence of [`CNAResidualBlock`]s.
 //!
-//! [`LayerBlockMeta`] defines a common meta API for [`LayerBlock`]
-//! and [`LayerBlockConfig`].
+//! [`CNALayerBlockMeta`] defines a common meta API for [`CNALayerBlock`]
+//! and [`CNALayerBlockConfig`].
 //!
-//! [`LayerBlockConfig`] implements [`Config`], and provides
-//! [`LayerBlockConfig::init`] to initialize a [`LayerBlock`].
+//! [`CNALayerBlockConfig`] implements [`Config`], and provides
+//! [`CNALayerBlockConfig::init`] to initialize a [`CNALayerBlock`].
 //!
-//! [`LayerBlock`] implements [`Module`], and provides
-//! [`LayerBlock::forward`].
+//! [`CNALayerBlock`] implements [`Module`], and provides
+//! [`CNALayerBlock::forward`].
 
 use crate::layers::drop::drop_block::DropBlockOptions;
-use crate::models::resnet::residual_block::{
-    ResidualBlock, ResidualBlockConfig, ResidualBlockMeta,
+use crate::models::resnet::cna_residual_block::{
+    CNAResidualBlock, CNAResidualBlockConfig, CNAResidualBlockMeta,
 };
 use crate::models::resnet::util::stride_div_output_resolution;
 use crate::utility::probability::expect_probability;
@@ -21,8 +21,8 @@ use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::config::Config;
 use burn::prelude::{Backend, Module, Tensor};
 
-/// [`LayerBlock`] Meta API.
-pub trait LayerBlockMeta {
+/// [`CNALayerBlock`] Meta API.
+pub trait CNALayerBlockMeta {
     /// The number of blocks.
     fn len(&self) -> usize;
 
@@ -63,20 +63,20 @@ pub trait LayerBlockMeta {
     }
 }
 
-/// [`LayerBlock`] Configuration.
+/// [`CNALayerBlock`] Configuration.
 #[derive(Config, Debug)]
-pub struct LayerBlockConfig {
+pub struct CNALayerBlockConfig {
     /// The component blocks.
-    pub blocks: Vec<ResidualBlockConfig>,
+    pub blocks: Vec<CNAResidualBlockConfig>,
 }
 
-impl From<Vec<ResidualBlockConfig>> for LayerBlockConfig {
-    fn from(blocks: Vec<ResidualBlockConfig>) -> Self {
+impl From<Vec<CNAResidualBlockConfig>> for CNALayerBlockConfig {
+    fn from(blocks: Vec<CNAResidualBlockConfig>) -> Self {
         Self { blocks }
     }
 }
 
-impl LayerBlockMeta for LayerBlockConfig {
+impl CNALayerBlockMeta for CNALayerBlockConfig {
     fn len(&self) -> usize {
         self.blocks.len()
     }
@@ -96,7 +96,7 @@ impl LayerBlockMeta for LayerBlockConfig {
     }
 }
 
-impl LayerBlockConfig {
+impl CNALayerBlockConfig {
     /// Build a config.
     pub fn build(
         num_blocks: usize,
@@ -108,9 +108,9 @@ impl LayerBlockConfig {
         let blocks = (0..num_blocks)
             .map(|b| {
                 if b == 0 {
-                    ResidualBlockConfig::build(in_planes, out_planes, stride, bottleneck)
+                    CNAResidualBlockConfig::build(in_planes, out_planes, stride, bottleneck)
                 } else {
-                    ResidualBlockConfig::build(out_planes, out_planes, 1, bottleneck)
+                    CNAResidualBlockConfig::build(out_planes, out_planes, 1, bottleneck)
                 }
             })
             .collect();
@@ -153,14 +153,14 @@ impl LayerBlockConfig {
         }
     }
 
-    /// Initialize a new [`LayerBlock`].
+    /// Initialize a new [`CNALayerBlock`].
     pub fn init<B: Backend>(
         self,
         device: &B::Device,
-    ) -> LayerBlock<B> {
+    ) -> CNALayerBlock<B> {
         self.expect_valid();
 
-        LayerBlock {
+        CNALayerBlock {
             blocks: self
                 .blocks
                 .into_iter()
@@ -175,7 +175,7 @@ impl LayerBlockConfig {
         f: &mut F,
     ) -> Self
     where
-        F: FnMut(usize, ResidualBlockConfig) -> ResidualBlockConfig,
+        F: FnMut(usize, CNAResidualBlockConfig) -> CNAResidualBlockConfig,
     {
         Self {
             blocks: self
@@ -211,12 +211,12 @@ impl LayerBlockConfig {
 
 /// Layer block.
 #[derive(Module, Debug)]
-pub struct LayerBlock<B: Backend> {
+pub struct CNALayerBlock<B: Backend> {
     /// Internal blocks.
-    pub blocks: Vec<ResidualBlock<B>>,
+    pub blocks: Vec<CNAResidualBlock<B>>,
 }
 
-impl<B: Backend> LayerBlockMeta for LayerBlock<B> {
+impl<B: Backend> CNALayerBlockMeta for CNALayerBlock<B> {
     fn len(&self) -> usize {
         self.blocks.len()
     }
@@ -236,7 +236,7 @@ impl<B: Backend> LayerBlockMeta for LayerBlock<B> {
     }
 }
 
-impl<B: Backend> LayerBlock<B> {
+impl<B: Backend> CNALayerBlock<B> {
     /// Apply the layer block.
     pub fn forward(
         &self,
@@ -276,7 +276,7 @@ impl<B: Backend> LayerBlock<B> {
         f: &mut F,
     ) -> Self
     where
-        F: FnMut(usize, ResidualBlock<B>) -> ResidualBlock<B>,
+        F: FnMut(usize, CNAResidualBlock<B>) -> CNAResidualBlock<B>,
     {
         Self {
             blocks: self
@@ -308,44 +308,18 @@ impl<B: Backend> LayerBlock<B> {
         let options = options.into();
         self.map_blocks(&mut |_, block| block.with_drop_block(options.clone()))
     }
-
-    /// Extend the layer block.
-    ///
-    /// Duplicates the config of the last layer `size` times, interleaved into the layers
-    /// after the first.
-    ///
-    /// # Arguments
-    ///
-    /// - `size`: additional layers to add.
-    pub fn extend(
-        self,
-        size: usize,
-    ) -> Self {
-        let device = &self.devices()[0];
-        let mut blocks = self.blocks;
-        let source_cfg = blocks.last().unwrap().to_config();
-        let mut idx = 1;
-        for _ in 0..size {
-            blocks.insert(idx, source_cfg.clone().init(device));
-            idx += 2;
-            if idx >= blocks.len() {
-                idx = 1;
-            }
-        }
-        Self { blocks }
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::resnet::basic_block::BasicBlockConfig;
+    use crate::models::resnet::cna_basic_block::CNABasicBlockConfig;
     use bimm_contracts::assert_shape_contract;
     use burn::backend::NdArray;
 
     #[test]
     fn test_layer_block_config_build() {
-        let config = LayerBlockConfig::build(2, 16, 32, 2, false);
+        let config = CNALayerBlockConfig::build(2, 16, 32, 2, false);
         config.expect_valid();
         assert_eq!(config.len(), 2);
         assert_eq!(config.in_planes(), 16);
@@ -375,11 +349,11 @@ mod tests {
         let b_planes = 32;
         let c_planes = 64;
 
-        let config = LayerBlockConfig::from(vec![
-            BasicBlockConfig::new(a_planes, b_planes)
+        let config = CNALayerBlockConfig::from(vec![
+            CNABasicBlockConfig::new(a_planes, b_planes)
                 .with_stride(2)
                 .into(),
-            BasicBlockConfig::new(b_planes, c_planes)
+            CNABasicBlockConfig::new(b_planes, c_planes)
                 .with_stride(3)
                 .into(),
         ]);
@@ -392,7 +366,7 @@ mod tests {
         assert_eq!(config.stride(), 2 * 3);
         assert_eq!(config.output_resolution([12, 24]), [2, 4]);
 
-        let block: LayerBlock<B> = config.init(&device);
+        let block: CNALayerBlock<B> = config.init(&device);
 
         assert_eq!(block.len(), 2);
         assert_eq!(block.in_planes(), a_planes);

@@ -1,36 +1,37 @@
 //! # Residual Block Wrapper
 //!
-//! [`ResidualBlock`] is a abstraction wrapper around either:
-//! * [`BasicBlock`] - the basic `ResNet` conv block, or
-//! * [`BottleneckBlock`] - the bottleneck variant `ResNet` conv block.
+//! [`CNAResidualBlock`] is a abstraction wrapper around either:
+//! * [`CNABasicBlock`] - the basic `ResNet` conv block, or
+//! * [`CNABottleneckBlock`] - the bottleneck variant `ResNet` conv block.
 //!
-//! [`ResidualBlockMeta`] defines a common meta api shared by:
-//! * [`ResidualBlock`], and
-//! * [`ResidualBlockConfig`]
+//! [`CNAResidualBlockMeta`] defines a common meta api shared by:
+//! * [`CNAResidualBlock`], and
+//! * [`CNAResidualBlockConfig`]
 //!
-//! [`ResidualBlockConfig`] implements [`Config`], and provides an
-//! [`ResidualBlockConfig::init`] constructor pathway to [`ResidualBlock`].
+//! [`CNAResidualBlockConfig`] implements [`Config`], and provides an
+//! [`CNAResidualBlockConfig::init`] constructor pathway to [`CNAResidualBlock`].
 //!
-//! [`ResidualBlock`] implements [`Module`],
-//! and provides [`ResidualBlock::forward`].
+//! [`CNAResidualBlock`] implements [`Module`],
+//! and provides [`CNAResidualBlock::forward`].
 //!
-//! [`ResidualBlock`] can also be constructed via:
-//! * [`From<BasicBlock<B>>`](`BasicBlock`),
-//! * [`From<BottleneckBlock<B>>`](`BottleneckBlock`).
+//! [`CNAResidualBlock`] can also be constructed via:
+//! * [`From<CNABasicBlock<B>>`](`CNABasicBlock`),
+//! * [`From<CNABottleneckBlock<B>>`](`CNABottleneckBlock`).
 use crate::layers::drop::drop_block::DropBlockOptions;
-use crate::models::resnet::basic_block::{BasicBlock, BasicBlockConfig, BasicBlockMeta};
-use crate::models::resnet::bottleneck::{
-    BottleneckBlock, BottleneckBlockConfig, BottleneckBlockMeta,
+use crate::models::resnet::cna_basic_block::{
+    CNABasicBlock, CNABasicBlockConfig, CNABasicBlockMeta,
+};
+use crate::models::resnet::cna_bottleneck::{
+    CNABottleneckBlock, CNABottleneckBlockConfig, CNABottleneckBlockMeta,
 };
 use crate::models::resnet::util::stride_div_output_resolution;
 use crate::utility::probability::expect_probability;
-use burn::config::Config;
-use burn::prelude::{Backend, Module, Tensor};
+use burn::prelude::{Backend, Config, Module, Tensor};
 
-/// [`ResidualBlock`] Meta API.
+/// [`CNAResidualBlock`] Meta API.
 ///
-/// Defines a shared API for [`ResidualBlock`] and [`ResidualBlockConfig`].
-pub trait ResidualBlockMeta {
+/// Defines a shared API for [`CNAResidualBlock`] and [`CNAResidualBlockConfig`].
+pub trait CNAResidualBlockMeta {
     /// The number of input feature planes.
     fn in_planes(&self) -> usize;
 
@@ -48,7 +49,8 @@ pub trait ResidualBlockMeta {
     ///
     /// # Arguments
     ///
-    /// - `input_resolution`: ``[in_height=out_height*stride, in_width=out_width*stride]``.
+    /// - `input_resolution`: \
+    ///   ``[in_height=out_height*stride, in_width=out_width*stride]``.
     ///
     /// # Returns
     ///
@@ -65,19 +67,19 @@ pub trait ResidualBlockMeta {
     }
 }
 
-/// [`ResidualBlock`] Config.
+/// [`CNAResidualBlock`] Config.
 ///
-/// Implements [`ResidualBlockMeta`].
+/// Implements [`CNAResidualBlockMeta`].
 #[derive(Config, Debug)]
-pub enum ResidualBlockConfig {
-    /// A `ResNet` [`BasicBlock`].
-    Basic(BasicBlockConfig),
+pub enum CNAResidualBlockConfig {
+    /// A `ResNet` [`CNABasicBlock`].
+    Basic(CNABasicBlockConfig),
 
-    /// A `ResNet` [`BottleneckBlock`].
-    Bottleneck(BottleneckBlockConfig),
+    /// A `ResNet` [`CNABottleneckBlock`].
+    Bottleneck(CNABottleneckBlockConfig),
 }
 
-impl ResidualBlockMeta for ResidualBlockConfig {
+impl CNAResidualBlockMeta for CNAResidualBlockConfig {
     fn in_planes(&self) -> usize {
         match self {
             Self::Basic(config) => config.in_planes(),
@@ -110,27 +112,27 @@ impl ResidualBlockMeta for ResidualBlockConfig {
     }
 }
 
-impl From<BasicBlockConfig> for ResidualBlockConfig {
-    fn from(config: BasicBlockConfig) -> Self {
+impl From<CNABasicBlockConfig> for CNAResidualBlockConfig {
+    fn from(config: CNABasicBlockConfig) -> Self {
         Self::Basic(config)
     }
 }
 
-impl From<BottleneckBlockConfig> for ResidualBlockConfig {
-    fn from(config: BottleneckBlockConfig) -> Self {
+impl From<CNABottleneckBlockConfig> for CNAResidualBlockConfig {
+    fn from(config: CNABottleneckBlockConfig) -> Self {
         Self::Bottleneck(config)
     }
 }
 
-impl ResidualBlockConfig {
-    /// Initialize a [`ResidualBlock`].
+impl CNAResidualBlockConfig {
+    /// Initialize a [`CNAResidualBlock`].
     pub fn init<B: Backend>(
-        &self,
+        self,
         device: &B::Device,
-    ) -> ResidualBlock<B> {
+    ) -> CNAResidualBlock<B> {
         match self {
-            Self::Basic(config) => ResidualBlock::Basic(config.clone().init(device)),
-            Self::Bottleneck(config) => ResidualBlock::Bottleneck(config.clone().init(device)),
+            Self::Basic(config) => config.init(device).into(),
+            Self::Bottleneck(config) => config.init(device).into(),
         }
     }
 
@@ -142,11 +144,11 @@ impl ResidualBlockConfig {
         bottleneck: bool,
     ) -> Self {
         if bottleneck {
-            BottleneckBlockConfig::new(in_planes, out_planes)
+            CNABottleneckBlockConfig::new(in_planes, out_planes)
                 .with_stride(stride)
                 .into()
         } else {
-            BasicBlockConfig::new(in_planes, out_planes)
+            CNABasicBlockConfig::new(in_planes, out_planes)
                 .with_stride(stride)
                 .into()
         }
@@ -176,30 +178,30 @@ impl ResidualBlockConfig {
     }
 }
 
-/// A `ResNet` [`BasicBlock`] or [`BottleneckBlock`] wrapper.
+/// A `ResNet` [`CNABasicBlock`] or [`CNABottleneckBlock`] wrapper.
 #[derive(Module, Debug)]
 #[allow(clippy::large_enum_variant)]
-pub enum ResidualBlock<B: Backend> {
-    /// A `ResNet` [`BasicBlock`].
-    Basic(BasicBlock<B>),
+pub enum CNAResidualBlock<B: Backend> {
+    /// A `ResNet` [`CNABasicBlock`].
+    Basic(CNABasicBlock<B>),
 
-    /// A `ResNet` [`BottleneckBlock`].
-    Bottleneck(BottleneckBlock<B>),
+    /// A `ResNet` [`CNABottleneckBlock`].
+    Bottleneck(CNABottleneckBlock<B>),
 }
 
-impl<B: Backend> From<BasicBlock<B>> for ResidualBlock<B> {
-    fn from(block: BasicBlock<B>) -> Self {
+impl<B: Backend> From<CNABasicBlock<B>> for CNAResidualBlock<B> {
+    fn from(block: CNABasicBlock<B>) -> Self {
         Self::Basic(block)
     }
 }
 
-impl<B: Backend> From<BottleneckBlock<B>> for ResidualBlock<B> {
-    fn from(block: BottleneckBlock<B>) -> Self {
+impl<B: Backend> From<CNABottleneckBlock<B>> for CNAResidualBlock<B> {
+    fn from(block: CNABottleneckBlock<B>) -> Self {
         Self::Bottleneck(block)
     }
 }
 
-impl<B: Backend> ResidualBlockMeta for ResidualBlock<B> {
+impl<B: Backend> CNAResidualBlockMeta for CNAResidualBlock<B> {
     fn in_planes(&self) -> usize {
         match self {
             Self::Basic(block) => block.in_planes(),
@@ -222,7 +224,7 @@ impl<B: Backend> ResidualBlockMeta for ResidualBlock<B> {
     }
 }
 
-impl<B: Backend> ResidualBlock<B> {
+impl<B: Backend> CNAResidualBlock<B> {
     /// Apply the wrapped block to the input.
     ///
     /// # Arguments
@@ -264,14 +266,6 @@ impl<B: Backend> ResidualBlock<B> {
             Self::Bottleneck(config) => config.with_drop_block(options).into(),
         }
     }
-
-    /// Create a config from this module.
-    pub fn to_config(&self) -> ResidualBlockConfig {
-        match self {
-            Self::Basic(block) => block.to_config().into(),
-            Self::Bottleneck(block) => block.to_config().into(),
-        }
-    }
 }
 
 #[cfg(test)]
@@ -286,9 +280,9 @@ mod tests {
         let planes = 32;
 
         {
-            let inner_cfg = BasicBlockConfig::new(in_planes, planes).with_stride(2);
-            let cfg: ResidualBlockConfig = inner_cfg.clone().into();
-            assert!(matches!(cfg, ResidualBlockConfig::Basic(_)));
+            let inner_cfg = CNABasicBlockConfig::new(in_planes, planes).with_stride(2);
+            let cfg: CNAResidualBlockConfig = inner_cfg.clone().into();
+            assert!(matches!(cfg, CNAResidualBlockConfig::Basic(_)));
             assert_eq!(cfg.in_planes(), in_planes);
             assert_eq!(cfg.out_planes(), planes);
             assert_eq!(cfg.stride(), 2);
@@ -296,9 +290,9 @@ mod tests {
         }
 
         {
-            let inner_cfg = BottleneckBlockConfig::new(in_planes, planes).with_stride(2);
-            let cfg: ResidualBlockConfig = inner_cfg.clone().into();
-            assert!(matches!(cfg, ResidualBlockConfig::Bottleneck(_)));
+            let inner_cfg = CNABottleneckBlockConfig::new(in_planes, planes).with_stride(2);
+            let cfg: CNAResidualBlockConfig = inner_cfg.clone().into();
+            assert!(matches!(cfg, CNAResidualBlockConfig::Bottleneck(_)));
             assert_eq!(cfg.in_planes(), in_planes);
             assert_eq!(cfg.out_planes(), planes);
             assert_eq!(cfg.stride(), 2);
@@ -319,12 +313,12 @@ mod tests {
         let out_height = 4;
         let out_width = 4;
 
-        let cfg: ResidualBlockConfig = BasicBlockConfig::new(in_planes, planes)
+        let cfg: CNAResidualBlockConfig = CNABasicBlockConfig::new(in_planes, planes)
             .with_stride(2)
             .into();
 
-        let block: ResidualBlock<B> = cfg.init(&device);
-        assert!(matches!(block, ResidualBlock::Basic(_)));
+        let block: CNAResidualBlock<B> = cfg.init(&device);
+        assert!(matches!(block, CNAResidualBlock::Basic(_)));
         assert_eq!(block.in_planes(), in_planes);
         assert_eq!(block.out_planes(), planes);
         assert_eq!(block.stride(), 2);
@@ -361,12 +355,12 @@ mod tests {
         let out_height = 4;
         let out_width = 4;
 
-        let cfg: ResidualBlockConfig = BottleneckBlockConfig::new(in_planes, planes)
+        let cfg: CNAResidualBlockConfig = CNABottleneckBlockConfig::new(in_planes, planes)
             .with_stride(2)
             .into();
 
-        let block: ResidualBlock<B> = cfg.init(&device);
-        assert!(matches!(block, ResidualBlock::Bottleneck(_)));
+        let block: CNAResidualBlock<B> = cfg.init(&device);
+        assert!(matches!(block, CNAResidualBlock::Bottleneck(_)));
         assert_eq!(block.in_planes(), in_planes);
         assert_eq!(block.out_planes(), planes);
         assert_eq!(block.stride(), 2);
