@@ -17,7 +17,7 @@ use crate::layers::blocks::cna::{AbstractCNA2dConfig, CNA2d, CNA2dConfig, CNA2dM
 use crate::layers::drop::drop_block::{DropBlock2d, DropBlock2dConfig, DropBlockOptions};
 use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
 use crate::models::resnet::downsample::{ConvDownsample, ConvDownsampleConfig};
-use crate::models::resnet::util::stride_div_output_resolution;
+use crate::models::resnet::util::{scalar_to_array, stride_div_output_resolution};
 use crate::utility::probability::expect_probability;
 use burn::nn::conv::Conv2dConfig;
 use burn::nn::{BatchNormConfig, PaddingConfig2d};
@@ -219,20 +219,22 @@ impl BottleneckBlockConfig {
             act: self.activation.clone(),
         };
 
-        let cna1: CNA2dConfig = cna_builder
-            .build_config(Conv2dConfig::new([in_planes, first_planes], [1, 1]).with_bias(false));
+        let cna1: CNA2dConfig = cna_builder.build_config(
+            Conv2dConfig::new([in_planes, first_planes], scalar_to_array(1)).with_bias(false),
+        );
 
         let cna2: CNA2dConfig = cna_builder.build_config(
-            Conv2dConfig::new([first_planes, width], [3, 3])
-                .with_stride([stride, stride])
-                .with_dilation([dilation, dilation])
+            Conv2dConfig::new([first_planes, width], scalar_to_array(3))
+                .with_stride(scalar_to_array(stride))
+                .with_dilation(scalar_to_array(dilation))
                 .with_padding(PaddingConfig2d::Explicit(dilation, dilation))
                 .with_groups(self.cardinality())
                 .with_bias(false),
         );
 
-        let cna3: CNA2dConfig = cna_builder
-            .build_config(Conv2dConfig::new([width, out_planes], [1, 1]).with_bias(false));
+        let cna3: CNA2dConfig = cna_builder.build_config(
+            Conv2dConfig::new([width, out_planes], scalar_to_array(1)).with_bias(false),
+        );
 
         BottleneckBlock {
             base_width: self.base_width,
