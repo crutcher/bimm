@@ -4,9 +4,10 @@
 //! ## Notable Components
 //!
 //! * [`cache`] - weight loading cache.
+//! * [`compat`] - compat code, ported or planned for an upcoming release of ``burn``.
+//!   * [`compat::activation_wrapper::Activation`] - activation layer abstraction wrapper.
+//!   * [`compat::normalization_wrapper::Normalization`] - norm layer abstraction wrapper.
 //! * [`layers`] - reusable neural network modules.
-//!   * [`compat::activation`] - activation layers.
-//!     * [`compat::activation_wrapper::Activation`] - activation layer abstraction wrapper.
 //!   * [`layers::blocks`] - miscellaneous blocks.
 //!     * [`layers::blocks::conv_norm`] - ``Conv2d + BatchNorm2d`` block.
 //!   * [`layers::drop`] - dropout layers.

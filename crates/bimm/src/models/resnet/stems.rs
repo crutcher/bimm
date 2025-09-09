@@ -54,11 +54,13 @@
 //!   act
 //!
 //! Stem:
+//! ```text,ignore
 //!   head: vec<(`ConvNormAct`)>
 //!   tail: Union[
 //!     Conv/[AA]?/Norm/Act |
 //!     [Max|AvgPool]? [AA]?
 //!   ]
+//! ```
 //!
 use crate::compat::activation_wrapper::{Activation, ActivationConfig};
 use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig, ConvNorm2dMeta};

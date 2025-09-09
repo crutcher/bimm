@@ -13,7 +13,7 @@
 
 use crate::compat::activation_wrapper::ActivationConfig;
 use crate::compat::normalization_wrapper::NormalizationConfig;
-use crate::layers::blocks::cna_block::{AbstractCNA2dConfig, CNA2d, CNA2dConfig, CNA2dMeta};
+use crate::layers::blocks::cna::{AbstractCNA2dConfig, CNA2d, CNA2dConfig, CNA2dMeta};
 use crate::layers::drop::drop_block::{DropBlock2d, DropBlock2dConfig, DropBlockOptions};
 use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
 use crate::models::resnet::downsample::{ConvDownsample, ConvDownsampleConfig};
@@ -136,14 +136,14 @@ pub struct CNABottleneckBlockConfig {
     #[config(default = "None")]
     pub drop_block: Option<DropBlockOptions>,
 
-    /// [`Normalization`] config.
+    /// [`crate::compat::normalization_wrapper::Normalization`] config.
     ///
     /// The feature size of this config will be replaced
     /// with the appropriate feature size for the input layer.
     #[config(default = "NormalizationConfig::Batch(BatchNormConfig::new(0))")]
     pub normalization: NormalizationConfig,
 
-    /// [`Activation`] layer config.
+    /// [`crate::compat::activation_wrapper::Activation`] config.
     #[config(default = "ActivationConfig::Relu")]
     pub activation: ActivationConfig,
 }

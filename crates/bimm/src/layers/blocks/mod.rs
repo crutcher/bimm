@@ -2,4 +2,4 @@
 
 pub mod conv_norm;
 
-pub mod cna_block;
+pub mod cna;

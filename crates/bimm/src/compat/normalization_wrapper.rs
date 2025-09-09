@@ -1,12 +1,12 @@
 //! # Normalization Wrapper
 //!
 //! Provides support for built-in ``burn::nn::norm`` norm layers:
-//! * [`Batch`] - [`BatchNorm`]
-//! * [`Group`] - [`GroupNorm`]
-//! * [`Instance`] - [`InstanceNorm`]
-//! * [`Layer`] - [`LayerNorm`]
+//! * [`Normalization::Batch`] - [`BatchNorm`]
+//! * [`Normalization::Group`] - [`GroupNorm`]
+//! * [`Normalization::Instance`] - [`InstanceNorm`]
+//! * [`Normalization::Layer`] - [`LayerNorm`]
 //!
-//! ## ['`RmsNorm`'] is not supported.
+//! ## [`burn::nn::RmsNorm`] is not supported.
 //!
 //! * In v0.18.0, this fails to implement Debug.
 //! * In v0.19.0-dev, this does.
@@ -124,10 +124,10 @@ impl NormalizationConfig {
 /// Normalization Layer Wrapper
 ///
 /// Provides support for built-in ``burn::nn::norm`` norm layers:
-/// * [`Batch`] - [`BatchNorm`]
-/// * [`Group`] - [`GroupNorm`]
-/// * [`Instance`] - [`InstanceNorm`]
-/// * [`Layer`] - [`LayerNorm`]
+/// * [`Normalization::Batch`] - [`BatchNorm`]
+/// * [`Normalization::Group`] - [`GroupNorm`]
+/// * [`Normalization::Instance`] - [`InstanceNorm`]
+/// * [`Normalization::Layer`] - [`LayerNorm`]
 /// * ['`RmsNorm`'] - Not Supported.
 ///   * In v0.18.0, this fails to implement Debug.
 ///   * In v0.19.0-dev, this does.

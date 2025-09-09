@@ -2,8 +2,8 @@
 //!
 //! A [`CNA2d`] module is:
 //! * a [`Conv2d`] layer,
-//! * a [`BatchNorm`] layer,
-//! * a [`Application`] layer.
+//! * a [`Normalization`] layer,
+//! * a [`Activation`] layer.
 //!
 //! With support for hooking the forward method,
 //! to run code between the norm and application layers.
@@ -15,6 +15,42 @@ use burn::config::Config;
 use burn::module::Module;
 use burn::nn::conv::{Conv2d, Conv2dConfig};
 use burn::prelude::{Backend, Tensor};
+
+/// Abstract policy for [`CNA2d`] Config.
+///
+/// Defines a [`NormalizationConfig`] and [`ActivationConfig`],
+/// and can be lifted to a [`CNA2dConfig`] to match a [`Conv2dConfig`].
+///
+/// The abstract [`NormalizationConfig`] will be feature matched
+/// with the target [`Conv2dConfig`].
+#[derive(Config, Debug)]
+pub struct AbstractCNA2dConfig {
+    /// The [`Normalization`] config.
+    pub norm: NormalizationConfig,
+
+    /// Activation Config.
+    #[config(default = "ActivationConfig::Relu")]
+    pub act: ActivationConfig,
+}
+
+impl AbstractCNA2dConfig {
+    /// Merge with a [`Conv2dConfig`] to construct a [`CNA2dConfig`].
+    ///
+    /// The abstract [`NormalizationConfig`] will be feature matched
+    /// with the target [`Conv2dConfig`], resulting in a normalization
+    /// layer sized appropriately for the input convolution.
+    pub fn build_config(
+        &self,
+        conv: Conv2dConfig,
+    ) -> CNA2dConfig {
+        CNA2dConfig {
+            conv,
+            norm: self.norm.clone(),
+            act: self.act.clone(),
+        }
+        .match_norm_features()
+    }
+}
 
 /// [`CNA2d`] Meta.
 pub trait CNA2dMeta {
@@ -29,36 +65,6 @@ pub trait CNA2dMeta {
 
     /// Get the stride.
     fn stride(&self) -> &[usize; 2];
-}
-
-/// Abstract policy for [`CNA2d`] Config.
-///
-/// Defines a norm and act layer,
-/// and can be lifted to a [`CNA2dConfig`]
-/// to match a [`Conv2dConfig`].
-#[derive(Config, Debug)]
-pub struct AbstractCNA2dConfig {
-    /// The [`Normalization`] config.
-    pub norm: NormalizationConfig,
-
-    /// Activation Config.
-    #[config(default = "ActivationConfig::Relu")]
-    pub act: ActivationConfig,
-}
-
-impl AbstractCNA2dConfig {
-    /// Merge with a [`Conv2dConfig`] to construct a [`CNA2dConfig`].
-    pub fn build_config(
-        &self,
-        conv: Conv2dConfig,
-    ) -> CNA2dConfig {
-        CNA2dConfig {
-            conv,
-            norm: self.norm.clone(),
-            act: self.act.clone(),
-        }
-        .match_norm_features()
-    }
 }
 
 /// [`CNA2d`] Config.
@@ -110,7 +116,9 @@ impl CNA2dConfig {
         }
     }
 
-    /// Adjust the norm features to match the conv output.
+    /// Adjust the norm features to match the conv output size.
+    ///
+    /// ['`CNA2dConfig::init`'] does this automatically.
     pub fn match_norm_features(self) -> Self {
         let features = self.out_channels();
         let norm = self.norm.with_num_features(features);
@@ -118,7 +126,15 @@ impl CNA2dConfig {
     }
 }
 
-/// Grouped [`Conv2d`] and [`BatchNorm`] layer.
+/// Sequenced conv/norm/activation block.
+///
+/// A [`CNA2d`] module is:
+/// * a [`Conv2d`] layer,
+/// * a [`Normalization`] layer,
+/// * a [`Activation`] layer.
+///
+/// With support for hooking the forward method,
+/// to run code between the norm and application layers.
 #[derive(Module, Debug)]
 pub struct CNA2d<B: Backend> {
     /// Internal Conv2d layer.
@@ -151,6 +167,15 @@ impl<B: Backend> CNA2dMeta for CNA2d<B> {
 
 impl<B: Backend> CNA2d<B> {
     /// Forward Pass.
+    ///
+    /// Applies the conv/norm/act layers in sequence.
+    ///
+    /// ```rust,ignore
+    /// let x = self.conv.forward(input);
+    /// let x = self.norm.forward(x);
+    /// let x = self.act.forward(x);
+    /// return x
+    /// ```
     pub fn forward(
         &self,
         input: Tensor<B, 4>,
@@ -160,7 +185,15 @@ impl<B: Backend> CNA2d<B> {
 
     /// Hooked Forward Pass.
     ///
-    /// Applies the hook after normalization, but before activation.
+    /// Applies the hook after normalization but before activation.
+    ///
+    /// ```rust,ignore
+    /// let x = self.conv.forward(input);
+    /// let x = self.norm.forward(x);
+    /// let x = hook(x);
+    /// let x = self.act.forward(x);
+    /// return x
+    /// ```
     pub fn hook_forward<F>(
         &self,
         input: Tensor<B, 4>,
@@ -221,6 +254,7 @@ impl<B: Backend> CNA2d<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use burn::backend::{Autodiff, NdArray};
     use burn::nn::{BatchNormConfig, PaddingConfig2d};
 
     #[test]
@@ -238,5 +272,26 @@ mod tests {
         assert_eq!(&config.conv.channels, &inner_config.channels);
         assert_eq!(&config.conv.kernel_size, &inner_config.kernel_size);
         assert_eq!(&config.conv.stride, &inner_config.stride);
+    }
+
+    #[test]
+    fn test_cna() {
+        type B = Autodiff<NdArray<f32>>;
+        let device = Default::default();
+
+        let config = CNA2dConfig::new(
+            Conv2dConfig::new([2, 4], [3, 3])
+                .with_stride([2, 2])
+                .with_padding(PaddingConfig2d::Explicit(1, 1))
+                .with_bias(false),
+            NormalizationConfig::Batch(BatchNormConfig::new(0)),
+        )
+        .with_act(ActivationConfig::Relu);
+
+        let layer: CNA2d<B> = config.init(&device);
+        assert_eq!(layer.in_channels(), 2);
+        assert_eq!(layer.out_channels(), 4);
+        assert_eq!(layer.groups(), 1);
+        assert_eq!(layer.stride(), &[2, 2]);
     }
 }
