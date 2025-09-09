@@ -108,9 +108,9 @@ impl LayerBlockConfig {
         let blocks = (0..num_blocks)
             .map(|b| {
                 if b == 0 {
-                    ResidualBlockConfig::new(in_planes, out_planes, stride, bottleneck)
+                    ResidualBlockConfig::build(in_planes, out_planes, stride, bottleneck)
                 } else {
-                    ResidualBlockConfig::new(out_planes, out_planes, 1, bottleneck)
+                    ResidualBlockConfig::build(out_planes, out_planes, 1, bottleneck)
                 }
             })
             .collect();

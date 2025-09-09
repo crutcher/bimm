@@ -137,7 +137,7 @@ impl CNAResidualBlockConfig {
     }
 
     /// Legacy constructor.
-    pub fn new(
+    pub fn build(
         in_planes: usize,
         out_planes: usize,
         stride: usize,

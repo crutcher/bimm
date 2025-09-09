@@ -108,9 +108,9 @@ impl CNALayerBlockConfig {
         let blocks = (0..num_blocks)
             .map(|b| {
                 if b == 0 {
-                    CNAResidualBlockConfig::new(in_planes, out_planes, stride, bottleneck)
+                    CNAResidualBlockConfig::build(in_planes, out_planes, stride, bottleneck)
                 } else {
-                    CNAResidualBlockConfig::new(out_planes, out_planes, 1, bottleneck)
+                    CNAResidualBlockConfig::build(out_planes, out_planes, 1, bottleneck)
                 }
             })
             .collect();
