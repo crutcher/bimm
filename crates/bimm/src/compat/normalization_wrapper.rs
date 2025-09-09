@@ -78,7 +78,6 @@ impl NormalizationConfig {
             NormalizationConfig::Group(config) => config.init(device).into(),
             NormalizationConfig::Instance(config) => config.init(device).into(),
             NormalizationConfig::Layer(config) => config.init(device).into(),
-            // NormalizationConfig::Rms(config) => config.init(device).into(),
         }
     }
 
@@ -209,6 +208,29 @@ impl<B: Backend> Normalization<B> {
 mod tests {
     use super::*;
     use burn::backend::{Autodiff, NdArray};
+
+    #[test]
+    fn test_match_feature_size() {
+        let config: NormalizationConfig = BatchNormConfig::new(0).into();
+        assert_eq!(config.num_features(), 0);
+        let config = config.with_num_features(12);
+        assert_eq!(config.num_features(), 12);
+
+        let config: NormalizationConfig = GroupNormConfig::new(4, 0).into();
+        assert_eq!(config.num_features(), 0);
+        let config = config.with_num_features(12);
+        assert_eq!(config.num_features(), 12);
+
+        let config: NormalizationConfig = InstanceNormConfig::new(0).into();
+        assert_eq!(config.num_features(), 0);
+        let config = config.with_num_features(12);
+        assert_eq!(config.num_features(), 12);
+
+        let config: NormalizationConfig = LayerNormConfig::new(0).into();
+        assert_eq!(config.num_features(), 0);
+        let config = config.with_num_features(12);
+        assert_eq!(config.num_features(), 12);
+    }
 
     #[test]
     fn test_batch_norm() {
