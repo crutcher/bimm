@@ -1,0 +1,24 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Nextest" type="CargoCommandRunConfiguration" factoryName="Cargo Command" focusToolWindowBeforeRun="true">
+    <option name="buildProfileId" value="dev" />
+    <option name="command" value="nextest run" />
+    <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+    <envs>
+      <env name="CINIC10_PATH" value="/media/Data/CINIC-10" />
+    </envs>
+    <option name="emulateTerminal" value="true" />
+    <option name="channel" value="STABLE" />
+    <option name="requiredFeatures" value="true" />
+    <option name="allFeatures" value="false" />
+    <option name="withSudo" value="false" />
+    <option name="buildTarget" value="REMOTE" />
+    <option name="backtrace" value="SHORT" />
+    <option name="isRedirectInput" value="false" />
+    <option name="redirectInputPath" value="" />
+    <method v="2">
+      <option name="RunConfigurationTask" enabled="false" run_configuration_name="Fix" run_configuration_type="CargoCommandRunConfiguration" />
+      <option name="RunConfigurationTask" enabled="false" run_configuration_name="Format" run_configuration_type="CargoCommandRunConfiguration" />
+      <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+    </method>
+  </configuration>
+</component>

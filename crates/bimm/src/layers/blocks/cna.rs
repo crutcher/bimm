@@ -97,7 +97,7 @@ impl CNA2dMeta for CNA2dConfig {
     }
 
     fn stride(&self) -> [usize; 2] {
-        self.conv.stride.clone()
+        self.conv.stride
     }
 }
 
@@ -165,7 +165,7 @@ impl<B: Backend> CNA2dMeta for CNA2d<B> {
     }
 
     fn stride(&self) -> [usize; 2] {
-        self.conv.stride.clone()
+        self.conv.stride
     }
 }
 
