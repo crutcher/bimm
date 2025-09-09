@@ -9,11 +9,6 @@ use crate::layers::blocks::cna::CNA2d;
 use crate::layers::blocks::conv_norm::ConvNorm2d;
 use crate::models::resnet::basic_block::BasicBlock;
 use crate::models::resnet::bottleneck::BottleneckBlock;
-use crate::models::resnet::cna_basic_block::CNABasicBlock;
-use crate::models::resnet::cna_bottleneck::CNABottleneckBlock;
-use crate::models::resnet::cna_layer_block::CNALayerBlock;
-use crate::models::resnet::cna_residual_block::CNAResidualBlock;
-use crate::models::resnet::cna_resnet_model::CNAResNet;
 use crate::models::resnet::downsample::ConvDownsample;
 use crate::models::resnet::layer_block::LayerBlock;
 use crate::models::resnet::residual_block::ResidualBlock;
@@ -25,16 +20,6 @@ use burn::prelude::Backend;
 use burn::record::{FullPrecisionSettings, Recorder};
 use burn_import::pytorch::PyTorchFileRecorder;
 use std::path::PathBuf;
-
-/// Load weights from ``torch`` weights path onto a [`ResNet`] model.
-pub fn load_pytorch_weights<B: Backend>(
-    resnet: ResNet<B>,
-    path: PathBuf,
-) -> anyhow::Result<ResNet<B>> {
-    let device = &resnet.devices()[0];
-    let record = load_resnet_stub_record::<B>(path, device)?;
-    Ok(record.copy_weights(resnet))
-}
 
 /// Load a [`ResNetStubRecord`] from ``torch`` weights path.
 pub fn load_resnet_stub_record<B: Backend>(
@@ -60,28 +45,11 @@ pub struct ResNetStub<B: Backend> {
 }
 
 impl<B: Backend> ResNetStubRecord<B> {
-    pub fn copy_weights(
+    pub fn cna_copy_weights(
         self,
         target: ResNet<B>,
     ) -> ResNet<B> {
         ResNet {
-            input_conv_norm: copy_conv_norm_weights(self.conv1, self.bn1, target.input_conv_norm),
-            layers: self
-                .layers
-                .into_iter()
-                .zip(target.layers)
-                .map(|(s, t)| s.copy_weights(t))
-                .collect(),
-            output_fc: target.output_fc.load_record(self.fc),
-            ..target
-        }
-    }
-
-    pub fn cna_copy_weights(
-        self,
-        target: CNAResNet<B>,
-    ) -> CNAResNet<B> {
-        CNAResNet {
             input_conv_norm: copy_conv_norm_weights(self.conv1, self.bn1, target.input_conv_norm),
             layers: self
                 .layers
@@ -101,25 +69,11 @@ pub struct LayerBlockStub<B: Backend> {
 }
 
 impl<B: Backend> LayerBlockStubRecord<B> {
-    pub fn copy_weights(
+    pub fn cna_copy_weights(
         self,
         target: LayerBlock<B>,
     ) -> LayerBlock<B> {
         LayerBlock {
-            blocks: self
-                .blocks
-                .into_iter()
-                .zip(target.blocks)
-                .map(|(s, t)| s.copy_weights(t))
-                .collect(),
-        }
-    }
-
-    pub fn cna_copy_weights(
-        self,
-        target: CNALayerBlock<B>,
-    ) -> CNALayerBlock<B> {
-        CNALayerBlock {
             blocks: self
                 .blocks
                 .into_iter()
@@ -138,31 +92,11 @@ pub enum ResidualBlockStub<B: Backend> {
 }
 
 impl<B: Backend> ResidualBlockStubRecord<B> {
-    pub fn copy_weights(
+    pub fn cna_copy_weights(
         self,
         target: ResidualBlock<B>,
     ) -> ResidualBlock<B> {
-        match (self, target) {
-            (ResidualBlockStubRecord::Basic(stub), ResidualBlock::Basic(block)) => {
-                ResidualBlock::Basic(stub.copy_weights(block))
-            }
-            (ResidualBlockStubRecord::Bottleneck(stub), ResidualBlock::Bottleneck(block)) => {
-                ResidualBlock::Bottleneck(stub.copy_weights(block))
-            }
-            (ResidualBlockStubRecord::Basic(_), ResidualBlock::Bottleneck(_)) => {
-                panic!("Cannot apply basic block stub to bottleneck block")
-            }
-            (ResidualBlockStubRecord::Bottleneck(_), ResidualBlock::Basic(_)) => {
-                panic!("Cannot apply bottleneck block stub to basic block")
-            }
-        }
-    }
-
-    pub fn cna_copy_weights(
-        self,
-        target: CNAResidualBlock<B>,
-    ) -> CNAResidualBlock<B> {
-        use CNAResidualBlock as T;
+        use ResidualBlock as T;
         use ResidualBlockStubRecord as S;
         match (self, target) {
             (S::Basic(stub), T::Basic(block)) => stub.cna_copy_weights(block).into(),
@@ -242,23 +176,11 @@ pub struct BasicBlockStub<B: Backend> {
 }
 
 impl<B: Backend> BasicBlockStubRecord<B> {
-    pub fn copy_weights(
+    pub fn cna_copy_weights(
         self,
         target: BasicBlock<B>,
     ) -> BasicBlock<B> {
         BasicBlock {
-            conv_norm1: copy_conv_norm_weights(self.conv1, self.bn1, target.conv_norm1),
-            conv_norm2: copy_conv_norm_weights(self.conv2, self.bn2, target.conv_norm2),
-            downsample: copy_downsample_weights(self.downsample, target.downsample),
-            ..target
-        }
-    }
-
-    pub fn cna_copy_weights(
-        self,
-        target: CNABasicBlock<B>,
-    ) -> CNABasicBlock<B> {
-        CNABasicBlock {
             cna1: copy_cna_weights(self.conv1, self.bn1, target.cna1),
             cna2: copy_cna_weights(self.conv2, self.bn2, target.cna2),
             ..target
@@ -278,24 +200,11 @@ pub struct BottleneckStub<B: Backend> {
 }
 
 impl<B: Backend> BottleneckStubRecord<B> {
-    pub fn copy_weights(
+    pub fn cna_copy_weights(
         self,
         target: BottleneckBlock<B>,
     ) -> BottleneckBlock<B> {
         BottleneckBlock {
-            conv_norm1: copy_conv_norm_weights(self.conv1, self.bn1, target.conv_norm1),
-            conv_norm2: copy_conv_norm_weights(self.conv2, self.bn2, target.conv_norm2),
-            conv_norm3: copy_conv_norm_weights(self.conv3, self.bn3, target.conv_norm3),
-            downsample: copy_downsample_weights(self.downsample, target.downsample),
-            ..target
-        }
-    }
-
-    pub fn cna_copy_weights(
-        self,
-        target: CNABottleneckBlock<B>,
-    ) -> CNABottleneckBlock<B> {
-        CNABottleneckBlock {
             cna1: copy_cna_weights(self.conv1, self.bn1, target.cna1),
             cna2: copy_cna_weights(self.conv2, self.bn2, target.cna2),
             cna3: copy_cna_weights(self.conv3, self.bn3, target.cna3),

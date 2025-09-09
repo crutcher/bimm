@@ -11,15 +11,17 @@
 //! [`BasicBlock`] implements [`Module`], and provides
 //! [`BasicBlock::forward`].
 
-use crate::compat::activation_wrapper::{Activation, ActivationConfig};
-use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig, ConvNorm2dMeta};
+use crate::compat::activation_wrapper::ActivationConfig;
+use crate::compat::normalization_wrapper::NormalizationConfig;
+use crate::layers::blocks::cna::{AbstractCNA2dConfig, CNA2d, CNA2dConfig, CNA2dMeta};
 use crate::layers::drop::drop_block::{DropBlock2d, DropBlock2dConfig, DropBlockOptions};
 use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
 use crate::models::resnet::downsample::{ConvDownsample, ConvDownsampleConfig};
-use crate::models::resnet::util::{CONV_INTO_RELU_INITIALIZER, stride_div_output_resolution};
+use crate::models::resnet::util::stride_div_output_resolution;
 use crate::utility::probability::expect_probability;
+use burn::nn::BatchNormConfig;
+use burn::nn::PaddingConfig2d;
 use burn::nn::conv::Conv2dConfig;
-use burn::nn::{Initializer, PaddingConfig2d};
 use burn::prelude::{Backend, Config, Module, Tensor};
 
 /// [`BasicBlock`] Meta trait.
@@ -70,7 +72,8 @@ pub trait BasicBlockMeta {
     ///
     /// # Arguments
     ///
-    /// - `input_resolution`: ``[in_height=out_height*stride, in_width=out_width*stride]``.
+    /// - `input_resolution`: \
+    ///   ``[in_height=out_height*stride, in_width=out_width*stride]``.
     ///
     /// # Returns
     ///
@@ -95,6 +98,8 @@ pub trait BasicBlockMeta {
 }
 
 /// [`BasicBlock`] Config.
+///
+/// Implements [`BasicBlockMeta`].
 #[derive(Config, Debug)]
 pub struct BasicBlockConfig {
     /// The size of the in channels dimension.
@@ -135,20 +140,16 @@ pub struct BasicBlockConfig {
     #[config(default = "None")]
     pub drop_block: Option<DropBlockOptions>,
 
-    /// The activation layer config.
+    /// [`crate::compat::normalization_wrapper::Normalization`] config.
+    ///
+    /// The feature size of this config will be replaced
+    /// with the appropriate feature size for the input layer.
+    #[config(default = "NormalizationConfig::Batch(BatchNormConfig::new(0))")]
+    pub normalization: NormalizationConfig,
+
+    /// [`crate::compat::activation_wrapper::Activation`] config.
     #[config(default = "ActivationConfig::Relu")]
     pub activation: ActivationConfig,
-
-    /// The [`ConvNorm2d`] initializer.
-    ///
-    /// This should be set to a value tuned by the relationship
-    /// with `activation`.
-    #[config(default = "CONV_INTO_RELU_INITIALIZER.clone()")]
-    pub initializer: Initializer,
-
-    /// Whether to zero initialize the last norm layer.
-    #[config(default = "true")]
-    pub zero_init_last: bool,
 }
 
 impl BasicBlockMeta for BasicBlockConfig {
@@ -210,27 +211,31 @@ impl BasicBlockConfig {
             // TODO: mechanism to select different pool operations.
             ConvDownsampleConfig::new(self.in_planes(), self.out_planes())
                 .with_stride(self.stride())
-                .with_initializer(self.initializer.clone())
                 .into()
         } else {
             None
         };
 
-        let conv_norm1: ConvNorm2dConfig = Conv2dConfig::new([in_planes, first_planes], [3, 3])
-            .with_stride([stride, stride])
-            .with_dilation([first_dilation, first_dilation])
-            .with_padding(PaddingConfig2d::Explicit(first_dilation, first_dilation))
-            .with_groups(self.cardinality())
-            .with_bias(false)
-            .with_initializer(self.initializer.clone())
-            .into();
+        let cna_builder = AbstractCNA2dConfig {
+            norm: self.normalization.clone(),
+            act: self.activation.clone(),
+        };
 
-        let conv_norm2: ConvNorm2dConfig = Conv2dConfig::new([first_planes, out_planes], [3, 3])
-            .with_dilation([dilation, dilation])
-            .with_padding(PaddingConfig2d::Explicit(dilation, dilation))
-            .with_bias(false)
-            .with_initializer(self.initializer.clone())
-            .into();
+        let cna1: CNA2dConfig = cna_builder.build_config(
+            Conv2dConfig::new([in_planes, first_planes], [3, 3])
+                .with_stride([stride, stride])
+                .with_dilation([first_dilation, first_dilation])
+                .with_padding(PaddingConfig2d::Explicit(first_dilation, first_dilation))
+                .with_groups(self.cardinality())
+                .with_bias(false),
+        );
+
+        let cna2: CNA2dConfig = cna_builder.build_config(
+            Conv2dConfig::new([first_planes, out_planes], [3, 3])
+                .with_dilation([dilation, dilation])
+                .with_padding(PaddingConfig2d::Explicit(dilation, dilation))
+                .with_bias(false),
+        );
 
         BasicBlock {
             expansion_factor: self.expansion_factor,
@@ -239,22 +244,14 @@ impl BasicBlockConfig {
             downsample: downsample.as_ref().map(|cfg| cfg.init(device)),
 
             // Group 1
-            conv_norm1: conv_norm1.init(device),
+            cna1: cna1.init(device),
+            cna2: cna2.init(device),
+
             drop_block: self
                 .drop_block
                 .as_ref()
                 .map(|options| DropBlock2dConfig::from(options.clone()).init()),
-            act1: self.activation.init(device),
             ae: None,
-
-            // Group 2
-            conv_norm2: {
-                let mut block = conv_norm2.init(device);
-                if self.zero_init_last {
-                    block.zero_init_norm()
-                }
-                block
-            },
             se: None,
             drop_path: if drop_path_prob != 0.0 {
                 DropPathConfig::new()
@@ -264,12 +261,13 @@ impl BasicBlockConfig {
             } else {
                 None
             },
-            act2: self.activation.init(device),
         }
     }
 }
 
 /// Basic Block for `ResNet`.
+///
+/// Implements [`BasicBlockMeta`].
 #[derive(Module, Debug)]
 pub struct BasicBlock<B: Backend> {
     /// Expansion factor.
@@ -281,21 +279,17 @@ pub struct BasicBlock<B: Backend> {
     /// Optional `DownSample` layer; for the residual connection.
     pub downsample: Option<ConvDownsample<B>>,
 
-    /// First conv/norm layer.
-    pub conv_norm1: ConvNorm2d<B>,
+    /// First Conv/Norm/Act Block.
+    pub cna1: CNA2d<B>,
+    /// Second Conv/Norm/Act Block.
+    pub cna2: CNA2d<B>,
 
     /// Optional `DropBlock` layer.
     pub drop_block: Option<DropBlock2d>,
 
-    /// First activation layer.
-    pub act1: Activation<B>,
-
     /// Optional anti-aliasing layer.
     // TODO: aa: anti-aliasing layer
     pub ae: Option<usize>,
-
-    /// Second conv/norm layer.
-    pub conv_norm2: ConvNorm2d<B>,
 
     /// Optional attention layer.
     // TODO: se: attention layer
@@ -303,32 +297,29 @@ pub struct BasicBlock<B: Backend> {
 
     /// Optional `DropPath` layer.
     pub drop_path: Option<DropPath>,
-
-    /// Second activation layer.
-    pub act2: Activation<B>,
 }
 
 impl<B: Backend> BasicBlockMeta for BasicBlock<B> {
     fn in_planes(&self) -> usize {
-        self.conv_norm1.in_channels()
+        self.cna1.in_channels()
     }
 
     fn dilation(&self) -> usize {
-        self.conv_norm2.conv.dilation[0]
+        self.cna1.conv.dilation[0]
     }
 
     fn first_dilation(&self) -> Option<usize> {
-        let d1 = self.conv_norm1.conv.dilation[0];
-        let d2 = self.conv_norm2.conv.dilation[0];
+        let d1 = self.cna1.conv.dilation[0];
+        let d2 = self.cna2.conv.dilation[0];
         if d1 == d2 { None } else { Some(d1) }
     }
 
     fn planes(&self) -> usize {
-        self.conv_norm1.out_channels() / self.expansion_factor()
+        self.cna1.out_channels() / self.expansion_factor()
     }
 
     fn cardinality(&self) -> usize {
-        self.conv_norm1.groups()
+        self.cna1.groups()
     }
 
     fn expansion_factor(&self) -> usize {
@@ -340,15 +331,15 @@ impl<B: Backend> BasicBlockMeta for BasicBlock<B> {
     }
 
     fn first_planes(&self) -> usize {
-        self.conv_norm1.out_channels()
+        self.cna1.out_channels()
     }
 
     fn out_planes(&self) -> usize {
-        self.conv_norm2.out_channels()
+        self.cna2.out_channels()
     }
 
     fn stride(&self) -> usize {
-        self.conv_norm1.stride()[0]
+        self.cna1.stride()[0]
     }
 }
 
@@ -400,7 +391,10 @@ impl<B: Backend> BasicBlock<B> {
         bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &identity, &out_bindings);
 
         // Group 1
-        let x = self.conv_norm1.forward(input);
+        let x = self.cna1.hook_forward(input, |x| match &self.drop_block {
+            Some(drop_block) => drop_block.forward(x),
+            None => x,
+        });
 
         #[cfg(debug_assertions)]
         bimm_contracts::assert_shape_contract_periodically!(
@@ -414,32 +408,24 @@ impl<B: Backend> BasicBlock<B> {
             ]
         );
 
-        let x = match &self.drop_block {
-            Some(drop_block) => drop_block.forward(x),
-            None => x,
-        };
-        let x = self.act1.forward(x);
         let x = match &self.ae {
             Some(_) => unimplemented!("anti-aliasing is not implemented"),
             None => x,
         };
 
         // Group 2
-        let x = self.conv_norm2.forward(x);
+        let x = self.cna2.hook_forward(x, |x| {
+            let x = match &self.se {
+                Some(_) => unimplemented!("attention is not implemented"),
+                None => x,
+            };
+            let x = match &self.drop_path {
+                Some(drop_path) => drop_path.forward(x),
+                None => x,
+            };
 
-        #[cfg(debug_assertions)]
-        bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
-
-        let x = match &self.se {
-            Some(_) => unimplemented!("attention is not implemented"),
-            None => x,
-        };
-        let x = match &self.drop_path {
-            Some(drop_path) => drop_path.forward(x),
-            None => x,
-        };
-        let x = x + identity;
-        let x = self.act2.forward(x);
+            x + identity
+        });
 
         #[cfg(debug_assertions)]
         bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
@@ -476,23 +462,12 @@ impl<B: Backend> BasicBlock<B> {
             ..self
         }
     }
-
-    /// Construct a [`BasicBlockConfig`] from this [`BasicBlock`].
-    pub fn to_config(&self) -> BasicBlockConfig {
-        BasicBlockConfig::new(self.in_planes(), self.out_planes())
-            .with_cardinality(self.cardinality())
-            .with_expansion_factor(self.expansion_factor())
-            .with_reduction_factor(self.reduction_factor())
-            .with_stride(self.stride())
-            .with_dilation(self.dilation())
-            .with_first_dilation(self.first_dilation())
-            .with_activation(self.act1.to_config())
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::compat::activation_wrapper::ActivationConfig;
     use bimm_contracts::assert_shape_contract;
     use burn::backend::{Autodiff, NdArray};
 

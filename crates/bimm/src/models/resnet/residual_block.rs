@@ -24,8 +24,7 @@ use crate::models::resnet::bottleneck::{
 };
 use crate::models::resnet::util::stride_div_output_resolution;
 use crate::utility::probability::expect_probability;
-use burn::config::Config;
-use burn::prelude::{Backend, Module, Tensor};
+use burn::prelude::{Backend, Config, Module, Tensor};
 
 /// [`ResidualBlock`] Meta API.
 ///
@@ -48,7 +47,8 @@ pub trait ResidualBlockMeta {
     ///
     /// # Arguments
     ///
-    /// - `input_resolution`: ``[in_height=out_height*stride, in_width=out_width*stride]``.
+    /// - `input_resolution`: \
+    ///   ``[in_height=out_height*stride, in_width=out_width*stride]``.
     ///
     /// # Returns
     ///
@@ -125,12 +125,12 @@ impl From<BottleneckBlockConfig> for ResidualBlockConfig {
 impl ResidualBlockConfig {
     /// Initialize a [`ResidualBlock`].
     pub fn init<B: Backend>(
-        &self,
+        self,
         device: &B::Device,
     ) -> ResidualBlock<B> {
         match self {
-            Self::Basic(config) => ResidualBlock::Basic(config.clone().init(device)),
-            Self::Bottleneck(config) => ResidualBlock::Bottleneck(config.clone().init(device)),
+            Self::Basic(config) => config.init(device).into(),
+            Self::Bottleneck(config) => config.init(device).into(),
         }
     }
 
@@ -177,6 +177,8 @@ impl ResidualBlockConfig {
 }
 
 /// A `ResNet` [`BasicBlock`] or [`BottleneckBlock`] wrapper.
+///
+/// Implements [`ResidualBlockMeta`].
 #[derive(Module, Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum ResidualBlock<B: Backend> {
@@ -262,14 +264,6 @@ impl<B: Backend> ResidualBlock<B> {
         match self {
             Self::Basic(config) => config.with_drop_block(options).into(),
             Self::Bottleneck(config) => config.with_drop_block(options).into(),
-        }
-    }
-
-    /// Create a config from this module.
-    pub fn to_config(&self) -> ResidualBlockConfig {
-        match self {
-            Self::Basic(block) => block.to_config().into(),
-            Self::Bottleneck(block) => block.to_config().into(),
         }
     }
 }

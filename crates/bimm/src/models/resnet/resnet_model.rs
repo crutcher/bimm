@@ -39,7 +39,7 @@ pub const RESNET101_BLOCKS: [usize; 4] = [3, 4, 23, 3];
 /// ResNet-152 block depths.
 pub const RESNET152_BLOCKS: [usize; 4] = [3, 8, 36, 3];
 
-/// High-level `ResNet` model configuration.
+/// High-level [`ResNet`] model configuration.
 #[derive(Config, Debug)]
 pub struct ResNetAbstractConfig {
     /// Layer block depths.
@@ -49,7 +49,7 @@ pub struct ResNetAbstractConfig {
     pub num_classes: usize,
 
     /// Number of channels in stem convolutions.
-    /// TODO: Replace with a `ResNetStem` module.
+    /// TODO: Replace with a ``ResNetStem`` module.
     #[config(default = "64")]
     pub stem_width: usize,
 
@@ -113,7 +113,7 @@ impl ResNetAbstractConfig {
 
 /// [`ResNet`] Structure Config.
 ///
-/// This config defines the structure of a converted `ResNet` model.
+/// This config defines the structure of a converted [`ResNet`] model.
 /// It is not a semantic configuration and does not check the validity
 /// of the internal sizes before or during construction.
 #[derive(Config, Debug)]
@@ -265,7 +265,7 @@ pub struct ResNet<B: Backend> {
 }
 
 impl<B: Backend> ResNet<B> {
-    /// `ResNet` forward pass.
+    /// Forward pass.
     pub fn forward(
         &self,
         input: Tensor<B, 4>,
@@ -289,11 +289,11 @@ impl<B: Backend> ResNet<B> {
     pub fn load_pytorch_weights(
         self,
         path: PathBuf,
-    ) -> anyhow::Result<ResNet<B>> {
+    ) -> anyhow::Result<Self> {
         let device = &self.devices()[0];
         let record = load_resnet_stub_record::<B>(path, device)?;
         let resnet = self.with_classes(record.fc.weight.dims()[0]);
-        Ok(record.copy_weights(resnet))
+        Ok(record.cna_copy_weights(resnet))
     }
 
     /// Re-initialize the last layer with the specified number of output classes.

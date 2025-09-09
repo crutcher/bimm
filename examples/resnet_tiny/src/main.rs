@@ -2,7 +2,7 @@
 extern crate core;
 
 use bimm::cache;
-use bimm::models::resnet::cna_resnet_model::{CNAResNet, CNAResNetAbstractConfig};
+use bimm::models::resnet::resnet_model::{ResNet, ResNetAbstractConfig};
 use bimm_firehose::burn::batcher::{
     BatcherInputAdapter, BatcherOutputAdapter, FirehoseExecutorBatcher,
 };
@@ -158,7 +158,7 @@ pub fn backend_main<B: AutodiffBackend>(
 
     let weights = cache::fetch_model_weights(&args.pretrained_weights)?;
 
-    let resnet: CNAResNet<B> = CNAResNetAbstractConfig::resnet18(10)
+    let resnet: ResNet<B> = ResNetAbstractConfig::resnet18(10)
         .to_structure()
         .init(device)
         .load_pytorch_weights(weights)?
@@ -346,7 +346,7 @@ impl ModelConfig {
 
 #[derive(Module, Debug)]
 pub struct Model<B: Backend> {
-    pub resnet: CNAResNet<B>,
+    pub resnet: ResNet<B>,
 }
 
 impl<B: Backend> Model<B> {

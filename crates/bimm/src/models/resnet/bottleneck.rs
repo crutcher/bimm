@@ -1,4 +1,4 @@
-//! # Bottleneck Block for `ResNet`
+//! # [`BottleneckBlock`] Block for `ResNet`
 //!
 //! [`BottleneckBlock`] is the bottleneck form of the core `ResNet` convolution unit.
 //!
@@ -11,15 +11,16 @@
 //! [`BottleneckBlock`] implements [`Module`], and provides
 //! [`BottleneckBlock::forward`].
 
-use crate::compat::activation_wrapper::{Activation, ActivationConfig};
-use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig, ConvNorm2dMeta};
+use crate::compat::activation_wrapper::ActivationConfig;
+use crate::compat::normalization_wrapper::NormalizationConfig;
+use crate::layers::blocks::cna::{AbstractCNA2dConfig, CNA2d, CNA2dConfig, CNA2dMeta};
 use crate::layers::drop::drop_block::{DropBlock2d, DropBlock2dConfig, DropBlockOptions};
 use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
 use crate::models::resnet::downsample::{ConvDownsample, ConvDownsampleConfig};
-use crate::models::resnet::util::{CONV_INTO_RELU_INITIALIZER, stride_div_output_resolution};
+use crate::models::resnet::util::stride_div_output_resolution;
 use crate::utility::probability::expect_probability;
 use burn::nn::conv::Conv2dConfig;
-use burn::nn::{Initializer, PaddingConfig2d};
+use burn::nn::{BatchNormConfig, PaddingConfig2d};
 use burn::prelude::{Backend, Config, Module, Tensor};
 
 /// [`BottleneckBlock`] Meta trait.
@@ -52,7 +53,7 @@ pub trait BottleneckBlockMeta {
         self.width() / self.reduction_factor()
     }
 
-    /// Bottleneck width.
+    /// Get Width Plane.
     ///
     /// ``planes * (base_width / 64) * cardinality``
     fn width(&self) -> usize {
@@ -95,6 +96,8 @@ pub trait BottleneckBlockMeta {
 }
 
 /// [`BottleneckBlock`] Config.
+///
+/// Implements [`BottleneckBlockMeta`].
 #[derive(Config, Debug)]
 pub struct BottleneckBlockConfig {
     /// The size of the in channels dimension.
@@ -135,20 +138,16 @@ pub struct BottleneckBlockConfig {
     #[config(default = "None")]
     pub drop_block: Option<DropBlockOptions>,
 
-    /// The activation layer config.
+    /// [`crate::compat::normalization_wrapper::Normalization`] config.
+    ///
+    /// The feature size of this config will be replaced
+    /// with the appropriate feature size for the input layer.
+    #[config(default = "NormalizationConfig::Batch(BatchNormConfig::new(0))")]
+    pub normalization: NormalizationConfig,
+
+    /// [`crate::compat::activation_wrapper::Activation`] config.
     #[config(default = "ActivationConfig::Relu")]
     pub activation: ActivationConfig,
-
-    /// The [`ConvNorm2d`] initializer.
-    ///
-    /// This should be set to a value tuned by the relationship
-    /// with `activation`.
-    #[config(default = "CONV_INTO_RELU_INITIALIZER.clone()")]
-    pub initializer: Initializer,
-
-    /// Whether to zero initialize the last norm layer.
-    #[config(default = "true")]
-    pub zero_init_last: bool,
 }
 
 impl BottleneckBlockMeta for BottleneckBlockConfig {
@@ -210,30 +209,30 @@ impl BottleneckBlockConfig {
             // TODO: mechanism to select different pool operations.
             ConvDownsampleConfig::new(in_planes, out_planes)
                 .with_stride(stride)
-                .with_initializer(self.initializer.clone())
                 .into()
         } else {
             None
         };
 
-        let conv_norm1: ConvNorm2dConfig = Conv2dConfig::new([in_planes, first_planes], [1, 1])
-            .with_bias(false)
-            .with_initializer(self.initializer.clone())
-            .into();
+        let cna_builder = AbstractCNA2dConfig {
+            norm: self.normalization.clone(),
+            act: self.activation.clone(),
+        };
 
-        let conv_norm2: ConvNorm2dConfig = Conv2dConfig::new([first_planes, width], [3, 3])
-            .with_stride([stride, stride])
-            .with_dilation([dilation, dilation])
-            .with_padding(PaddingConfig2d::Explicit(dilation, dilation))
-            .with_groups(self.cardinality())
-            .with_bias(false)
-            .with_initializer(self.initializer.clone())
-            .into();
+        let cna1: CNA2dConfig = cna_builder
+            .build_config(Conv2dConfig::new([in_planes, first_planes], [1, 1]).with_bias(false));
 
-        let conv_norm3: ConvNorm2dConfig = Conv2dConfig::new([width, out_planes], [1, 1])
-            .with_bias(false)
-            .with_initializer(self.initializer.clone())
-            .into();
+        let cna2: CNA2dConfig = cna_builder.build_config(
+            Conv2dConfig::new([first_planes, width], [3, 3])
+                .with_stride([stride, stride])
+                .with_dilation([dilation, dilation])
+                .with_padding(PaddingConfig2d::Explicit(dilation, dilation))
+                .with_groups(self.cardinality())
+                .with_bias(false),
+        );
+
+        let cna3: CNA2dConfig = cna_builder
+            .build_config(Conv2dConfig::new([width, out_planes], [1, 1]).with_bias(false));
 
         BottleneckBlock {
             base_width: self.base_width,
@@ -242,27 +241,16 @@ impl BottleneckBlockConfig {
 
             downsample: downsample.as_ref().map(|c| c.init(device)),
 
-            // Group 1
-            conv_norm1: conv_norm1.init(device),
-            act1: self.activation.init(device),
+            cna1: cna1.init(device),
+            cna2: cna2.init(device),
+            cna3: cna3.init(device),
 
-            // Group 2
-            conv_norm2: conv_norm2.init(device),
             drop_block: self
                 .drop_block
                 .as_ref()
                 .map(|options| DropBlock2dConfig::from(options.clone()).init()),
-            act2: self.activation.init(device),
             ae: None,
 
-            // Group 3
-            conv_norm3: {
-                let mut block = conv_norm3.init(device);
-                if self.zero_init_last {
-                    block.zero_init_norm()
-                }
-                block
-            },
             se: None,
             drop_path: if drop_path_prob != 0.0 {
                 DropPathConfig::new()
@@ -272,12 +260,13 @@ impl BottleneckBlockConfig {
             } else {
                 None
             },
-            act3: self.activation.init(device),
         }
     }
 }
 
-/// Basic Block for `ResNet`.
+/// Bottleneck Block for `ResNet`.
+///
+/// Implements [`BottleneckBlockMeta`].
 #[derive(Module, Debug)]
 pub struct BottleneckBlock<B: Backend> {
     /// Base width.
@@ -292,27 +281,19 @@ pub struct BottleneckBlock<B: Backend> {
     /// Optional `DownSample` layer; for the residual connection.
     pub downsample: Option<ConvDownsample<B>>,
 
-    /// First conv/norm layer.
-    pub conv_norm1: ConvNorm2d<B>,
-
-    /// First activation layer.
-    pub act1: Activation<B>,
-
-    /// Second conv/norm layer.
-    pub conv_norm2: ConvNorm2d<B>,
+    /// First conv/norm/act layer.
+    pub cna1: CNA2d<B>,
+    /// Second conv/norm/act layer.
+    pub cna2: CNA2d<B>,
+    /// Third conv/norm/act layer.
+    pub cna3: CNA2d<B>,
 
     /// Optional `DropBlock` layer.
     pub drop_block: Option<DropBlock2d>,
 
-    /// Second activation layer.
-    pub act2: Activation<B>,
-
     /// Optional anti-aliasing layer.
     // TODO: aa: anti-aliasing layer
     pub ae: Option<usize>,
-
-    /// Third conv/norm layer.
-    pub conv_norm3: ConvNorm2d<B>,
 
     /// Optional attention layer.
     // TODO: se: attention layer
@@ -320,18 +301,15 @@ pub struct BottleneckBlock<B: Backend> {
 
     /// Optional `DropPath` layer.
     pub drop_path: Option<DropPath>,
-
-    /// Third activation layer.
-    pub act3: Activation<B>,
 }
 
 impl<B: Backend> BottleneckBlockMeta for BottleneckBlock<B> {
     fn in_planes(&self) -> usize {
-        self.conv_norm1.in_channels()
+        self.cna1.in_channels()
     }
 
     fn dilation(&self) -> usize {
-        self.conv_norm3.conv.dilation[0]
+        self.cna3.conv.dilation[0]
     }
 
     fn planes(&self) -> usize {
@@ -339,7 +317,7 @@ impl<B: Backend> BottleneckBlockMeta for BottleneckBlock<B> {
     }
 
     fn cardinality(&self) -> usize {
-        self.conv_norm2.groups()
+        self.cna2.groups()
     }
 
     fn base_width(&self) -> usize {
@@ -355,19 +333,19 @@ impl<B: Backend> BottleneckBlockMeta for BottleneckBlock<B> {
     }
 
     fn first_planes(&self) -> usize {
-        self.conv_norm1.out_channels()
+        self.cna1.out_channels()
     }
 
     fn width(&self) -> usize {
-        self.conv_norm3.in_channels()
+        self.cna3.in_channels()
     }
 
     fn out_planes(&self) -> usize {
-        self.conv_norm3.out_channels()
+        self.cna3.out_channels()
     }
 
     fn stride(&self) -> usize {
-        self.conv_norm2.stride()[0]
+        self.cna2.stride()[0]
     }
 }
 
@@ -418,8 +396,7 @@ impl<B: Backend> BottleneckBlock<B> {
         #[cfg(debug_assertions)]
         bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &identity, &out_bindings);
 
-        // Group 1
-        let x = self.conv_norm1.forward(input);
+        let x = self.cna1.forward(input);
 
         #[cfg(debug_assertions)]
         bimm_contracts::assert_shape_contract_periodically!(
@@ -433,65 +410,31 @@ impl<B: Backend> BottleneckBlock<B> {
             ],
         );
 
-        let x = self.act1.forward(x);
-
-        // Group 2
-        let x = self.conv_norm2.forward(x);
-
-        #[cfg(debug_assertions)]
-        bimm_contracts::assert_shape_contract_periodically!(
-            ["batch", "width", "out_height", "out_width"],
-            &x,
-            &[
-                ("batch", batch),
-                ("width", self.width()),
-                ("out_height", out_height),
-                ("out_width", out_width),
-            ],
-        );
-        let x = match &self.drop_block {
+        let x = self.cna2.hook_forward(x, |x| match &self.drop_block {
             Some(drop_block) => drop_block.forward(x),
             None => x,
-        };
-        let x = self.act2.forward(x);
+        });
+
         let x = match &self.ae {
             Some(_) => unimplemented!("anti-aliasing is not implemented"),
             None => x,
         };
 
-        // Group 3
-        let x = self.conv_norm3.forward(x);
+        self.cna3.hook_forward(x, |x| {
+            #[cfg(debug_assertions)]
+            bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
 
-        #[cfg(debug_assertions)]
-        bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
+            let x = match &self.se {
+                Some(_) => unimplemented!("attention is not implemented"),
+                None => x,
+            };
+            let x = match &self.drop_path {
+                Some(drop_path) => drop_path.forward(x),
+                None => x,
+            };
 
-        let x = match &self.se {
-            Some(_) => unimplemented!("attention is not implemented"),
-            None => x,
-        };
-        let x = match &self.drop_path {
-            Some(drop_path) => drop_path.forward(x),
-            None => x,
-        };
-        let x = x + identity;
-        let x = self.act3.forward(x);
-
-        #[cfg(debug_assertions)]
-        bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
-
-        x
-    }
-
-    /// Construct a [`BottleneckBlockConfig`] from this [`BottleneckBlock`].
-    pub fn to_config(&self) -> BottleneckBlockConfig {
-        BottleneckBlockConfig::new(self.in_planes(), self.planes())
-            .with_cardinality(self.cardinality())
-            .with_base_width(self.base_width())
-            .with_expansion_factor(self.expansion_factor())
-            .with_reduction_factor(self.reduction_factor())
-            .with_stride(self.stride())
-            .with_dilation(self.dilation())
-            .with_activation(self.act1.to_config())
+            x + identity
+        })
     }
 
     /// Set the drop path probability.

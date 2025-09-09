@@ -1,6 +1,6 @@
 //! # `ResNet`
 //!
-//! Implementation of the `ResNet` family of models for image recognition.
+//! Implementation of the *`ResNet`* family of models for image recognition.
 //! See: [arXiv:1512.03385v1 [cs.CV]](<https://arxiv.org/abs/1512.03385>)
 //!
 //! ## Example
@@ -69,11 +69,6 @@
 
 pub mod basic_block;
 pub mod bottleneck;
-pub mod cna_basic_block;
-pub mod cna_bottleneck;
-pub mod cna_layer_block;
-pub mod cna_residual_block;
-pub mod cna_resnet_model;
 pub mod downsample;
 pub mod layer_block;
 pub mod residual_block;

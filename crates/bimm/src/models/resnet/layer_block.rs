@@ -64,6 +64,8 @@ pub trait LayerBlockMeta {
 }
 
 /// [`LayerBlock`] Configuration.
+///
+/// Implements [`LayerBlockMeta`].
 #[derive(Config, Debug)]
 pub struct LayerBlockConfig {
     /// The component blocks.
@@ -209,7 +211,9 @@ impl LayerBlockConfig {
     }
 }
 
-/// Layer block.
+/// Layer block; stack of [`ResidualBlock`]s.
+///
+/// Implements [`LayerBlockMeta`].
 #[derive(Module, Debug)]
 pub struct LayerBlock<B: Backend> {
     /// Internal blocks.
@@ -307,32 +311,6 @@ impl<B: Backend> LayerBlock<B> {
     {
         let options = options.into();
         self.map_blocks(&mut |_, block| block.with_drop_block(options.clone()))
-    }
-
-    /// Extend the layer block.
-    ///
-    /// Duplicates the config of the last layer `size` times, interleaved into the layers
-    /// after the first.
-    ///
-    /// # Arguments
-    ///
-    /// - `size`: additional layers to add.
-    pub fn extend(
-        self,
-        size: usize,
-    ) -> Self {
-        let device = &self.devices()[0];
-        let mut blocks = self.blocks;
-        let source_cfg = blocks.last().unwrap().to_config();
-        let mut idx = 1;
-        for _ in 0..size {
-            blocks.insert(idx, source_cfg.clone().init(device));
-            idx += 2;
-            if idx >= blocks.len() {
-                idx = 1;
-            }
-        }
-        Self { blocks }
     }
 }
 
