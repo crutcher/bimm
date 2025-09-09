@@ -6,11 +6,13 @@ use bimm::models::resnet::{ResNet, ResNetAbstractConfig};
 use burn::data::dataloader::DataLoaderBuilder;
 use burn::data::dataset::transform::ShuffledDataset;
 use burn::data::dataset::vision::ImageFolderDataset;
+use burn::module::{ModuleMapper, ParamId};
 use burn::nn::loss::BinaryCrossEntropyLossConfig;
 use burn::optim::AdamConfig;
 use burn::optim::decay::WeightDecayConfig;
-use burn::prelude::{Backend, Config, Int, Module, Tensor};
+use burn::prelude::{Backend, Bool, Config, Int, Module, Tensor};
 use burn::record::CompactRecorder;
+use burn::tensor::Distribution;
 use burn::tensor::backend::AutodiffBackend;
 use burn::train::metric::{HammingScore, LossMetric};
 use burn::train::{

@@ -90,35 +90,35 @@ pub struct Args {
     )]
     pretrained_weights: String,
 
-    #[arg(long, default_value = "1000")]
-    pretrained_classes: usize,
-
+    // /// Number of classes in the pretrained weights.
+    // #[arg(long, default_value = "1000")]
+    // pretrained_classes: usize,
     /// Directory to save the artifacts.
-    #[arg(long, default_value = "/tmp/resnet_tiny")]
+    #[arg(long, default_value = "/tmp/resnet-finetune")]
     artifact_dir: String,
 
     /// Batch size for processing
-    #[arg(short, long, default_value_t = 24)]
+    #[arg(short, long, default_value_t = 32)]
     batch_size: usize,
 
     /// Number of workers for data loading.
-    #[arg(long, default_value = "4")]
+    #[arg(long, default_value = "2")]
     num_workers: Option<usize>,
 
     /// Number of epochs to train the model.
-    #[arg(long, default_value = "5")]
+    #[arg(long, default_value = "10")]
     num_epochs: usize,
 
     /// Drop Block Prob
-    #[arg(long, default_value = "0.25")]
+    #[arg(long, default_value = "0.2")]
     drop_block_prob: f64,
 
     /// Drop Path Prob
-    #[arg(long, default_value = "0.15")]
+    #[arg(long, default_value = "0.1")]
     drop_path_prob: f64,
 
     /// Learning rate
-    #[arg(long, default_value = "1e-3")]
+    #[arg(long, default_value = "1e-4")]
     pub learning_rate: f64,
 }
 
