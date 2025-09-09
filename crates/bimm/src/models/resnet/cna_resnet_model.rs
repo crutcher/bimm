@@ -20,6 +20,7 @@ use crate::models::resnet::cna_layer_block::{
     CNALayerBlock, CNALayerBlockConfig, CNALayerBlockMeta,
 };
 use crate::models::resnet::cna_residual_block::{CNAResidualBlock, CNAResidualBlockConfig};
+use crate::models::resnet::resnet_io::pytorch_stubs::load_resnet_stub_record;
 use crate::models::resnet::util::CONV_INTO_RELU_INITIALIZER;
 use crate::utility::probability::expect_probability;
 use burn::module::Module;
@@ -27,6 +28,7 @@ use burn::nn::conv::Conv2dConfig;
 use burn::nn::pool::{AdaptiveAvgPool2d, AdaptiveAvgPool2dConfig, MaxPool2d, MaxPool2dConfig};
 use burn::nn::{Initializer, Linear, LinearConfig, PaddingConfig2d};
 use burn::prelude::{Backend, Config, Tensor};
+use std::path::PathBuf;
 
 /// CNAResNet-18 block depths.
 pub const RESNET18_BLOCKS: [usize; 4] = [2, 2, 2, 2];
@@ -283,6 +285,17 @@ impl<B: Backend> CNAResNet<B> {
         // Reshape [B, C, 1, 1] -> [B, C]
         let x = x.flatten(1, 3);
         self.output_fc.forward(x)
+    }
+
+    /// Load weights from a `PyTorch` weights path.
+    pub fn load_pytorch_weights(
+        self,
+        path: PathBuf,
+    ) -> anyhow::Result<Self> {
+        let device = &self.devices()[0];
+        let record = load_resnet_stub_record::<B>(path, device)?;
+        let resnet = self.with_classes(record.fc.weight.dims()[0]);
+        Ok(record.cna_copy_weights(resnet))
     }
 
     /// Re-initialize the last layer with the specified number of output classes.

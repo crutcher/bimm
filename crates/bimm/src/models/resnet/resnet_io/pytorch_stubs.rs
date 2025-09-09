@@ -4,9 +4,16 @@
 //! These are stub modules to smooth over loading issues with the current version
 //! of `burn-import`. There is insufficient information in loaded weights to
 //! derive information about stateless modules (such as ``Activation::Relu``).
+use crate::compat::normalization_wrapper::Normalization;
+use crate::layers::blocks::cna::CNA2d;
 use crate::layers::blocks::conv_norm::ConvNorm2d;
 use crate::models::resnet::basic_block::BasicBlock;
 use crate::models::resnet::bottleneck::BottleneckBlock;
+use crate::models::resnet::cna_basic_block::CNABasicBlock;
+use crate::models::resnet::cna_bottleneck::CNABottleneckBlock;
+use crate::models::resnet::cna_layer_block::CNALayerBlock;
+use crate::models::resnet::cna_residual_block::CNAResidualBlock;
+use crate::models::resnet::cna_resnet_model::CNAResNet;
 use crate::models::resnet::downsample::ConvDownsample;
 use crate::models::resnet::layer_block::LayerBlock;
 use crate::models::resnet::residual_block::ResidualBlock;
@@ -43,6 +50,7 @@ pub fn load_resnet_stub_record<B: Backend>(
 
     Ok(record)
 }
+
 #[derive(Module, Debug)]
 pub struct ResNetStub<B: Backend> {
     pub conv1: Conv2d<B>,
@@ -68,6 +76,23 @@ impl<B: Backend> ResNetStubRecord<B> {
             ..target
         }
     }
+
+    pub fn cna_copy_weights(
+        self,
+        target: CNAResNet<B>,
+    ) -> CNAResNet<B> {
+        CNAResNet {
+            input_conv_norm: copy_conv_norm_weights(self.conv1, self.bn1, target.input_conv_norm),
+            layers: self
+                .layers
+                .into_iter()
+                .zip(target.layers)
+                .map(|(s, t)| s.cna_copy_weights(t))
+                .collect(),
+            output_fc: target.output_fc.load_record(self.fc),
+            ..target
+        }
+    }
 }
 
 #[derive(Module, Debug)]
@@ -86,6 +111,20 @@ impl<B: Backend> LayerBlockStubRecord<B> {
                 .into_iter()
                 .zip(target.blocks)
                 .map(|(s, t)| s.copy_weights(t))
+                .collect(),
+        }
+    }
+
+    pub fn cna_copy_weights(
+        self,
+        target: CNALayerBlock<B>,
+    ) -> CNALayerBlock<B> {
+        CNALayerBlock {
+            blocks: self
+                .blocks
+                .into_iter()
+                .zip(target.blocks)
+                .map(|(s, t)| s.cna_copy_weights(t))
                 .collect(),
         }
     }
@@ -114,6 +153,24 @@ impl<B: Backend> ResidualBlockStubRecord<B> {
                 panic!("Cannot apply basic block stub to bottleneck block")
             }
             (ResidualBlockStubRecord::Bottleneck(_), ResidualBlock::Basic(_)) => {
+                panic!("Cannot apply bottleneck block stub to basic block")
+            }
+        }
+    }
+
+    pub fn cna_copy_weights(
+        self,
+        target: CNAResidualBlock<B>,
+    ) -> CNAResidualBlock<B> {
+        use CNAResidualBlock as T;
+        use ResidualBlockStubRecord as S;
+        match (self, target) {
+            (S::Basic(stub), T::Basic(block)) => stub.cna_copy_weights(block).into(),
+            (S::Bottleneck(stub), T::Bottleneck(block)) => stub.cna_copy_weights(block).into(),
+            (S::Basic(_), T::Bottleneck(_)) => {
+                panic!("Cannot apply basic block stub to bottleneck block")
+            }
+            (S::Bottleneck(_), T::Basic(_)) => {
                 panic!("Cannot apply bottleneck block stub to basic block")
             }
         }
@@ -149,6 +206,21 @@ impl<B: Backend> DownsampleStubRecord<B> {
     }
 }
 
+pub fn copy_cna_weights<B: Backend>(
+    conv: Conv2dRecord<B>,
+    bn: BatchNormRecord<B, 2>,
+    target: CNA2d<B>,
+) -> CNA2d<B> {
+    match target.norm {
+        Normalization::Batch(norm) => CNA2d {
+            conv: target.conv.load_record(conv),
+            norm: norm.load_record(bn).into(),
+            ..target
+        },
+        _ => panic!("Stub cannot be applied to {:?}", target.norm),
+    }
+}
+
 pub fn copy_conv_norm_weights<B: Backend>(
     conv: Conv2dRecord<B>,
     bn: BatchNormRecord<B, 2>,
@@ -181,6 +253,17 @@ impl<B: Backend> BasicBlockStubRecord<B> {
             ..target
         }
     }
+
+    pub fn cna_copy_weights(
+        self,
+        target: CNABasicBlock<B>,
+    ) -> CNABasicBlock<B> {
+        CNABasicBlock {
+            cna1: copy_cna_weights(self.conv1, self.bn1, target.cna1),
+            cna2: copy_cna_weights(self.conv2, self.bn2, target.cna2),
+            ..target
+        }
+    }
 }
 
 #[derive(Module, Debug)]
@@ -203,6 +286,19 @@ impl<B: Backend> BottleneckStubRecord<B> {
             conv_norm1: copy_conv_norm_weights(self.conv1, self.bn1, target.conv_norm1),
             conv_norm2: copy_conv_norm_weights(self.conv2, self.bn2, target.conv_norm2),
             conv_norm3: copy_conv_norm_weights(self.conv3, self.bn3, target.conv_norm3),
+            downsample: copy_downsample_weights(self.downsample, target.downsample),
+            ..target
+        }
+    }
+
+    pub fn cna_copy_weights(
+        self,
+        target: CNABottleneckBlock<B>,
+    ) -> CNABottleneckBlock<B> {
+        CNABottleneckBlock {
+            cna1: copy_cna_weights(self.conv1, self.bn1, target.cna1),
+            cna2: copy_cna_weights(self.conv2, self.bn2, target.cna2),
+            cna3: copy_cna_weights(self.conv3, self.bn3, target.cna3),
             downsample: copy_downsample_weights(self.downsample, target.downsample),
             ..target
         }

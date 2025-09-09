@@ -2,6 +2,7 @@ use crate::Args;
 use crate::data::{ClassificationBatch, ClassificationBatcher};
 use crate::dataset::{CLASSES, PlanetLoader};
 use bimm::cache;
+use bimm::models::resnet::cna_resnet_model::{CNAResNet, CNAResNetAbstractConfig};
 use bimm::models::resnet::resnet_model::{ResNet, ResNetAbstractConfig};
 use burn::data::dataloader::DataLoaderBuilder;
 use burn::data::dataset::transform::ShuffledDataset;
@@ -26,7 +27,7 @@ pub trait MultiLabelClassification<B: Backend> {
     ) -> MultiLabelClassificationOutput<B>;
 }
 
-impl<B: Backend> MultiLabelClassification<B> for ResNet<B> {
+impl<B: Backend> MultiLabelClassification<B> for CNAResNet<B> {
     fn forward_classification(
         &self,
         images: Tensor<B, 4>,
@@ -43,7 +44,7 @@ impl<B: Backend> MultiLabelClassification<B> for ResNet<B> {
 }
 
 impl<B: AutodiffBackend> TrainStep<ClassificationBatch<B>, MultiLabelClassificationOutput<B>>
-    for ResNet<B>
+    for CNAResNet<B>
 {
     fn step(
         &self,
@@ -56,7 +57,7 @@ impl<B: AutodiffBackend> TrainStep<ClassificationBatch<B>, MultiLabelClassificat
 }
 
 impl<B: Backend> ValidStep<ClassificationBatch<B>, MultiLabelClassificationOutput<B>>
-    for ResNet<B>
+    for CNAResNet<B>
 {
     fn step(
         &self,
@@ -141,7 +142,7 @@ pub fn train<B: AutodiffBackend>(
 
     let weights_path = cache::fetch_model_weights(&args.pretrained_weights)?;
 
-    let model: ResNet<B> = ResNetAbstractConfig::resnet18(10)
+    let model: CNAResNet<B> = CNAResNetAbstractConfig::resnet18(10)
         .to_structure()
         .init(device)
         .load_pytorch_weights(weights_path)
