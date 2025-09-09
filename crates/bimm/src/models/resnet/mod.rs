@@ -71,6 +71,8 @@ pub mod basic_block;
 pub mod bottleneck;
 pub mod cna_basic_block;
 pub mod cna_bottleneck;
+pub mod cna_layer_block;
+pub mod cna_residual_block;
 pub mod downsample;
 pub mod layer_block;
 pub mod residual_block;
