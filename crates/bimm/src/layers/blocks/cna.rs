@@ -1,4 +1,4 @@
-//! # `CNA2d` Blocks
+//! # `CNA2d` - conv/norm/activation block.
 //!
 //! A [`CNA2d`] module is:
 //! * a [`Conv2d`] layer,
@@ -64,10 +64,12 @@ pub trait CNA2dMeta {
     fn out_channels(&self) -> usize;
 
     /// Get the stride.
-    fn stride(&self) -> &[usize; 2];
+    fn stride(&self) -> [usize; 2];
 }
 
 /// [`CNA2d`] Config.
+///
+/// Implements [`CNA2dMeta`].
 #[derive(Config, Debug)]
 pub struct CNA2dConfig {
     /// The [`Conv2d`] config.
@@ -94,8 +96,8 @@ impl CNA2dMeta for CNA2dConfig {
         self.conv.channels[1]
     }
 
-    fn stride(&self) -> &[usize; 2] {
-        &self.conv.stride
+    fn stride(&self) -> [usize; 2] {
+        self.conv.stride.clone()
     }
 }
 
@@ -135,6 +137,8 @@ impl CNA2dConfig {
 ///
 /// With support for hooking the forward method,
 /// to run code between the norm and application layers.
+///
+/// Implements [`CNA2dMeta`].
 #[derive(Module, Debug)]
 pub struct CNA2d<B: Backend> {
     /// Internal Conv2d layer.
@@ -160,15 +164,15 @@ impl<B: Backend> CNA2dMeta for CNA2d<B> {
         self.conv.weight.shape().dims[0]
     }
 
-    fn stride(&self) -> &[usize; 2] {
-        &self.conv.stride
+    fn stride(&self) -> [usize; 2] {
+        self.conv.stride.clone()
     }
 }
 
 impl<B: Backend> CNA2d<B> {
     /// Forward Pass.
     ///
-    /// Applies the conv/norm/act layers in sequence.
+    /// Applies the conv/norm/act layers in sequence:
     ///
     /// ```rust,ignore
     /// let x = self.conv.forward(input);
@@ -176,6 +180,15 @@ impl<B: Backend> CNA2d<B> {
     /// let x = self.act.forward(x);
     /// return x
     /// ```
+    ///
+    /// # Arguments
+    ///
+    /// - `input`: \
+    ///   ``[batch, in_channels, in_height=out_height*stride, in_width=out_width*stride]``.
+    ///
+    /// # Returns
+    ///
+    /// ``[batch, out_channels, out_height, out_width]``
     pub fn forward(
         &self,
         input: Tensor<B, 4>,
@@ -194,6 +207,15 @@ impl<B: Backend> CNA2d<B> {
     /// let x = self.act.forward(x);
     /// return x
     /// ```
+    ///
+    /// # Arguments
+    ///
+    /// - `input`: \
+    ///   ``[batch, in_channels, in_height=out_height*stride, in_width=out_width*stride]``.
+    ///
+    /// # Returns
+    ///
+    /// ``[batch, out_channels, out_height, out_width]``
     pub fn hook_forward<F>(
         &self,
         input: Tensor<B, 4>,
@@ -256,22 +278,24 @@ mod tests {
     use super::*;
     use burn::backend::{Autodiff, NdArray};
     use burn::nn::{BatchNormConfig, PaddingConfig2d};
+    use burn::tensor::Distribution;
 
     #[test]
     fn test_conv_norm_config() {
-        let inner_config = Conv2dConfig::new([2, 4], [3, 3])
+        let abstract_config =
+            AbstractCNA2dConfig::new(NormalizationConfig::Batch(BatchNormConfig::new(0)));
+
+        let conv_config = Conv2dConfig::new([2, 4], [3, 3])
             .with_stride([2, 2])
             .with_padding(PaddingConfig2d::Explicit(1, 1))
             .with_bias(false);
 
-        let config: CNA2dConfig = CNA2dConfig::new(
-            inner_config.clone(),
-            NormalizationConfig::Batch(BatchNormConfig::new(0)),
-        );
+        let config: CNA2dConfig = abstract_config.build_config(conv_config.clone());
 
-        assert_eq!(&config.conv.channels, &inner_config.channels);
-        assert_eq!(&config.conv.kernel_size, &inner_config.kernel_size);
-        assert_eq!(&config.conv.stride, &inner_config.stride);
+        assert_eq!(config.in_channels(), 2);
+        assert_eq!(config.out_channels(), 4);
+        assert_eq!(config.groups(), 1);
+        assert_eq!(config.stride(), [2, 2]);
     }
 
     #[test]
@@ -292,6 +316,42 @@ mod tests {
         assert_eq!(layer.in_channels(), 2);
         assert_eq!(layer.out_channels(), 4);
         assert_eq!(layer.groups(), 1);
-        assert_eq!(layer.stride(), &[2, 2]);
+        assert_eq!(layer.stride(), [2, 2]);
+
+        let batch_size = 2;
+        let height = 10;
+        let width = 10;
+        let channels = 2;
+
+        let input = Tensor::random(
+            [batch_size, channels, height, width],
+            Distribution::Default,
+            &device,
+        );
+
+        {
+            let output = layer.forward(input.clone());
+            let expected = {
+                let x = layer.conv.forward(input.clone());
+                let x = layer.norm.forward(x);
+                let x = layer.act.forward(x);
+                x
+            };
+            output.to_data().assert_eq(&expected.to_data(), true);
+        }
+
+        {
+            let hook = |x| x * 2.0;
+
+            let output = layer.hook_forward(input.clone(), hook);
+            let expected = {
+                let x = layer.conv.forward(input.clone());
+                let x = layer.norm.forward(x);
+                let x = hook(x);
+                let x = layer.act.forward(x);
+                x
+            };
+            output.to_data().assert_eq(&expected.to_data(), true);
+        }
     }
 }
