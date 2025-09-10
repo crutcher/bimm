@@ -238,6 +238,9 @@ pub trait DownsampleMeta {
     /// The stride of the downsample layer.
     fn stride(&self) -> usize;
 
+    /// Whether to use `avg` pooling.
+    fn avg(&self) -> bool;
+
     /// Get the output resolution for a given input resolution.
     ///
     /// The input must be a multiple of the stride.
@@ -288,6 +291,10 @@ pub struct DownsampleConfig {
     /// The feature size will be auto-matched.
     #[config(default = "NormalizationConfig::Batch(BatchNormConfig::new(0))")]
     norm: NormalizationConfig,
+
+    /// Whether to use `avg` pooling.
+    #[config(default = "false")]
+    avg: bool,
 }
 
 impl DownsampleMeta for DownsampleConfig {
@@ -310,6 +317,10 @@ impl DownsampleMeta for DownsampleConfig {
     fn stride(&self) -> usize {
         self.stride
     }
+
+    fn avg(&self) -> bool {
+        self.avg
+    }
 }
 
 impl DownsampleConfig {
@@ -318,22 +329,40 @@ impl DownsampleConfig {
         &self,
         device: &B::Device,
     ) -> Downsample<B> {
-        Downsample {
-            pool: None,
-            conv: Conv2dConfig::new(
-                scalar_to_array(self.in_channels),
-                scalar_to_array(self.kernel_size),
-            )
-            .with_stride(scalar_to_array(self.stride))
-            .with_padding(build_square_conv2d_padding_config(
-                self.kernel_size,
-                self.stride,
-                self.dilation,
-            ))
-            .with_dilation(scalar_to_array(self.dilation))
-            .init(device),
+        if self.avg {
+            let pool = if self.stride == 1 && self.dilation == 1 {
+                None
+            } else {
+                let _avg_stride = if self.dilation == 1 { self.stride } else { 1 };
+                todo!("ceil_mode needs to be implemented for AvgPool2dSame/AvgPool2d")
+            };
+            Downsample {
+                pool,
+                conv: Conv2dConfig::new(scalar_to_array(self.in_channels), scalar_to_array(1))
+                    .with_bias(false)
+                    .init(device),
 
-            norm: self.norm.init(device),
+                norm: self.norm.init(device),
+            }
+        } else {
+            Downsample {
+                pool: None,
+                conv: Conv2dConfig::new(
+                    scalar_to_array(self.in_channels),
+                    scalar_to_array(self.kernel_size),
+                )
+                .with_stride(scalar_to_array(self.stride))
+                .with_padding(build_square_conv2d_padding_config(
+                    self.kernel_size,
+                    self.stride,
+                    self.dilation,
+                ))
+                .with_dilation(scalar_to_array(self.dilation))
+                .with_bias(false)
+                .init(device),
+
+                norm: self.norm.init(device),
+            }
         }
     }
 }
@@ -367,6 +396,10 @@ impl<B: Backend> DownsampleMeta for Downsample<B> {
 
     fn stride(&self) -> usize {
         self.conv.stride[0]
+    }
+
+    fn avg(&self) -> bool {
+        self.pool.is_some()
     }
 }
 
