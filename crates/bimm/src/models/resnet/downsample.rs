@@ -2,10 +2,12 @@
 
 use crate::compat::normalization_wrapper::{Normalization, NormalizationConfig};
 use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig, ConvNorm2dMeta};
-use crate::models::resnet::util::{CONV_INTO_RELU_INITIALIZER, build_square_conv2d_padding_config};
+use crate::layers::pool::{AvgPool2dSame, AvgPool2dSameConfig};
+use crate::models::resnet::util::{build_square_conv2d_padding_config, CONV_INTO_RELU_INITIALIZER};
 use crate::models::resnet::util::{scalar_to_array, stride_div_output_resolution};
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::nn::conv::{Conv2d, Conv2dConfig};
+use burn::nn::pool::{AvgPool2d, AvgPool2dConfig};
 use burn::nn::{BatchNormConfig, Initializer, PaddingConfig2d};
 use burn::prelude::{Backend, Config, Module, Tensor};
 
@@ -165,6 +167,60 @@ impl<B: Backend> ConvDownsample<B> {
     }
 }
 
+/// [`AvgPool`] Config.
+#[derive(Config, Debug)]
+pub enum AvgPoolConfig {
+    /// [`AvgPool2d`] Config.
+    Avg(AvgPool2dConfig),
+
+    /// [`AvgPool2dSame`] Config.
+    AvgSame(AvgPool2dSameConfig),
+}
+
+impl From<AvgPool2dConfig> for AvgPoolConfig {
+    fn from(config: AvgPool2dConfig) -> Self {
+        AvgPoolConfig::Avg(config)
+    }
+}
+
+impl From<AvgPool2dSameConfig> for AvgPoolConfig {
+    fn from(config: AvgPool2dSameConfig) -> Self {
+        AvgPoolConfig::AvgSame(config)
+    }
+}
+
+impl AvgPoolConfig {
+    /// Initialize a [`AvgPool`].
+    pub fn init(self) -> AvgPool {
+        match self {
+            AvgPoolConfig::Avg(config) => config.init().into(),
+            AvgPoolConfig::AvgSame(config) => config.init().into(),
+        }
+    }
+}
+
+/// AvgPool Wrapper.
+#[derive(Module, Clone, Debug)]
+pub enum AvgPool {
+    /// [`AvgPool2d`] Layer.
+    Avg(AvgPool2d),
+
+    /// [`AvgPool2dSame`] Layer.
+    AvgSame(AvgPool2dSame),
+}
+
+impl From<AvgPool2d> for AvgPool {
+    fn from(pool: AvgPool2d) -> Self {
+        AvgPool::Avg(pool)
+    }
+}
+
+impl From<AvgPool2dSame> for AvgPool {
+    fn from(pool: AvgPool2dSame) -> Self {
+        AvgPool::AvgSame(pool)
+    }
+}
+
 /// [`Downsample`] Meta trait.
 pub trait DownsampleMeta {
     /// The size of the in channels dimension.
@@ -263,6 +319,7 @@ impl DownsampleConfig {
         device: &B::Device,
     ) -> Downsample<B> {
         Downsample {
+            pool: None,
             conv: Conv2dConfig::new(
                 scalar_to_array(self.in_channels),
                 scalar_to_array(self.kernel_size),
@@ -286,6 +343,7 @@ impl DownsampleConfig {
 /// Implements [`DownsampleMeta`].
 #[derive(Module, Debug)]
 pub struct Downsample<B: Backend> {
+    pool: Option<AvgPool>,
     conv: Conv2d<B>,
     norm: Normalization<B>,
 }
