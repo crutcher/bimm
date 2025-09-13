@@ -13,13 +13,63 @@
 
 use crate::layers::drop::drop_block::DropBlockOptions;
 use crate::models::resnet::residual_block::{
-    ResidualBlock, ResidualBlockConfig, ResidualBlockMeta,
+    AbstractResidualBlockConfig, ResidualBlock, ResidualBlockConfig, ResidualBlockMeta,
 };
 use crate::models::resnet::util::stride_div_output_resolution;
 use crate::utility::probability::expect_probability;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::config::Config;
 use burn::prelude::{Backend, Module, Tensor};
+
+/// Abstract [`LayerBlock`] Config.
+#[derive(Config, Debug)]
+pub struct AbstractLayerBlockConfig {
+    /// The number of internal blocks.
+    pub num_blocks: usize,
+
+    /// The number of input feature planes.
+    pub in_planes: usize,
+
+    /// The number of output feature planes.
+    pub out_planes: usize,
+
+    /// Should the first block downsample?
+    #[config(default = "false")]
+    pub downsample: bool,
+
+    /// Select between [`BasicBlock`] and [`BottleneckBlock`].
+    #[config(default = "false")]
+    pub bottleneck: bool,
+}
+
+impl AbstractLayerBlockConfig {
+    /// Convert to [`LayerBlockConfig`].
+    pub fn to_structure(self) -> LayerBlockConfig {
+        let blocks = (0..self.num_blocks)
+            .map(|b| {
+                let in_planes = if b == 0 {
+                    self.in_planes
+                } else {
+                    self.out_planes
+                };
+                let downsample = b == 0 && self.downsample;
+
+                AbstractResidualBlockConfig::new(in_planes, self.out_planes)
+                    .with_downsample(downsample)
+                    .with_bottleneck(self.bottleneck)
+                    .to_structure()
+            })
+            .collect();
+
+        LayerBlockConfig { blocks }
+    }
+}
+
+impl From<AbstractLayerBlockConfig> for LayerBlockConfig {
+    fn from(config: AbstractLayerBlockConfig) -> Self {
+        config.to_structure()
+    }
+}
 
 /// [`LayerBlock`] Meta API.
 pub trait LayerBlockMeta {
@@ -99,27 +149,6 @@ impl LayerBlockMeta for LayerBlockConfig {
 }
 
 impl LayerBlockConfig {
-    /// Build a config.
-    pub fn build(
-        num_blocks: usize,
-        in_planes: usize,
-        out_planes: usize,
-        stride: usize,
-        bottleneck: bool,
-    ) -> Self {
-        let blocks = (0..num_blocks)
-            .map(|b| {
-                if b == 0 {
-                    ResidualBlockConfig::build(in_planes, out_planes, stride, bottleneck)
-                } else {
-                    ResidualBlockConfig::build(out_planes, out_planes, 1, bottleneck)
-                }
-            })
-            .collect();
-
-        Self { blocks }
-    }
-
     /// Check if the config is valid.
     ///
     /// # Returns
@@ -323,7 +352,9 @@ mod tests {
 
     #[test]
     fn test_layer_block_config_build() {
-        let config = LayerBlockConfig::build(2, 16, 32, 2, false);
+        let config: LayerBlockConfig = AbstractLayerBlockConfig::new(2, 16, 32)
+            .with_downsample(true)
+            .into();
         config.expect_valid();
         assert_eq!(config.len(), 2);
         assert_eq!(config.in_planes(), 16);
@@ -358,28 +389,29 @@ mod tests {
                 .with_stride(2)
                 .into(),
             BasicBlockConfig::new(b_planes, c_planes)
-                .with_stride(3)
+                .with_stride(1)
+                .into(),
+            BasicBlockConfig::new(c_planes, c_planes)
+                .with_stride(1)
                 .into(),
         ]);
 
         config.expect_valid();
 
-        assert_eq!(config.len(), 2);
         assert_eq!(config.in_planes(), a_planes);
         assert_eq!(config.out_planes(), c_planes);
-        assert_eq!(config.stride(), 2 * 3);
-        assert_eq!(config.output_resolution([12, 24]), [2, 4]);
+        assert_eq!(config.stride(), 2);
+        assert_eq!(config.output_resolution([20, 16]), [10, 8]);
 
         let block: LayerBlock<B> = config.init(&device);
 
-        assert_eq!(block.len(), 2);
         assert_eq!(block.in_planes(), a_planes);
         assert_eq!(block.out_planes(), c_planes);
-        assert_eq!(block.stride(), 2 * 3);
-        assert_eq!(block.output_resolution([12, 24]), [2, 4]);
+        assert_eq!(block.stride(), 2);
+        assert_eq!(block.output_resolution([20, 16]), [10, 8]);
 
         let batch_size = 2;
-        let input = Tensor::ones([batch_size, a_planes, 12, 24], &device);
+        let input = Tensor::ones([batch_size, a_planes, 20, 16], &device);
 
         let output = block.forward(input.clone());
         assert_shape_contract!(
@@ -388,8 +420,8 @@ mod tests {
             &[
                 ("batch", batch_size),
                 ("out_planes", c_planes),
-                ("out_height", 2),
-                ("out_width", 4)
+                ("out_height", 10),
+                ("out_width", 8)
             ],
         );
 

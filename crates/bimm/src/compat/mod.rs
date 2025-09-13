@@ -4,5 +4,6 @@
 //! module to link against multiple versions of `burn_support`.
 
 pub mod activation_wrapper;
+pub mod conv_shape;
 pub mod normalization_wrapper;
 pub mod ops;

@@ -16,7 +16,9 @@
 use crate::compat::activation_wrapper::{Activation, ActivationConfig};
 use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig};
 use crate::layers::drop::drop_block::DropBlockOptions;
-use crate::models::resnet::layer_block::{LayerBlock, LayerBlockConfig, LayerBlockMeta};
+use crate::models::resnet::layer_block::{
+    AbstractLayerBlockConfig, LayerBlock, LayerBlockConfig, LayerBlockMeta,
+};
 use crate::models::resnet::residual_block::{ResidualBlock, ResidualBlockConfig};
 use crate::models::resnet::resnet_io::pytorch_stubs::load_resnet_stub_record;
 use crate::models::resnet::util::CONV_INTO_RELU_INITIALIZER;
@@ -70,14 +72,11 @@ impl From<ResNetAbstractConfig> for ResNetConfig {
         );
         let expansion = config.expansion;
 
-        let make_block = |idx: usize, in_factor: usize, out_factor: usize, stride: usize| {
-            LayerBlockConfig::build(
-                config.layers[idx],
-                64 * in_factor,
-                64 * out_factor,
-                stride,
-                config.bottleneck,
-            )
+        let make_block = |idx: usize, in_factor: usize, out_factor: usize, down: bool| {
+            AbstractLayerBlockConfig::new(config.layers[idx], 64 * in_factor, 64 * out_factor)
+                .with_downsample(down)
+                .with_bottleneck(config.bottleneck)
+                .into()
         };
 
         ResNetConfig::new(
@@ -89,10 +88,10 @@ impl From<ResNetAbstractConfig> for ResNetConfig {
             )
             .with_initializer(CONV_INTO_RELU_INITIALIZER.clone()),
             vec![
-                make_block(0, 1, expansion, 1),
-                make_block(1, expansion, 2 * expansion, 2),
-                make_block(2, 2 * expansion, 4 * expansion, 2),
-                make_block(3, 4 * expansion, 8 * expansion, 2),
+                make_block(0, 1, expansion, false),
+                make_block(1, expansion, 2 * expansion, true),
+                make_block(2, 2 * expansion, 4 * expansion, true),
+                make_block(3, 4 * expansion, 8 * expansion, true),
             ],
             config.num_classes,
         )

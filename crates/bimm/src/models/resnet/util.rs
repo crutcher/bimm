@@ -1,4 +1,5 @@
 //! # `ResNet` Utilities
+
 use bimm_contracts::unpack_shape_contract;
 use burn::nn::{Initializer, PaddingConfig2d};
 

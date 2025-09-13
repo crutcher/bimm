@@ -16,7 +16,7 @@ use crate::compat::normalization_wrapper::NormalizationConfig;
 use crate::layers::blocks::cna::{AbstractCNA2dConfig, CNA2d, CNA2dConfig, CNA2dMeta};
 use crate::layers::drop::drop_block::{DropBlock2d, DropBlock2dConfig, DropBlockOptions};
 use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
-use crate::models::resnet::downsample::{ConvDownsample, ConvDownsampleConfig};
+use crate::models::resnet::downsample::{ResNetDownsample, ResNetDownsampleConfig};
 use crate::models::resnet::util::{scalar_to_array, stride_div_output_resolution};
 use crate::utility::probability::expect_probability;
 use burn::nn::conv::Conv2dConfig;
@@ -130,6 +130,10 @@ pub struct BottleneckBlockConfig {
     #[config(default = 1)]
     pub dilation: usize,
 
+    /// Size of the kernel for the downsample layer.
+    #[config(default = "1")]
+    pub down_kernel_size: usize,
+
     /// Drop path probability.
     #[config(default = "0.0")]
     pub drop_path_prob: f64,
@@ -206,9 +210,10 @@ impl BottleneckBlockConfig {
         // stride = 1 if use_aa else stride
 
         let downsample = if stride != 1 || in_planes != out_planes {
-            // TODO: mechanism to select different pool operations.
-            ConvDownsampleConfig::new(in_planes, out_planes)
-                .with_stride(stride)
+            ResNetDownsampleConfig::new(self.in_planes(), self.out_planes(), self.down_kernel_size)
+                .with_stride(self.stride())
+                .with_dilation(self.dilation())
+                .with_norm(self.normalization.clone())
                 .into()
         } else {
             None
@@ -241,7 +246,7 @@ impl BottleneckBlockConfig {
             expansion_factor: self.expansion_factor,
             reduction_factor: self.reduction_factor,
 
-            downsample: downsample.as_ref().map(|c| c.init(device)),
+            downsample: downsample.as_ref().map(|c| c.clone().init(device)),
 
             cna1: cna1.init(device),
             cna2: cna2.init(device),
@@ -251,9 +256,7 @@ impl BottleneckBlockConfig {
                 .drop_block
                 .as_ref()
                 .map(|options| DropBlock2dConfig::from(options.clone()).init()),
-            ae: None,
 
-            se: None,
             drop_path: if drop_path_prob != 0.0 {
                 DropPathConfig::new()
                     .with_drop_prob(drop_path_prob)
@@ -281,7 +284,7 @@ pub struct BottleneckBlock<B: Backend> {
     pub reduction_factor: usize,
 
     /// Optional `DownSample` layer; for the residual connection.
-    pub downsample: Option<ConvDownsample<B>>,
+    pub downsample: Option<ResNetDownsample<B>>,
 
     /// First conv/norm/act layer.
     pub cna1: CNA2d<B>,
@@ -292,14 +295,6 @@ pub struct BottleneckBlock<B: Backend> {
 
     /// Optional `DropBlock` layer.
     pub drop_block: Option<DropBlock2d>,
-
-    /// Optional anti-aliasing layer.
-    // TODO: aa: anti-aliasing layer
-    pub ae: Option<usize>,
-
-    /// Optional attention layer.
-    // TODO: se: attention layer
-    pub se: Option<usize>,
 
     /// Optional `DropPath` layer.
     pub drop_path: Option<DropPath>,
@@ -417,19 +412,14 @@ impl<B: Backend> BottleneckBlock<B> {
             None => x,
         });
 
-        let x = match &self.ae {
-            Some(_) => unimplemented!("anti-aliasing is not implemented"),
-            None => x,
-        };
+        // TODO: anti-aliasing
 
         self.cna3.hook_forward(x, |x| {
             #[cfg(debug_assertions)]
             bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
 
-            let x = match &self.se {
-                Some(_) => unimplemented!("attention is not implemented"),
-                None => x,
-            };
+            // TODO: attention
+
             let x = match &self.drop_path {
                 Some(drop_path) => drop_path.forward(x),
                 None => x,

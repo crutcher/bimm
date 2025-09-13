@@ -9,7 +9,7 @@ use crate::layers::blocks::cna::CNA2d;
 use crate::layers::blocks::conv_norm::ConvNorm2d;
 use crate::models::resnet::basic_block::BasicBlock;
 use crate::models::resnet::bottleneck::BottleneckBlock;
-use crate::models::resnet::downsample::ConvDownsample;
+use crate::models::resnet::downsample::ResNetDownsample;
 use crate::models::resnet::layer_block::LayerBlock;
 use crate::models::resnet::residual_block::ResidualBlock;
 use crate::models::resnet::resnet_model::ResNet;
@@ -113,8 +113,8 @@ impl<B: Backend> ResidualBlockStubRecord<B> {
 
 pub fn copy_downsample_weights<B: Backend>(
     downsample: Option<DownsampleStubRecord<B>>,
-    target: Option<ConvDownsample<B>>,
-) -> Option<ConvDownsample<B>> {
+    target: Option<ResNetDownsample<B>>,
+) -> Option<ResNetDownsample<B>> {
     match (downsample, target) {
         (Some(stub), Some(target)) => Some(stub.copy_weights(target)),
         (None, None) => None,
@@ -132,10 +132,14 @@ pub struct DownsampleStub<B: Backend> {
 impl<B: Backend> DownsampleStubRecord<B> {
     pub fn copy_weights(
         self,
-        target: ConvDownsample<B>,
-    ) -> ConvDownsample<B> {
-        ConvDownsample {
-            conv_norm: copy_conv_norm_weights(self.conv, self.bn, target.conv_norm),
+        target: ResNetDownsample<B>,
+    ) -> ResNetDownsample<B> {
+        match target.norm {
+            Normalization::Batch(norm) => ResNetDownsample {
+                conv: target.conv.load_record(self.conv),
+                norm: norm.load_record(self.bn).into(),
+            },
+            _ => panic!("Stub cannot be applied to {:?}", target.norm),
         }
     }
 }
@@ -181,6 +185,7 @@ impl<B: Backend> BasicBlockStubRecord<B> {
         target: BasicBlock<B>,
     ) -> BasicBlock<B> {
         BasicBlock {
+            downsample: copy_downsample_weights(self.downsample, target.downsample),
             cna1: copy_cna_weights(self.conv1, self.bn1, target.cna1),
             cna2: copy_cna_weights(self.conv2, self.bn2, target.cna2),
             ..target

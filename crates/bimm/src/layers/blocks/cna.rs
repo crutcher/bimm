@@ -110,11 +110,11 @@ impl CNA2dConfig {
         self,
         device: &B::Device,
     ) -> CNA2d<B> {
-        let cfg = self.match_norm_features();
+        let out_channels = self.out_channels();
         CNA2d {
-            conv: cfg.conv.init(device),
-            norm: cfg.norm.init(device),
-            act: cfg.act.init(device),
+            conv: self.conv.init(device),
+            norm: self.norm.with_num_features(out_channels).init(device),
+            act: self.act.init(device),
         }
     }
 

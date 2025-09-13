@@ -118,7 +118,7 @@ impl AvgPool2dSameConfig {
     }
 }
 
-/// AvgPool2dSame Layer.
+/// `AvgPool2dSame` Layer.
 #[derive(Module, Clone, Debug)]
 pub struct AvgPool2dSame {
     pool: AvgPool2d,

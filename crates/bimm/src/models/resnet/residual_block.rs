@@ -26,6 +26,46 @@ use crate::models::resnet::util::stride_div_output_resolution;
 use crate::utility::probability::expect_probability;
 use burn::prelude::{Backend, Config, Module, Tensor};
 
+/// Abstract [`ResidualBlock`] Config.
+#[derive(Config, Debug)]
+pub struct AbstractResidualBlockConfig {
+    /// The number of input feature planes.
+    pub in_planes: usize,
+
+    /// The number of output feature planes.
+    pub out_planes: usize,
+
+    /// Should the first block downsample?
+    #[config(default = "false")]
+    pub downsample: bool,
+
+    /// Select between [`BasicBlock`] and [`BottleneckBlock`].
+    #[config(default = "false")]
+    pub bottleneck: bool,
+}
+
+impl AbstractResidualBlockConfig {
+    /// Convert to [`ResidualBlockConfig`].
+    pub fn to_structure(self) -> ResidualBlockConfig {
+        let stride = if self.downsample { 2 } else { 1 };
+        if self.bottleneck {
+            BottleneckBlockConfig::new(self.in_planes, self.out_planes)
+                .with_stride(stride)
+                .into()
+        } else {
+            BasicBlockConfig::new(self.in_planes, self.out_planes)
+                .with_stride(stride)
+                .into()
+        }
+    }
+}
+
+impl From<AbstractResidualBlockConfig> for ResidualBlockConfig {
+    fn from(config: AbstractResidualBlockConfig) -> Self {
+        config.to_structure()
+    }
+}
+
 /// [`ResidualBlock`] Meta API.
 ///
 /// Defines a shared API for [`ResidualBlock`] and [`ResidualBlockConfig`].
@@ -131,24 +171,6 @@ impl ResidualBlockConfig {
         match self {
             Self::Basic(config) => config.init(device).into(),
             Self::Bottleneck(config) => config.init(device).into(),
-        }
-    }
-
-    /// Legacy constructor.
-    pub fn build(
-        in_planes: usize,
-        out_planes: usize,
-        stride: usize,
-        bottleneck: bool,
-    ) -> Self {
-        if bottleneck {
-            BottleneckBlockConfig::new(in_planes, out_planes)
-                .with_stride(stride)
-                .into()
-        } else {
-            BasicBlockConfig::new(in_planes, out_planes)
-                .with_stride(stride)
-                .into()
         }
     }
 

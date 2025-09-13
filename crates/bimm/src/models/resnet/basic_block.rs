@@ -16,7 +16,7 @@ use crate::compat::normalization_wrapper::NormalizationConfig;
 use crate::layers::blocks::cna::{AbstractCNA2dConfig, CNA2d, CNA2dConfig, CNA2dMeta};
 use crate::layers::drop::drop_block::{DropBlock2d, DropBlock2dConfig, DropBlockOptions};
 use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
-use crate::models::resnet::downsample::{ConvDownsample, ConvDownsampleConfig};
+use crate::models::resnet::downsample::{ResNetDownsample, ResNetDownsampleConfig};
 use crate::models::resnet::util::{scalar_to_array, stride_div_output_resolution};
 use crate::utility::probability::expect_probability;
 use burn::nn::BatchNormConfig;
@@ -37,9 +37,6 @@ pub trait BasicBlockMeta {
 
     /// Configures the size of `first_planes` and `out_planes`.
     fn planes(&self) -> usize;
-
-    /// Groups of the conv filters.
-    fn cardinality(&self) -> usize;
 
     /// Control factor for `out_planes()`
     fn expansion_factor(&self) -> usize;
@@ -108,10 +105,6 @@ pub struct BasicBlockConfig {
     /// Configures the `out_planes` as a function of `expansion_factor`.
     pub planes: usize,
 
-    /// Groups of the conv filters.
-    #[config(default = "1")]
-    pub cardinality: usize,
-
     /// Control factor for `out_planes()`
     #[config(default = 1)]
     pub expansion_factor: usize,
@@ -131,6 +124,10 @@ pub struct BasicBlockConfig {
     /// Optional dilation rate for the first conv.
     #[config(default = "None")]
     pub first_dilation: Option<usize>,
+
+    /// Size of the kernel for the downsample layer.
+    #[config(default = "1")]
+    pub down_kernel_size: usize,
 
     /// Drop path probability.
     #[config(default = "0.0")]
@@ -169,10 +166,6 @@ impl BasicBlockMeta for BasicBlockConfig {
         self.planes
     }
 
-    fn cardinality(&self) -> usize {
-        self.cardinality
-    }
-
     fn expansion_factor(&self) -> usize {
         self.expansion_factor
     }
@@ -208,9 +201,10 @@ impl BasicBlockConfig {
         // stride = 1 if use_aa else stride
 
         let downsample = if stride != 1 || in_planes != out_planes {
-            // TODO: mechanism to select different pool operations.
-            ConvDownsampleConfig::new(self.in_planes(), self.out_planes())
+            ResNetDownsampleConfig::new(self.in_planes(), self.out_planes(), self.down_kernel_size)
                 .with_stride(self.stride())
+                .with_dilation(first_dilation)
+                .with_norm(self.normalization.clone())
                 .into()
         } else {
             None
@@ -226,7 +220,6 @@ impl BasicBlockConfig {
                 .with_stride(scalar_to_array(stride))
                 .with_dilation(scalar_to_array(first_dilation))
                 .with_padding(PaddingConfig2d::Explicit(first_dilation, first_dilation))
-                .with_groups(self.cardinality())
                 .with_bias(false),
         );
 
@@ -241,7 +234,7 @@ impl BasicBlockConfig {
             expansion_factor: self.expansion_factor,
             reduction_factor: self.reduction_factor,
 
-            downsample: downsample.as_ref().map(|cfg| cfg.init(device)),
+            downsample: downsample.as_ref().map(|cfg| cfg.clone().init(device)),
 
             // Group 1
             cna1: cna1.init(device),
@@ -251,8 +244,6 @@ impl BasicBlockConfig {
                 .drop_block
                 .as_ref()
                 .map(|options| DropBlock2dConfig::from(options.clone()).init()),
-            ae: None,
-            se: None,
             drop_path: if drop_path_prob != 0.0 {
                 DropPathConfig::new()
                     .with_drop_prob(drop_path_prob)
@@ -277,7 +268,7 @@ pub struct BasicBlock<B: Backend> {
     pub reduction_factor: usize,
 
     /// Optional `DownSample` layer; for the residual connection.
-    pub downsample: Option<ConvDownsample<B>>,
+    pub downsample: Option<ResNetDownsample<B>>,
 
     /// First Conv/Norm/Act Block.
     pub cna1: CNA2d<B>,
@@ -286,14 +277,6 @@ pub struct BasicBlock<B: Backend> {
 
     /// Optional `DropBlock` layer.
     pub drop_block: Option<DropBlock2d>,
-
-    /// Optional anti-aliasing layer.
-    // TODO: aa: anti-aliasing layer
-    pub ae: Option<usize>,
-
-    /// Optional attention layer.
-    // TODO: se: attention layer
-    pub se: Option<usize>,
 
     /// Optional `DropPath` layer.
     pub drop_path: Option<DropPath>,
@@ -316,10 +299,6 @@ impl<B: Backend> BasicBlockMeta for BasicBlock<B> {
 
     fn planes(&self) -> usize {
         self.cna1.out_channels() / self.expansion_factor()
-    }
-
-    fn cardinality(&self) -> usize {
-        self.cna1.groups()
     }
 
     fn expansion_factor(&self) -> usize {
@@ -387,10 +366,9 @@ impl<B: Backend> BasicBlock<B> {
             ("out_height", out_height),
             ("out_width", out_width),
         ];
-        #[cfg(debug_assertions)]
-        bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &identity, &out_bindings);
+        // #[cfg(debug_assertions)]
+        //  bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &identity, &out_bindings);
 
-        // Group 1
         let x = self.cna1.hook_forward(input, |x| match &self.drop_block {
             Some(drop_block) => drop_block.forward(x),
             None => x,
@@ -408,17 +386,11 @@ impl<B: Backend> BasicBlock<B> {
             ]
         );
 
-        let x = match &self.ae {
-            Some(_) => unimplemented!("anti-aliasing is not implemented"),
-            None => x,
-        };
+        // TODO: anti-aliasing
 
-        // Group 2
         let x = self.cna2.hook_forward(x, |x| {
-            let x = match &self.se {
-                Some(_) => unimplemented!("attention is not implemented"),
-                None => x,
-            };
+            // TODO: attention
+
             let x = match &self.drop_path {
                 Some(drop_path) => drop_path.forward(x),
                 None => x,
