@@ -14,6 +14,7 @@
 //! [`ResNet::forward`].
 
 use crate::compat::activation_wrapper::{Activation, ActivationConfig};
+use crate::compat::normalization_wrapper::NormalizationConfig;
 use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig};
 use crate::layers::drop::drop_block::DropBlockOptions;
 use crate::models::resnet::layer_block::{
@@ -24,6 +25,7 @@ use crate::models::resnet::resnet_io::pytorch_stubs::load_resnet_stub_record;
 use crate::models::resnet::util::CONV_INTO_RELU_INITIALIZER;
 use crate::utility::probability::expect_probability;
 use burn::module::Module;
+use burn::nn::BatchNormConfig;
 use burn::nn::conv::Conv2dConfig;
 use burn::nn::pool::{AdaptiveAvgPool2d, AdaptiveAvgPool2dConfig, MaxPool2d, MaxPool2dConfig};
 use burn::nn::{Initializer, Linear, LinearConfig, PaddingConfig2d};
@@ -62,6 +64,17 @@ pub struct ResNetAbstractConfig {
     /// Use bottleneck blocks.
     #[config(default = "false")]
     pub bottleneck: bool,
+
+    /// [`crate::compat::normalization_wrapper::Normalization`] config.
+    ///
+    /// The feature size of this config will be replaced
+    /// with the appropriate feature size for the input layer.
+    #[config(default = "NormalizationConfig::Batch(BatchNormConfig::new(0))")]
+    pub normalization: NormalizationConfig,
+
+    /// [`crate::compat::activation_wrapper::Activation`] config.
+    #[config(default = "ActivationConfig::Relu")]
+    pub activation: ActivationConfig,
 }
 
 impl From<ResNetAbstractConfig> for ResNetConfig {
@@ -76,6 +89,8 @@ impl From<ResNetAbstractConfig> for ResNetConfig {
             AbstractLayerBlockConfig::new(config.layers[idx], 64 * in_factor, 64 * out_factor)
                 .with_downsample(down)
                 .with_bottleneck(config.bottleneck)
+                .with_normalization(config.normalization.clone())
+                .with_activation(config.activation.clone())
                 .into()
         };
 

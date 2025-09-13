@@ -2,11 +2,13 @@ use crate::Args;
 use crate::data::{ClassificationBatch, ClassificationBatcher};
 use crate::dataset::{CLASSES, PlanetLoader};
 use bimm::cache;
+use bimm::compat::activation_wrapper::{Activation, ActivationConfig};
 use bimm::models::resnet::{ResNet, ResNetAbstractConfig};
 use burn::data::dataloader::DataLoaderBuilder;
 use burn::data::dataset::transform::ShuffledDataset;
 use burn::data::dataset::vision::ImageFolderDataset;
 use burn::module::{ModuleMapper, ParamId};
+use burn::nn::PReluConfig;
 use burn::nn::loss::BinaryCrossEntropyLossConfig;
 use burn::optim::AdamConfig;
 use burn::optim::decay::WeightDecayConfig;
@@ -144,6 +146,7 @@ pub fn train<B: AutodiffBackend>(
     let weights_path = cache::fetch_model_weights(&args.pretrained_weights)?;
 
     let model: ResNet<B> = ResNetAbstractConfig::resnet18(10)
+        // .with_activation(ActivationConfig::Gelu)
         .to_structure()
         .init(device)
         .load_pytorch_weights(weights_path)

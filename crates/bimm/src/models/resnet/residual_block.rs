@@ -17,6 +17,8 @@
 //! [`ResidualBlock`] can also be constructed via:
 //! * [`From<BasicBlock<B>>`](`BasicBlock`),
 //! * [`From<BottleneckBlock<B>>`](`BottleneckBlock`).
+use crate::compat::activation_wrapper::ActivationConfig;
+use crate::compat::normalization_wrapper::NormalizationConfig;
 use crate::layers::drop::drop_block::DropBlockOptions;
 use crate::models::resnet::basic_block::{BasicBlock, BasicBlockConfig, BasicBlockMeta};
 use crate::models::resnet::bottleneck::{
@@ -24,6 +26,7 @@ use crate::models::resnet::bottleneck::{
 };
 use crate::models::resnet::util::stride_div_output_resolution;
 use crate::utility::probability::expect_probability;
+use burn::nn::BatchNormConfig;
 use burn::prelude::{Backend, Config, Module, Tensor};
 
 /// Abstract [`ResidualBlock`] Config.
@@ -42,6 +45,17 @@ pub struct AbstractResidualBlockConfig {
     /// Select between [`BasicBlock`] and [`BottleneckBlock`].
     #[config(default = "false")]
     pub bottleneck: bool,
+
+    /// [`crate::compat::normalization_wrapper::Normalization`] config.
+    ///
+    /// The feature size of this config will be replaced
+    /// with the appropriate feature size for the input layer.
+    #[config(default = "NormalizationConfig::Batch(BatchNormConfig::new(0))")]
+    pub normalization: NormalizationConfig,
+
+    /// [`crate::compat::activation_wrapper::Activation`] config.
+    #[config(default = "ActivationConfig::Relu")]
+    pub activation: ActivationConfig,
 }
 
 impl AbstractResidualBlockConfig {
@@ -51,10 +65,14 @@ impl AbstractResidualBlockConfig {
         if self.bottleneck {
             BottleneckBlockConfig::new(self.in_planes, self.out_planes)
                 .with_stride(stride)
+                .with_normalization(self.normalization)
+                .with_activation(self.activation)
                 .into()
         } else {
             BasicBlockConfig::new(self.in_planes, self.out_planes)
                 .with_stride(stride)
+                .with_normalization(self.normalization)
+                .with_activation(self.activation)
                 .into()
         }
     }

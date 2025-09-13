@@ -11,6 +11,8 @@
 //! [`LayerBlock`] implements [`Module`], and provides
 //! [`LayerBlock::forward`].
 
+use crate::compat::activation_wrapper::ActivationConfig;
+use crate::compat::normalization_wrapper::NormalizationConfig;
 use crate::layers::drop::drop_block::DropBlockOptions;
 use crate::models::resnet::residual_block::{
     AbstractResidualBlockConfig, ResidualBlock, ResidualBlockConfig, ResidualBlockMeta,
@@ -19,6 +21,7 @@ use crate::models::resnet::util::stride_div_output_resolution;
 use crate::utility::probability::expect_probability;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::config::Config;
+use burn::nn::BatchNormConfig;
 use burn::prelude::{Backend, Module, Tensor};
 
 /// Abstract [`LayerBlock`] Config.
@@ -40,6 +43,17 @@ pub struct AbstractLayerBlockConfig {
     /// Select between [`BasicBlock`] and [`BottleneckBlock`].
     #[config(default = "false")]
     pub bottleneck: bool,
+
+    /// [`crate::compat::normalization_wrapper::Normalization`] config.
+    ///
+    /// The feature size of this config will be replaced
+    /// with the appropriate feature size for the input layer.
+    #[config(default = "NormalizationConfig::Batch(BatchNormConfig::new(0))")]
+    pub normalization: NormalizationConfig,
+
+    /// [`crate::compat::activation_wrapper::Activation`] config.
+    #[config(default = "ActivationConfig::Relu")]
+    pub activation: ActivationConfig,
 }
 
 impl AbstractLayerBlockConfig {
@@ -57,6 +71,8 @@ impl AbstractLayerBlockConfig {
                 AbstractResidualBlockConfig::new(in_planes, self.out_planes)
                     .with_downsample(downsample)
                     .with_bottleneck(self.bottleneck)
+                    .with_normalization(self.normalization.clone())
+                    .with_activation(self.activation.clone())
                     .to_structure()
             })
             .collect();
