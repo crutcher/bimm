@@ -2,13 +2,13 @@
 //!
 //! [`ResNet`] is the core `ResNet` module.
 //!
-//! [`ResNetAbstractConfig`] implements [`Config`], and provides
+//! [`ResNetContractConfig`] implements [`Config`], and provides
 //! a high-level configuration interface.
-//! It provides [`ResNetAbstractConfig::to_structure`] to convert
-//! to a [`ResNetConfig`].
+//! It provides [`ResNetContractConfig::to_structure`] to convert
+//! to a [`ResNetStructureConfig`].
 //!
-//! [`ResNetConfig`] implements [`Config`], and provides
-//! [`ResNetConfig::init`] to initialize a [`ResNet`].
+//! [`ResNetStructureConfig`] implements [`Config`], and provides
+//! [`ResNetStructureConfig::init`] to initialize a [`ResNet`].
 //!
 //! [`ResNet`] implements [`Module`], and provides
 //! [`ResNet::forward`].
@@ -18,9 +18,9 @@ use crate::compat::normalization_wrapper::NormalizationConfig;
 use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig};
 use crate::layers::drop::drop_block::DropBlockOptions;
 use crate::models::resnet::layer_block::{
-    AbstractLayerBlockConfig, LayerBlock, LayerBlockConfig, LayerBlockMeta,
+    LayerBlock, LayerBlockContractConfig, LayerBlockMeta, LayerBlockStructureConfig,
 };
-use crate::models::resnet::residual_block::{ResidualBlock, ResidualBlockConfig};
+use crate::models::resnet::residual_block::{ResidualBlock, ResidualBlockStructureConfig};
 use crate::models::resnet::resnet_io::pytorch_stubs::load_resnet_stub_record;
 use crate::models::resnet::util::CONV_INTO_RELU_INITIALIZER;
 use crate::utility::probability::expect_probability;
@@ -45,7 +45,7 @@ pub const RESNET152_BLOCKS: [usize; 4] = [3, 8, 36, 3];
 
 /// High-level [`ResNet`] model configuration.
 #[derive(Config, Debug)]
-pub struct ResNetAbstractConfig {
+pub struct ResNetContractConfig {
     /// Layer block depths.
     pub layers: [usize; 4],
 
@@ -77,8 +77,8 @@ pub struct ResNetAbstractConfig {
     pub activation: ActivationConfig,
 }
 
-impl From<ResNetAbstractConfig> for ResNetConfig {
-    fn from(config: ResNetAbstractConfig) -> Self {
+impl From<ResNetContractConfig> for ResNetStructureConfig {
+    fn from(config: ResNetContractConfig) -> Self {
         assert!(
             config.expansion == 1 || config.expansion == 4,
             "ResNet module only supports expansion values [1, 4] for residual blocks"
@@ -86,7 +86,7 @@ impl From<ResNetAbstractConfig> for ResNetConfig {
         let expansion = config.expansion;
 
         let make_block = |idx: usize, in_factor: usize, out_factor: usize, down: bool| {
-            AbstractLayerBlockConfig::new(config.layers[idx], 64 * in_factor, 64 * out_factor)
+            LayerBlockContractConfig::new(config.layers[idx], 64 * in_factor, 64 * out_factor)
                 .with_downsample(down)
                 .with_bottleneck(config.bottleneck)
                 .with_normalization(config.normalization.clone())
@@ -94,7 +94,7 @@ impl From<ResNetAbstractConfig> for ResNetConfig {
                 .into()
         };
 
-        ResNetConfig::new(
+        ResNetStructureConfig::new(
             ConvNorm2dConfig::from(
                 Conv2dConfig::new([3, config.stem_width], [7, 7])
                     .with_stride([2, 2])
@@ -113,9 +113,9 @@ impl From<ResNetAbstractConfig> for ResNetConfig {
     }
 }
 
-impl ResNetAbstractConfig {
-    /// Convert to a [`ResNetConfig`].
-    pub fn to_structure(self) -> ResNetConfig {
+impl ResNetContractConfig {
+    /// Convert to a [`ResNetStructureConfig`].
+    pub fn to_structure(self) -> ResNetStructureConfig {
         self.into()
     }
 
@@ -131,7 +131,7 @@ impl ResNetAbstractConfig {
 /// It is not a semantic configuration and does not check the validity
 /// of the internal sizes before or during construction.
 #[derive(Config, Debug)]
-pub struct ResNetConfig {
+pub struct ResNetStructureConfig {
     /// The input Conv/Norm block configuration.
     pub input_conv_norm: ConvNorm2dConfig,
 
@@ -144,13 +144,13 @@ pub struct ResNetConfig {
     pub input_act: ActivationConfig,
 
     /// The inner layers configuration.
-    pub layers: Vec<LayerBlockConfig>,
+    pub layers: Vec<LayerBlockStructureConfig>,
 
     /// The number of classes.
     pub num_classes: usize,
 }
 
-impl ResNetConfig {
+impl ResNetStructureConfig {
     /// Initialize a [`ResNet`] model.
     pub fn init<B: Backend>(
         self,
@@ -216,7 +216,7 @@ impl ResNetConfig {
 
         let net_num_blocks = self.layers.iter().map(|b| b.len()).sum::<usize>();
         let mut net_block_idx = 0;
-        let mut update_drop_path = |_idx: usize, block: ResidualBlockConfig| {
+        let mut update_drop_path = |_idx: usize, block: ResidualBlockStructureConfig| {
             // stochastic depth linear decay rule
             let block_dpr = drop_path_rate * (net_block_idx as f64) / ((net_num_blocks - 1) as f64);
             net_block_idx += 1;

@@ -8,7 +8,7 @@
 //! Example of building a pretrained ResNet-18 module:
 //! ```rust,no_run
 //! use bimm::cache::fetch_model_weights;
-//! use bimm::models::resnet::{ResNet, ResNetAbstractConfig};
+//! use bimm::models::resnet::{ResNet, ResNetContractConfig};
 //! use burn::backend::NdArray;
 //!
 //! let device = Default::default();
@@ -20,7 +20,7 @@
 //!
 //! let my_classes = 10;
 //!
-//! let model: ResNet<NdArray> = ResNetAbstractConfig::resnet18(source_classes)
+//! let model: ResNet<NdArray> = ResNetContractConfig::resnet18(source_classes)
 //!     .to_structure()
 //!     .init(&device)
 //!     .load_pytorch_weights(weights_path)
@@ -36,8 +36,8 @@
 //!
 //! This module uses 2-layer configuration.
 //!
-//! * [`ResNetAbstractConfig`]
-//! * [`ResNetConfig`]
+//! * [`ResNetContractConfig`]
+//! * [`ResNetStructureConfig`]
 //!
 //! The high-level abstract config describes `ResNet` modules semantically,
 //! while the low-level config describes the structural config.

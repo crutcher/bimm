@@ -3,7 +3,7 @@ use crate::data::{ClassificationBatch, ClassificationBatcher};
 use crate::dataset::{CLASSES, PlanetLoader};
 use bimm::cache;
 use bimm::compat::activation_wrapper::{Activation, ActivationConfig};
-use bimm::models::resnet::{ResNet, ResNetAbstractConfig};
+use bimm::models::resnet::{ResNet, ResNetContractConfig};
 use burn::data::dataloader::DataLoaderBuilder;
 use burn::data::dataset::transform::ShuffledDataset;
 use burn::data::dataset::vision::ImageFolderDataset;
@@ -145,7 +145,7 @@ pub fn train<B: AutodiffBackend>(
 
     let weights_path = cache::fetch_model_weights(&args.pretrained_weights)?;
 
-    let model: ResNet<B> = ResNetAbstractConfig::resnet18(10)
+    let model: ResNet<B> = ResNetContractConfig::resnet18(10)
         // .with_activation(ActivationConfig::Gelu)
         .to_structure()
         .init(device)

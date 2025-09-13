@@ -2,11 +2,11 @@
 //!
 //! A [`LayerBlock`] is a sequence of [`ResidualBlock`]s.
 //!
-//! [`LayerBlockMeta`] defines a common meta API for [`LayerBlock`]
-//! and [`LayerBlockConfig`].
+//! [`LayerBlockMeta`] defines a common introspection API for [`LayerBlock`]
+//! and [`LayerBlockStructureConfig`].
 //!
-//! [`LayerBlockConfig`] implements [`Config`], and provides
-//! [`LayerBlockConfig::init`] to initialize a [`LayerBlock`].
+//! [`LayerBlockStructureConfig`] implements [`Config`], and provides
+//! [`LayerBlockStructureConfig::init`] to initialize a [`LayerBlock`].
 //!
 //! [`LayerBlock`] implements [`Module`], and provides
 //! [`LayerBlock::forward`].
@@ -15,7 +15,7 @@ use crate::compat::activation_wrapper::ActivationConfig;
 use crate::compat::normalization_wrapper::NormalizationConfig;
 use crate::layers::drop::drop_block::DropBlockOptions;
 use crate::models::resnet::residual_block::{
-    AbstractResidualBlockConfig, ResidualBlock, ResidualBlockConfig, ResidualBlockMeta,
+    ResidualBlock, ResidualBlockContractConfig, ResidualBlockMeta, ResidualBlockStructureConfig,
 };
 use crate::models::resnet::util::stride_div_output_resolution;
 use crate::utility::probability::expect_probability;
@@ -26,7 +26,7 @@ use burn::prelude::{Backend, Module, Tensor};
 
 /// Abstract [`LayerBlock`] Config.
 #[derive(Config, Debug)]
-pub struct AbstractLayerBlockConfig {
+pub struct LayerBlockContractConfig {
     /// The number of internal blocks.
     pub num_blocks: usize,
 
@@ -56,9 +56,9 @@ pub struct AbstractLayerBlockConfig {
     pub activation: ActivationConfig,
 }
 
-impl AbstractLayerBlockConfig {
-    /// Convert to [`LayerBlockConfig`].
-    pub fn to_structure(self) -> LayerBlockConfig {
+impl LayerBlockContractConfig {
+    /// Convert to [`LayerBlockStructureConfig`].
+    pub fn to_structure(self) -> LayerBlockStructureConfig {
         let blocks = (0..self.num_blocks)
             .map(|b| {
                 let in_planes = if b == 0 {
@@ -68,7 +68,7 @@ impl AbstractLayerBlockConfig {
                 };
                 let downsample = b == 0 && self.downsample;
 
-                AbstractResidualBlockConfig::new(in_planes, self.out_planes)
+                ResidualBlockContractConfig::new(in_planes, self.out_planes)
                     .with_downsample(downsample)
                     .with_bottleneck(self.bottleneck)
                     .with_normalization(self.normalization.clone())
@@ -77,12 +77,12 @@ impl AbstractLayerBlockConfig {
             })
             .collect();
 
-        LayerBlockConfig { blocks }
+        LayerBlockStructureConfig { blocks }
     }
 }
 
-impl From<AbstractLayerBlockConfig> for LayerBlockConfig {
-    fn from(config: AbstractLayerBlockConfig) -> Self {
+impl From<LayerBlockContractConfig> for LayerBlockStructureConfig {
+    fn from(config: LayerBlockContractConfig) -> Self {
         config.to_structure()
     }
 }
@@ -133,18 +133,18 @@ pub trait LayerBlockMeta {
 ///
 /// Implements [`LayerBlockMeta`].
 #[derive(Config, Debug)]
-pub struct LayerBlockConfig {
+pub struct LayerBlockStructureConfig {
     /// The component blocks.
-    pub blocks: Vec<ResidualBlockConfig>,
+    pub blocks: Vec<ResidualBlockStructureConfig>,
 }
 
-impl From<Vec<ResidualBlockConfig>> for LayerBlockConfig {
-    fn from(blocks: Vec<ResidualBlockConfig>) -> Self {
+impl From<Vec<ResidualBlockStructureConfig>> for LayerBlockStructureConfig {
+    fn from(blocks: Vec<ResidualBlockStructureConfig>) -> Self {
         Self { blocks }
     }
 }
 
-impl LayerBlockMeta for LayerBlockConfig {
+impl LayerBlockMeta for LayerBlockStructureConfig {
     fn len(&self) -> usize {
         self.blocks.len()
     }
@@ -164,7 +164,7 @@ impl LayerBlockMeta for LayerBlockConfig {
     }
 }
 
-impl LayerBlockConfig {
+impl LayerBlockStructureConfig {
     /// Check if the config is valid.
     ///
     /// # Returns
@@ -222,7 +222,7 @@ impl LayerBlockConfig {
         f: &mut F,
     ) -> Self
     where
-        F: FnMut(usize, ResidualBlockConfig) -> ResidualBlockConfig,
+        F: FnMut(usize, ResidualBlockStructureConfig) -> ResidualBlockStructureConfig,
     {
         Self {
             blocks: self
@@ -368,7 +368,7 @@ mod tests {
 
     #[test]
     fn test_layer_block_config_build() {
-        let config: LayerBlockConfig = AbstractLayerBlockConfig::new(2, 16, 32)
+        let config: LayerBlockStructureConfig = LayerBlockContractConfig::new(2, 16, 32)
             .with_downsample(true)
             .into();
         config.expect_valid();
@@ -400,7 +400,7 @@ mod tests {
         let b_planes = 32;
         let c_planes = 64;
 
-        let config = LayerBlockConfig::from(vec![
+        let config = LayerBlockStructureConfig::from(vec![
             BasicBlockConfig::new(a_planes, b_planes)
                 .with_stride(2)
                 .into(),

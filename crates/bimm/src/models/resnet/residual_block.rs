@@ -6,10 +6,10 @@
 //!
 //! [`ResidualBlockMeta`] defines a common meta api shared by:
 //! * [`ResidualBlock`], and
-//! * [`ResidualBlockConfig`]
+//! * [`ResidualBlockStructureConfig`]
 //!
-//! [`ResidualBlockConfig`] implements [`Config`], and provides an
-//! [`ResidualBlockConfig::init`] constructor pathway to [`ResidualBlock`].
+//! [`ResidualBlockStructureConfig`] implements [`Config`], and provides an
+//! [`ResidualBlockStructureConfig::init`] constructor pathway to [`ResidualBlock`].
 //!
 //! [`ResidualBlock`] implements [`Module`],
 //! and provides [`ResidualBlock::forward`].
@@ -31,7 +31,7 @@ use burn::prelude::{Backend, Config, Module, Tensor};
 
 /// Abstract [`ResidualBlock`] Config.
 #[derive(Config, Debug)]
-pub struct AbstractResidualBlockConfig {
+pub struct ResidualBlockContractConfig {
     /// The number of input feature planes.
     pub in_planes: usize,
 
@@ -58,9 +58,9 @@ pub struct AbstractResidualBlockConfig {
     pub activation: ActivationConfig,
 }
 
-impl AbstractResidualBlockConfig {
-    /// Convert to [`ResidualBlockConfig`].
-    pub fn to_structure(self) -> ResidualBlockConfig {
+impl ResidualBlockContractConfig {
+    /// Convert to [`ResidualBlockStructureConfig`].
+    pub fn to_structure(self) -> ResidualBlockStructureConfig {
         let stride = if self.downsample { 2 } else { 1 };
         if self.bottleneck {
             BottleneckBlockConfig::new(self.in_planes, self.out_planes)
@@ -78,15 +78,15 @@ impl AbstractResidualBlockConfig {
     }
 }
 
-impl From<AbstractResidualBlockConfig> for ResidualBlockConfig {
-    fn from(config: AbstractResidualBlockConfig) -> Self {
+impl From<ResidualBlockContractConfig> for ResidualBlockStructureConfig {
+    fn from(config: ResidualBlockContractConfig) -> Self {
         config.to_structure()
     }
 }
 
 /// [`ResidualBlock`] Meta API.
 ///
-/// Defines a shared API for [`ResidualBlock`] and [`ResidualBlockConfig`].
+/// Defines a shared API for [`ResidualBlock`] and [`ResidualBlockStructureConfig`].
 pub trait ResidualBlockMeta {
     /// The number of input feature planes.
     fn in_planes(&self) -> usize;
@@ -127,7 +127,7 @@ pub trait ResidualBlockMeta {
 ///
 /// Implements [`ResidualBlockMeta`].
 #[derive(Config, Debug)]
-pub enum ResidualBlockConfig {
+pub enum ResidualBlockStructureConfig {
     /// A `ResNet` [`BasicBlock`].
     Basic(BasicBlockConfig),
 
@@ -135,7 +135,7 @@ pub enum ResidualBlockConfig {
     Bottleneck(BottleneckBlockConfig),
 }
 
-impl ResidualBlockMeta for ResidualBlockConfig {
+impl ResidualBlockMeta for ResidualBlockStructureConfig {
     fn in_planes(&self) -> usize {
         match self {
             Self::Basic(config) => config.in_planes(),
@@ -168,19 +168,19 @@ impl ResidualBlockMeta for ResidualBlockConfig {
     }
 }
 
-impl From<BasicBlockConfig> for ResidualBlockConfig {
+impl From<BasicBlockConfig> for ResidualBlockStructureConfig {
     fn from(config: BasicBlockConfig) -> Self {
         Self::Basic(config)
     }
 }
 
-impl From<BottleneckBlockConfig> for ResidualBlockConfig {
+impl From<BottleneckBlockConfig> for ResidualBlockStructureConfig {
     fn from(config: BottleneckBlockConfig) -> Self {
         Self::Bottleneck(config)
     }
 }
 
-impl ResidualBlockConfig {
+impl ResidualBlockStructureConfig {
     /// Initialize a [`ResidualBlock`].
     pub fn init<B: Backend>(
         self,
@@ -321,8 +321,8 @@ mod tests {
 
         {
             let inner_cfg = BasicBlockConfig::new(in_planes, planes).with_stride(2);
-            let cfg: ResidualBlockConfig = inner_cfg.clone().into();
-            assert!(matches!(cfg, ResidualBlockConfig::Basic(_)));
+            let cfg: ResidualBlockStructureConfig = inner_cfg.clone().into();
+            assert!(matches!(cfg, ResidualBlockStructureConfig::Basic(_)));
             assert_eq!(cfg.in_planes(), in_planes);
             assert_eq!(cfg.out_planes(), planes);
             assert_eq!(cfg.stride(), 2);
@@ -331,8 +331,8 @@ mod tests {
 
         {
             let inner_cfg = BottleneckBlockConfig::new(in_planes, planes).with_stride(2);
-            let cfg: ResidualBlockConfig = inner_cfg.clone().into();
-            assert!(matches!(cfg, ResidualBlockConfig::Bottleneck(_)));
+            let cfg: ResidualBlockStructureConfig = inner_cfg.clone().into();
+            assert!(matches!(cfg, ResidualBlockStructureConfig::Bottleneck(_)));
             assert_eq!(cfg.in_planes(), in_planes);
             assert_eq!(cfg.out_planes(), planes);
             assert_eq!(cfg.stride(), 2);
@@ -353,7 +353,7 @@ mod tests {
         let out_height = 4;
         let out_width = 4;
 
-        let cfg: ResidualBlockConfig = BasicBlockConfig::new(in_planes, planes)
+        let cfg: ResidualBlockStructureConfig = BasicBlockConfig::new(in_planes, planes)
             .with_stride(2)
             .into();
 
@@ -395,7 +395,7 @@ mod tests {
         let out_height = 4;
         let out_width = 4;
 
-        let cfg: ResidualBlockConfig = BottleneckBlockConfig::new(in_planes, planes)
+        let cfg: ResidualBlockStructureConfig = BottleneckBlockConfig::new(in_planes, planes)
             .with_stride(2)
             .into();
 
