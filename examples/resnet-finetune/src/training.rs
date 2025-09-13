@@ -8,8 +8,8 @@ use burn::data::dataloader::DataLoaderBuilder;
 use burn::data::dataset::transform::ShuffledDataset;
 use burn::data::dataset::vision::ImageFolderDataset;
 use burn::module::{ModuleMapper, ParamId};
-use burn::nn::PReluConfig;
 use burn::nn::loss::BinaryCrossEntropyLossConfig;
+use burn::nn::{LeakyReluConfig, PReluConfig};
 use burn::optim::AdamConfig;
 use burn::optim::decay::WeightDecayConfig;
 use burn::prelude::{Backend, Bool, Config, Int, Module, Tensor};
@@ -146,7 +146,7 @@ pub fn train<B: AutodiffBackend>(
     let weights_path = cache::fetch_model_weights(&args.pretrained_weights)?;
 
     let model: ResNet<B> = ResNetContractConfig::resnet18(10)
-        // .with_activation(ActivationConfig::Gelu)
+        .with_activation(PReluConfig::new().into())
         .to_structure()
         .init(device)
         .load_pytorch_weights(weights_path)

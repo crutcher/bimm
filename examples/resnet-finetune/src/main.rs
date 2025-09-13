@@ -102,11 +102,11 @@ pub struct Args {
     batch_size: usize,
 
     /// Number of workers for data loading.
-    #[arg(long, default_value = "2")]
+    #[arg(long, default_value = "0")]
     num_workers: Option<usize>,
 
     /// Number of epochs to train the model.
-    #[arg(long, default_value = "10")]
+    #[arg(long, default_value = "20")]
     num_epochs: usize,
 
     /// Drop Block Prob
@@ -114,7 +114,7 @@ pub struct Args {
     drop_block_prob: f64,
 
     /// Drop Path Prob
-    #[arg(long, default_value = "0.1")]
+    #[arg(long, default_value = "0.0")]
     drop_path_prob: f64,
 
     /// Learning rate

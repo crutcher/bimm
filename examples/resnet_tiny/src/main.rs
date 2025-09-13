@@ -22,8 +22,8 @@ use bimm_firehose_image::{ColorType, ImageShape};
 use burn::backend::{Autodiff, Cuda};
 use burn::data::dataloader::{DataLoaderBuilder, Dataset};
 use burn::data::dataset::transform::ShuffledDataset;
-use burn::grad_clipping::GradientClippingConfig;
 use burn::lr_scheduler::cosine::CosineAnnealingLrSchedulerConfig;
+use burn::nn::PReluConfig;
 use burn::nn::loss::CrossEntropyLossConfig;
 use burn::optim::AdamConfig;
 use burn::optim::decay::WeightDecayConfig;
@@ -118,7 +118,7 @@ pub struct Args {
     drop_block_prob: f64,
 
     /// Drop Path Prob
-    #[arg(long, default_value = "0.1")]
+    #[arg(long, default_value = "0.0")]
     drop_path_prob: f64,
 
     /// Early stopping patience
@@ -159,6 +159,7 @@ pub fn backend_main<B: AutodiffBackend>(
     let weights = cache::fetch_model_weights(&args.pretrained_weights)?;
 
     let resnet: ResNet<B> = ResNetContractConfig::resnet18(10)
+        .with_activation(PReluConfig::new().into())
         .to_structure()
         .init(device)
         .load_pytorch_weights(weights)?
@@ -168,9 +169,8 @@ pub fn backend_main<B: AutodiffBackend>(
 
     let model: Model<B> = Model { resnet };
 
-    let optim_config = AdamConfig::new()
-        .with_weight_decay(WeightDecayConfig::new(5e-5).into())
-        .with_grad_clipping(Some(GradientClippingConfig::Norm(3.0)));
+    let optim_config = AdamConfig::new().with_weight_decay(WeightDecayConfig::new(5e-4).into());
+    // .with_grad_clipping(Some(GradientClippingConfig::Norm(3.0)));
 
     let artifact_dir = args.artifact_dir.as_ref().unwrap().as_ref();
     create_artifact_dir(artifact_dir);
