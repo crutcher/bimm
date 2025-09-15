@@ -7,13 +7,10 @@ use std::sync::Arc;
 
 /// Static builder for [`ResNetPreFabContractConfig`].
 pub type StaticResNetPreFabContractConfig = StaticPreFabConfig<ResNetContractConfig>;
-
 /// A [`ResNetContractConfig`] Well-Known Pre-Fab.
 pub type ResNetPreFabContractConfig = PreFabConfig<ResNetContractConfig>;
-
 /// Static builder for [`ResNetPreFabContractConfig`].
 pub type StaticResNetPreFabStructureConfig = StaticPreFabConfig<ResNetStructureConfig>;
-
 /// A [`ResNetStructureConfig`] Well-Known Pre-Fab.
 pub type ResNetPreFabStructureConfig = PreFabConfig<ResNetStructureConfig>;
 
@@ -22,6 +19,15 @@ impl From<&StaticResNetPreFabContractConfig> for ResNetPreFabStructureConfig {
         config.to_prefab().to_structure_prefab()
     }
 }
+
+/// Static builder for [`ResNetPreFabContractMap`].
+pub type StaticResNetPreFabContractMap<'a> = StaticPreFabMap<'a, ResNetContractConfig>;
+/// A map of [`ResNetContractConfig`]s.
+pub type ResNetPreFabContractMap = PreFabMap<ResNetContractConfig>;
+/// Static builder for [`ResNetPreFabStructureMap`].
+pub type StaticResNetPreFabStructureMap<'a> = StaticPreFabMap<'a, ResNetStructureConfig>;
+/// A map of [`ResNetStructureConfig`]s.
+pub type ResNetPreFabStructureMap = PreFabMap<ResNetStructureConfig>;
 
 impl ResNetPreFabContractConfig {
     /// Convert to a [`ResNetPreFabStructureConfig`].
@@ -41,20 +47,7 @@ impl From<&ResNetPreFabContractConfig> for ResNetPreFabStructureConfig {
         config.to_structure_prefab()
     }
 }
-
-/// Static builder for [`ResNetPreFabContractMap`].
-pub type StaticResNetPreFabContractMap<'a> = StaticPreFabMap<'a, ResNetContractConfig>;
-
-/// A map of [`ResNetContractConfig`]s.
-pub type ResNetPreFabContractMap = PreFabMap<ResNetContractConfig>;
-
-/// Static builder for [`ResNetPreFabStructureMap`].
-pub type StaticResNetPreFabStructureMap<'a> = StaticPreFabMap<'a, ResNetStructureConfig>;
-
-/// A map of [`ResNetStructureConfig`]s.
-pub type ResNetPreFabStructureMap = PreFabMap<ResNetStructureConfig>;
-
-/// `ResNet18` pretrained on `ImageNet`.
+/// Pretrained [`super::ResNet`] configs and weights.
 pub static PREFAB_RESNET_MAP: StaticResNetPreFabContractMap = StaticResNetPreFabContractMap {
     name: "resnet",
     description: "Well-Know ResNet configs",
