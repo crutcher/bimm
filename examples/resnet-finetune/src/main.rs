@@ -205,7 +205,8 @@ pub fn train<B: AutodiffBackend>(
 
     let weights = prefab
         .expect_lookup_pretrained_weights(&args.resnet_pretrained)
-        .fetch_weights(&disk_cache)?;
+        .fetch_weights(&disk_cache)
+        .expect("Failed to fetch pretrained weights");
 
     let resnet_config = prefab
         .to_config()
@@ -214,7 +215,8 @@ pub fn train<B: AutodiffBackend>(
 
     let model: ResNet<B> = resnet_config
         .init(device)
-        .load_pytorch_weights(weights)?
+        .load_pytorch_weights(weights)
+        .expect("Failed to load pretrained weights")
         .with_classes(CLASSES.len())
         .with_stochastic_drop_block(args.drop_block_prob)
         .with_stochastic_path_depth(args.drop_path_prob);

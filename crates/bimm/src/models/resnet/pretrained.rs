@@ -41,13 +41,27 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
             builder: || ResNetContractConfig::new([2, 2, 2, 2], 1000),
 
             weights: Some(&StaticPretrainedWeightsMap {
-                items: &[&StaticPretrainedWeightsDescriptor {
-                    name: "tv_in1k",
-                    description: "ResNet18 pretrained on ImageNet",
-                    license: Some("bsd-3-clause"),
-                    origin: Some("https://github.com/pytorch/vision"),
-                    urls: &["https://download.pytorch.org/models/resnet18-f37072fd.pth"],
-                }],
+                items: &[
+                    &StaticPretrainedWeightsDescriptor {
+                        name: "tv_in1k",
+                        description: "ResNet18 pretrained on ImageNet",
+                        license: Some("bsd-3-clause"),
+                        origin: Some("https://github.com/pytorch/vision"),
+                        urls: &["https://download.pytorch.org/models/resnet18-f37072fd.pth"],
+                    },
+                    /*
+                    DeserializeError("Candle Tensor error: invalid Zip archive: Could not find central directory end")
+                    &StaticPretrainedWeightsDescriptor {
+                        name: "a1_in1k",
+                        description: "ResNet18 pretrained on ImageNet",
+                        license: None,
+                        origin: Some("https://github.com/huggingface/pytorch-image-models"),
+                        urls: &[
+                            "https://github.com/huggingface/pytorch-image-models/releases/download/v0.1-rsb-weights/resnet18_a1_0-d63eafa0.pth",
+                        ],
+                    },
+                    */
+                ],
             }),
         },
         &StaticPreFabConfig {
@@ -67,6 +81,7 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
         },
         /*
         FIXME: The loaded weights have a downsample that the config does not have.
+        DeserializeError("Candle Tensor error: invalid Zip archive: Could not find central directory end")
         &StaticPreFabConfig {
             name: "resnet50",
             description: "ResNet-50 [3, 4, 6, 3] Bottleneck",
