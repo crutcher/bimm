@@ -1,5 +1,8 @@
 //! # Config Prefabs for Well-Known Model Configurations
 
+use crate::cache::weights::{
+    PretrainedWeightsDescriptor, PretrainedWeightsMap, StaticPretrainedWeightsMap,
+};
 use anyhow::bail;
 use burn::config::Config;
 use std::collections::BTreeMap;
@@ -19,6 +22,9 @@ where
 
     /// Builder function for the config.
     pub builder: fn() -> C,
+
+    /// Pretrained weights map.
+    pub weights: Option<&'static StaticPretrainedWeightsMap<'static>>,
 }
 
 impl<C> StaticPreFabConfig<C>
@@ -32,6 +38,7 @@ where
             name: self.name.to_string(),
             description: self.description.to_string(),
             builder: Arc::new(builder),
+            weights: self.weights.map(|w| w.to_directory()),
         }
     }
 
@@ -76,6 +83,9 @@ where
 
     /// Builder function for the config.
     pub builder: Arc<dyn Fn() -> C + Send + Sync>,
+
+    /// Pretrained weights map.
+    pub weights: Option<PretrainedWeightsMap>,
 }
 
 impl<C> Debug for PreFabConfig<C>
@@ -110,6 +120,39 @@ where
     /// Build a new config.
     pub fn new_config(&self) -> C {
         (self.builder)()
+    }
+
+    /// Lookup a descriptor.
+    pub fn lookup_weights(
+        &self,
+        name: &str,
+    ) -> Option<PretrainedWeightsDescriptor> {
+        match &self.weights {
+            None => None,
+            Some(m) => m.lookup_by_name(name),
+        }
+    }
+
+    /// Lookup a descriptor.
+    pub fn try_lookup_weights(
+        &self,
+        name: &str,
+    ) -> anyhow::Result<PretrainedWeightsDescriptor> {
+        match self.lookup_weights(name) {
+            Some(d) => Ok(d),
+            None => bail!("Descriptor not found: {}", name),
+        }
+    }
+
+    /// Lookup a descriptor.
+    pub fn expect_lookup_weights(
+        &self,
+        name: &str,
+    ) -> PretrainedWeightsDescriptor {
+        match self.try_lookup_weights(name) {
+            Ok(p) => p,
+            Err(e) => panic!("{}", e),
+        }
     }
 }
 

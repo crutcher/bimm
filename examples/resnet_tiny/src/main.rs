@@ -2,7 +2,7 @@
 extern crate core;
 
 use bimm::cache::disk::DiskCacheConfig;
-use bimm::models::resnet::pretrained::{PREFAB_RESNET_CONTRACTS, PRETRAINED_RESNET18_WEIGHT_MAP};
+use bimm::models::resnet::pretrained::PRETRAINED_RESNETS;
 use bimm::models::resnet::resnet_model::ResNet;
 use bimm_firehose::burn::batcher::{
     BatcherInputAdapter, BatcherOutputAdapter, FirehoseExecutorBatcher,
@@ -106,6 +106,14 @@ pub struct Args {
     #[arg(long)]
     validation_root: String,
 
+    /// Resnet Model Config
+    #[arg(long, default_value = "resnet-18")]
+    resnet_prefab: String,
+
+    /// Resnet Pretrained
+    #[arg(long, default_value = "tv_in1k")]
+    resnet_pretrained: String,
+
     /// Drop Block Prob
     #[arg(long, default_value = "0.2")]
     drop_block_prob: f64,
@@ -151,16 +159,14 @@ pub fn backend_main<B: AutodiffBackend>(
 
     let disk_cache = DiskCacheConfig::default();
 
-    let resnet_config = PREFAB_RESNET_CONTRACTS
-        .to_prefab_map()
-        .expect_lookup_by_name("resnet-18")
+    let prefab = PRETRAINED_RESNETS.expect_lookup_by_name(&args.resnet_prefab);
+
+    let weight_descriptor = prefab.expect_lookup_weights(&args.resnet_pretrained);
+
+    let resnet_config = prefab
         .new_config()
         // .with_activation(PReluConfig::new().into())
         .to_structure();
-
-    let weight_descriptor = PRETRAINED_RESNET18_WEIGHT_MAP
-        .to_directory()
-        .expect_lookup_by_name("resnet-18");
 
     let resnet: ResNet<B> = resnet_config
         .init(device)

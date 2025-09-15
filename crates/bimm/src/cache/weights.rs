@@ -115,12 +115,6 @@ impl PretrainedWeightsDescriptor {
 /// Static [`PretrainedWeightsMap`] builder.
 #[derive(Debug)]
 pub struct StaticPretrainedWeightsMap<'a> {
-    /// Name of the directory.
-    pub name: &'a str,
-
-    /// Description of the directory.
-    pub description: &'a str,
-
     /// List of static descriptors.
     pub items: &'a [&'a StaticPretrainedWeightsDescriptor<'a>],
 }
@@ -129,8 +123,6 @@ impl<'a> StaticPretrainedWeightsMap<'a> {
     /// Convert to a [`PretrainedWeightsMap`].
     pub fn to_directory(&self) -> PretrainedWeightsMap {
         PretrainedWeightsMap {
-            name: self.name.to_string(),
-            description: self.description.to_string(),
             items: self
                 .items
                 .iter()
@@ -152,12 +144,6 @@ impl<'a> From<&StaticPretrainedWeightsMap<'a>> for PretrainedWeightsMap {
 /// Directory of [`PretrainedWeightsDescriptor`]s.
 #[derive(Debug, Clone)]
 pub struct PretrainedWeightsMap {
-    /// Name of the directory.
-    pub name: String,
-
-    /// Description of the directory.
-    pub description: String,
-
     /// Map of descriptors.
     pub items: BTreeMap<String, PretrainedWeightsDescriptor>,
 }

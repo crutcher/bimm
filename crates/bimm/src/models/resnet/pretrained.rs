@@ -34,30 +34,24 @@ use crate::cache::weights::{StaticPretrainedWeightsDescriptor, StaticPretrainedW
 use crate::models::resnet::{RESNET18_BLOCKS, ResNetContractConfig, ResNetStructureConfig};
 use std::sync::Arc;
 
-/// ResNet-18 pretrained weights.
-pub static PRETRAINED_RESNET18_WEIGHT_MAP: StaticPretrainedWeightsMap =
-    StaticPretrainedWeightsMap {
-        name: "resnet-18",
-        description: "ResNet-18 pretrained weights.",
-        items: &[&StaticPretrainedWeightsDescriptor {
-            name: "resnet18",
-            description: "ResNet18 pretrained on ImageNet",
-            urls: &["https://download.pytorch.org/models/resnet18-f37072fd.pth"],
-        }],
-    };
-
 /// `ResNet18` pretrained on `ImageNet`.
-pub static RESNET18_PREFAB: StaticResNetPreFabContractConfig = StaticResNetPreFabContractConfig {
-    name: "resnet-18",
-    description: "ResNet-18 [2, 2, 2, 2] BasicBlocks",
-    builder: || ResNetContractConfig::new(RESNET18_BLOCKS, 1000),
-};
-
-/// `ResNet18` pretrained on `ImageNet`.
-pub static PREFAB_RESNET_CONTRACTS: StaticResNetPreFabContractMap = StaticResNetPreFabContractMap {
+pub static PRETRAINED_RESNETS: StaticResNetPreFabContractMap = StaticResNetPreFabContractMap {
     name: "resnet",
     description: "Well-Know ResNet configs",
-    items: &[&RESNET18_PREFAB],
+
+    items: &[&StaticResNetPreFabContractConfig {
+        name: "resnet-18",
+        description: "ResNet-18 [2, 2, 2, 2] BasicBlocks",
+        builder: || ResNetContractConfig::new(RESNET18_BLOCKS, 1000),
+
+        weights: Some(&StaticPretrainedWeightsMap {
+            items: &[&StaticPretrainedWeightsDescriptor {
+                name: "tv_in1k",
+                description: "ResNet18 pretrained on ImageNet",
+                urls: &["https://download.pytorch.org/models/resnet18-f37072fd.pth"],
+            }],
+        }),
+    }],
 };
 
 /// Static builder for [`ResNetPreFabContractConfig`].
@@ -86,6 +80,7 @@ impl ResNetPreFabContractConfig {
             name: self.name.clone(),
             description: self.description.clone(),
             builder: Arc::new(move || builder().to_structure()),
+            weights: self.weights.clone(),
         }
     }
 }
