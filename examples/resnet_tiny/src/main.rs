@@ -1,8 +1,8 @@
 #![recursion_limit = "256"]
 extern crate core;
 
-use bimm::cache;
-use bimm::models::resnet::resnet_model::{ResNet, ResNetContractConfig};
+use bimm::cache::weights;
+use bimm::models::resnet::resnet_model::{RESNET101_BLOCKS, ResNet, ResNetContractConfig};
 use bimm_firehose::burn::batcher::{
     BatcherInputAdapter, BatcherOutputAdapter, FirehoseExecutorBatcher,
 };
@@ -63,7 +63,7 @@ pub struct Args {
     seed: u64,
 
     /// Batch size for processing
-    #[arg(short, long, default_value_t = 256)]
+    #[arg(short, long, default_value_t = 32)]
     batch_size: usize,
 
     /// Number of workers for data loading.
@@ -156,9 +156,13 @@ pub fn backend_main<B: AutodiffBackend>(
 
     let device = &devices[0];
 
-    let weights = cache::fetch_model_weights(&args.pretrained_weights)?;
+    //let pretrained_weights = "https://download.pytorch.org/models/resnet34-b627a593.pth";
+    let pretrained_weights = "https://download.pytorch.org/models/resnet101-63fe2227.pth";
 
-    let resnet: ResNet<B> = ResNetContractConfig::resnet18(10)
+    let weights = weights::fetch_model_weights(pretrained_weights)?;
+
+    let resnet: ResNet<B> = ResNetContractConfig::new(RESNET101_BLOCKS, 1000)
+        .with_bottleneck(true)
         .with_activation(PReluConfig::new().into())
         .to_structure()
         .init(device)
@@ -358,7 +362,8 @@ impl<B: Backend> Model<B> {
         let output = self.resnet.forward(images);
 
         let loss = CrossEntropyLossConfig::new()
-            .with_smoothing(Some(0.1))
+            // .with_logits(true)
+            // .with_smoothing(Some(0.1))
             .init(&output.device())
             .forward(output.clone(), targets.clone());
 

@@ -1,20 +1,16 @@
 use crate::Args;
 use crate::data::{ClassificationBatch, ClassificationBatcher};
 use crate::dataset::{CLASSES, PlanetLoader};
-use bimm::cache;
-use bimm::compat::activation_wrapper::{Activation, ActivationConfig};
-use bimm::models::resnet::{ResNet, ResNetContractConfig};
+use bimm::cache::weights;
+use bimm::models::resnet::{RESNET34_BLOCKS, ResNet, ResNetContractConfig};
 use burn::data::dataloader::DataLoaderBuilder;
 use burn::data::dataset::transform::ShuffledDataset;
 use burn::data::dataset::vision::ImageFolderDataset;
-use burn::module::{ModuleMapper, ParamId};
 use burn::nn::loss::BinaryCrossEntropyLossConfig;
-use burn::nn::{LeakyReluConfig, PReluConfig};
 use burn::optim::AdamConfig;
 use burn::optim::decay::WeightDecayConfig;
-use burn::prelude::{Backend, Bool, Config, Int, Module, Tensor};
+use burn::prelude::{Backend, Config, Int, Module, Tensor};
 use burn::record::CompactRecorder;
-use burn::tensor::Distribution;
 use burn::tensor::backend::AutodiffBackend;
 use burn::train::metric::{HammingScore, LossMetric};
 use burn::train::{
@@ -143,10 +139,14 @@ pub fn train<B: AutodiffBackend>(
         .num_workers(config.num_workers)
         .build(valid);
 
-    let weights_path = cache::fetch_model_weights(&args.pretrained_weights)?;
+    // let pretrained_weights = &args.pretrained_weights;
+    //let pretrained_weights = "https://github.com/huggingface/pytorch-image-models/releases/download/v0.1-rsb-weights/resnet34_a1_0-46f8f793.pth";
+    let pretrained_weights = "https://download.pytorch.org/models/resnet34-b627a593.pth";
 
-    let model: ResNet<B> = ResNetContractConfig::resnet18(10)
-        .with_activation(PReluConfig::new().into())
+    let weights_path = weights::fetch_model_weights(pretrained_weights)?;
+
+    let model: ResNet<B> = ResNetContractConfig::new(RESNET34_BLOCKS, 1000)
+        // .with_activation(PReluConfig::new().into())
         .to_structure()
         .init(device)
         .load_pytorch_weights(weights_path)

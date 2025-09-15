@@ -19,6 +19,7 @@ burn = { workspace = true, features = ["network", "ndarray"] }
 dirs = { workspace = true }
 burn-import = { workspace = true }
 
+crc = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
 anyhow = { workspace = true }

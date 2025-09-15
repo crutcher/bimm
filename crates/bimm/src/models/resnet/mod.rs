@@ -7,7 +7,7 @@
 //!
 //! Example of building a pretrained ResNet-18 module:
 //! ```rust,no_run
-//! use bimm::cache::fetch_model_weights;
+//! use bimm::cache::weights::fetch_model_weights;
 //! use bimm::models::resnet::{ResNet, ResNetContractConfig};
 //! use burn::backend::NdArray;
 //!
@@ -71,6 +71,7 @@ pub mod basic_block;
 pub mod bottleneck;
 pub mod downsample;
 pub mod layer_block;
+pub mod prefab;
 pub mod residual_block;
 pub mod resnet_io;
 pub mod resnet_model;
