@@ -5,6 +5,8 @@
 //!
 //! ## Example
 //!
+//! Examples of loading pretrained model:
+//!
 //! ```rust,no_run
 //! use burn::backend::NdArray;
 //! use bimm::cache::disk::DiskCacheConfig;
@@ -25,8 +27,12 @@
 //!     .init(&device)
 //!     .load_pytorch_weights(weights)
 //!     .expect("Failed to load weights")
+//!     // re-head the model to 10 classes:
 //!     .with_classes(10)
-//!     .with_stochastic_drop_block(0.2);
+//!     // Enable (drop_block_prob) stochastic block drops for training:
+//!     .with_stochastic_drop_block(0.2)
+//!     // Enable (drop_path_prob) stochastic depth for training:
+//!     .with_stochastic_path_depth(0.1);
 //! ```
 //!
 //! ## Configuration

@@ -45,28 +45,30 @@ See the [CONTRIBUTING](CONTRIBUTING.md) guide for build and contribution instruc
 
 #### Example
 
-Example of building a pretrained ResNet-18 module:
+Example of building a pretrained model:
 
 ```rust,no_run
-use bimm::cache::fetch_model_weights;
-use bimm::models::resnet::{ResNet, ResNetAbstractConfig};
-use burn::backend::NdArray;
+use burn::backend::Wgpu;
+use bimm::cache::disk::DiskCacheConfig;
+use bimm::models::resnet::{PREFAB_RESNET_MAP, ResNet};
 
 let device = Default::default();
 
-let source =
-    "https://download.pytorch.org/models/resnet18-f37072fd.pth";
-let source_classes = 1000;
-let weights_path= fetch_model_weights(source).unwrap();
+let prefab = PREFAB_RESNET_MAP.expect_lookup_prefab("resnet18");
 
-let my_classes = 10;
+let weights = prefab
+    .expect_lookup_pretrained_weights("tv_in1k")
+    .fetch_weights(&DiskCacheConfig::default())
+    .expect("Failed to fetch weights");
 
-let model: ResNet<NdArray> = ResNetAbstractConfig::resnet18(source_classes)
+let model: ResNet<Wgpu> = prefab
+    .to_config()
     .to_structure()
     .init(&device)
-    .load_pytorch_weights(weights_path)
-    .expect("Model should be loaded successfully")
-    .with_classes(my_classes)
+    .load_pytorch_weights(weights)
+    .expect("Failed to load weights")
+    // re-head the model to 10 classes:
+    .with_classes(10)
     // Enable (drop_block_prob) stochastic block drops for training:
     .with_stochastic_drop_block(0.2)
     // Enable (drop_path_prob) stochastic depth for training:
