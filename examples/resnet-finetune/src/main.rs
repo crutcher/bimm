@@ -115,6 +115,22 @@ pub struct Args {
     pub weight_decay: f32,
 }
 
+#[derive(Config, Debug)]
+struct LogConfig {
+    seed: u64,
+    train_percentage: u8,
+    batch_size: usize,
+    num_epochs: usize,
+    resnet_prefab: String,
+    resnet_pretrained: String,
+    drop_block_prob: f64,
+    drop_path_prob: f64,
+    learning_rate: f64,
+    patience: usize,
+    weight_decay: f32,
+    resnet: ResNetContractConfig,
+}
+
 fn main() {
     let args = Args::parse();
 
@@ -160,21 +176,6 @@ pub fn train<B: AutodiffBackend>(
         .with_weight_decay(Some(WeightDecayConfig::new(args.weight_decay)))
         .init();
 
-    #[derive(Config)]
-    struct LogConfig {
-        seed: u64,
-        train_percentage: u8,
-        batch_size: usize,
-        num_epochs: usize,
-        resnet_prefab: String,
-        resnet_pretrained: String,
-        drop_block_prob: f64,
-        drop_path_prob: f64,
-        learning_rate: f64,
-        patience: usize,
-        weight_decay: f32,
-        resnet: ResNetContractConfig,
-    }
     LogConfig {
         seed: args.seed,
         train_percentage: args.train_percentage,

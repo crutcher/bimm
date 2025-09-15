@@ -120,7 +120,7 @@ pub struct StemStageConfig {
 
     /// Initializer for the convolutional layers.
     #[config(default = "CONV_INTO_RELU_INITIALIZER.clone()")]
-    pub intializer: Initializer,
+    pub initializer: Initializer,
 }
 
 impl StemMeta for StemStageConfig {
@@ -146,7 +146,7 @@ impl StemStageConfig {
         StemStage {
             conv_norm: self
                 .conv_norm
-                .with_initializer(self.intializer)
+                .with_initializer(self.initializer)
                 .init(device),
 
             activation: self.activation.init(device),
