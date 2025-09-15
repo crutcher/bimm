@@ -1,4 +1,4 @@
-//! # ResNet Model Loaders
+//! # `ResNet` Model Loaders
 
 // Loader goals:
 //
@@ -34,7 +34,7 @@ use crate::cache::weights::StaticPretrainedWeightsDescriptor;
 use crate::models::resnet::{RESNET18_BLOCKS, ResNetContractConfig, ResNetStructureConfig};
 use std::sync::Arc;
 
-/// ResNet18 pretrained on ImageNet.
+/// `ResNet18` pretrained on `ImageNet`.
 pub static RESNET18_TORCHVISION: StaticPretrainedWeightsDescriptor =
     StaticPretrainedWeightsDescriptor {
         name: "resnet18",
@@ -42,7 +42,7 @@ pub static RESNET18_TORCHVISION: StaticPretrainedWeightsDescriptor =
         urls: &["https://download.pytorch.org/models/resnet18-f37072fd.pth"],
     };
 
-/// ResNet18 pretrained on ImageNet.
+/// `ResNet18` pretrained on `ImageNet`.
 pub static RESNET18_PREFAB: StaticResNetPreFabContract = StaticResNetPreFabContract {
     name: "resnet18",
     description: "ResNet18 pretrained on ImageNet",

@@ -40,7 +40,7 @@ pub struct LayerBlockContractConfig {
     #[config(default = "false")]
     pub downsample: bool,
 
-    /// Select between [`BasicBlock`] and [`BottleneckBlock`].
+    /// Select between [`super::basic_block::BasicBlock`] and [`super::bottleneck::BottleneckBlock`].
     #[config(default = "false")]
     pub bottleneck: bool,
 

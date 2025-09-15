@@ -23,13 +23,13 @@ impl<C> StaticPreFabConfig<C>
 where
     C: 'static + Config + Debug + Clone,
 {
-    /// Convert to a [`PreFabConfig`].
+    /// Convert to a [`PreFabConfig<C>`].
     pub fn to_prefab(&self) -> PreFabConfig<C> {
         let builder = self.builder;
         PreFabConfig {
             name: self.name.to_string(),
             description: self.description.to_string(),
-            builder: Arc::new(move || builder()),
+            builder: Arc::new(builder),
         }
     }
 }

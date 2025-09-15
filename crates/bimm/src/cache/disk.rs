@@ -49,7 +49,7 @@ impl DiskCacheConfig {
     /// Does not ensure that the path (or any of the parents) exist.
     pub fn resource_to_path(
         &self,
-        resource_key: &Vec<String>,
+        resource_key: &[String],
     ) -> anyhow::Result<PathBuf> {
         let path = self.base_cache_dir()?;
         Ok(resource_key.iter().fold(path, |acc, s| acc.join(s)))
@@ -58,7 +58,7 @@ impl DiskCacheConfig {
     /// Map a resource key to a cache path and ensure the parent directory exists.
     pub fn ensure_resource_parent_dir(
         &self,
-        resource_key: &Vec<String>,
+        resource_key: &[String],
     ) -> anyhow::Result<PathBuf> {
         let path = self.resource_to_path(resource_key)?;
         if !path.exists() {
@@ -71,9 +71,9 @@ impl DiskCacheConfig {
     pub fn fetch_resource(
         &self,
         url: &str,
-        resource: &Vec<String>,
+        resource: &[String],
     ) -> anyhow::Result<PathBuf> {
-        let cache_file_path = self.ensure_resource_parent_dir(&resource)?;
+        let cache_file_path = self.ensure_resource_parent_dir(resource)?;
         disk::try_cache_download_to_path(url, cache_file_path)
     }
 }

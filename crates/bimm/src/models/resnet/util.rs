@@ -47,7 +47,7 @@ pub static CONV_INTO_RELU_INITIALIZER: Initializer = Initializer::KaimingNormal 
     fan_out_only: true,
 };
 
-/// Compute the necessary [`burn::nn::Conv2d`] padding for the given square parameters.
+/// Compute the necessary [`burn::nn::conv::Conv2d`] padding for the given square parameters.
 ///
 /// All parameters are assumed square (the same in height and width).
 ///
@@ -71,7 +71,7 @@ pub fn get_square_conv2d_padding(
     ((stride - 1) + dilation * (kernel - 1)) / 2
 }
 
-/// Compute the necessary [`burn::nn::Conv2d`] padding for the given square parameters.
+/// Compute the necessary [`burn::nn::conv::Conv2d`] padding for the given square parameters.
 ///
 /// All parameters are assumed square (the same in height and width).
 ///

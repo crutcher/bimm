@@ -71,7 +71,7 @@ pub mod basic_block;
 pub mod bottleneck;
 pub mod downsample;
 pub mod layer_block;
-pub mod prefab;
+pub mod prefabs;
 pub mod residual_block;
 pub mod resnet_io;
 pub mod resnet_model;
