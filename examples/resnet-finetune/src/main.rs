@@ -9,7 +9,7 @@ use crate::data::{ClassificationBatch, ClassificationBatcher};
 use crate::dataset::{CLASSES, PlanetLoader, download};
 use bimm::cache::disk::DiskCacheConfig;
 use bimm::compat::activation_wrapper::ActivationConfig;
-use bimm::models::resnet::{PREFAB_RESNET_MAP, ResNet};
+use bimm::models::resnet::{PREFAB_RESNET_MAP, ResNet, ResNetContractConfig};
 use burn::backend::{Autodiff, Cuda};
 use burn::config::Config;
 use burn::data::dataloader::DataLoaderBuilder;
@@ -62,6 +62,14 @@ $ --drop-path-prob=0.15 --drop-block-prob=0.25 --learning-rate=1e-5
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
+    /// Random seed for reproducibility.
+    #[arg(short, long, default_value = "0")]
+    seed: u64,
+
+    /// Train percentage.
+    #[arg(long, default_value = "70")]
+    pub train_percentage: u8,
+
     /// Directory to save the artifacts.
     #[arg(long, default_value = "/tmp/resnet-finetune")]
     artifact_dir: String,
@@ -72,7 +80,7 @@ pub struct Args {
 
     /// Number of workers for data loading.
     #[arg(long, default_value = "2")]
-    num_workers: Option<usize>,
+    num_workers: usize,
 
     /// Number of epochs to train the model.
     #[arg(long, default_value = "60")]
@@ -101,10 +109,11 @@ pub struct Args {
     /// Early stopping patience
     #[arg(long, default_value = "10")]
     patience: usize,
-}
 
-#[allow(dead_code)]
-const ARTIFACT_DIR: &str = "/tmp/resnet-finetune";
+    /// Optimizer Weight decay.
+    #[arg(long, default_value_t = 5e-4)]
+    pub weight_decay: f32,
+}
 
 fn main() {
     let args = Args::parse();
@@ -115,13 +124,124 @@ fn main() {
     train::<Autodiff<Cuda>>(&args, &device);
 }
 
-#[allow(dead_code)]
-fn run<B: Backend>(
+pub fn train<B: AutodiffBackend>(
     args: &Args,
     device: &B::Device,
-) {
-    train::<Autodiff<B>>(args, device);
-    // infer::<B>(ARTIFACT_DIR, device, 0.5);
+) -> anyhow::Result<()> {
+    // Remove existing artifacts before to get an accurate learner summary
+    let artifact_dir: &str = args.artifact_dir.as_ref();
+    std::fs::remove_dir_all(artifact_dir)?;
+    std::fs::create_dir_all(artifact_dir)?;
+
+    B::seed(args.seed);
+
+    let disk_cache = DiskCacheConfig::default();
+
+    let prefab = PREFAB_RESNET_MAP.expect_lookup_prefab(&args.resnet_prefab);
+
+    let weights = prefab
+        .expect_lookup_pretrained_weights(&args.resnet_pretrained)
+        .fetch_weights(&disk_cache)
+        .expect("Failed to fetch pretrained weights");
+
+    let resnet_config = prefab.to_config().with_activation(ActivationConfig::Gelu);
+
+    let model: ResNet<B> = resnet_config
+        .clone()
+        .to_structure()
+        .init(device)
+        .load_pytorch_weights(weights)
+        .expect("Failed to load pretrained weights")
+        .with_classes(CLASSES.len())
+        .with_stochastic_drop_block(args.drop_block_prob)
+        .with_stochastic_path_depth(args.drop_path_prob);
+
+    let optimizer = AdamConfig::new()
+        .with_weight_decay(Some(WeightDecayConfig::new(args.weight_decay)))
+        .init();
+
+    #[derive(Config)]
+    struct LogConfig {
+        seed: u64,
+        train_percentage: u8,
+        batch_size: usize,
+        num_epochs: usize,
+        resnet_prefab: String,
+        resnet_pretrained: String,
+        drop_block_prob: f64,
+        drop_path_prob: f64,
+        learning_rate: f64,
+        patience: usize,
+        weight_decay: f32,
+        resnet: ResNetContractConfig,
+    }
+    LogConfig {
+        seed: args.seed,
+        train_percentage: args.train_percentage,
+        batch_size: args.batch_size,
+        num_epochs: args.num_epochs,
+        resnet_prefab: args.resnet_prefab.clone(),
+        resnet_pretrained: args.resnet_pretrained.clone(),
+        drop_block_prob: args.drop_block_prob,
+        drop_path_prob: args.drop_path_prob,
+        learning_rate: args.learning_rate,
+        patience: args.patience,
+        weight_decay: args.weight_decay,
+        resnet: resnet_config,
+    }
+    .save(format!("{artifact_dir}/config.json"))
+    .expect("Config should be saved successfully");
+
+    // Dataloaders
+    let batcher_train = ClassificationBatcher::<B>::new(device.clone());
+    let batcher_valid = ClassificationBatcher::<B::InnerBackend>::new(device.clone());
+
+    let (train, valid) =
+        ImageFolderDataset::planet_train_val_split(args.train_percentage, args.seed).unwrap();
+
+    let dataloader_train = DataLoaderBuilder::new(batcher_train)
+        .batch_size(args.batch_size)
+        .shuffle(args.seed)
+        .num_workers(args.num_workers)
+        .build(ShuffledDataset::with_seed(train, args.seed));
+
+    let dataloader_test = DataLoaderBuilder::new(batcher_valid)
+        .batch_size(args.batch_size)
+        .num_workers(args.num_workers)
+        .build(valid);
+
+    // Learner config
+    let learner = LearnerBuilder::new(artifact_dir)
+        .metric_train_numeric(HammingScore::new())
+        .metric_valid_numeric(HammingScore::new())
+        .metric_train_numeric(LossMetric::new())
+        .metric_valid_numeric(LossMetric::new())
+        .with_file_checkpointer(CompactRecorder::new())
+        .early_stopping(MetricEarlyStoppingStrategy::new(
+            &LossMetric::<B>::new(),
+            Aggregate::Mean,
+            Direction::Lowest,
+            Split::Valid,
+            StoppingCondition::NoImprovementSince {
+                n_epochs: args.patience,
+            },
+        ))
+        .devices(vec![device.clone()])
+        .num_epochs(args.num_epochs)
+        .summary()
+        .build(model, optimizer, args.learning_rate);
+
+    // Training
+    let now = Instant::now();
+    let model_trained = learner.fit(dataloader_train, dataloader_test);
+    let elapsed = now.elapsed().as_secs();
+    println!("Training completed in {}m{}s", (elapsed / 60), elapsed % 60);
+
+    model_trained
+        .save_file(format!("{artifact_dir}/model"), &CompactRecorder::new())
+        .expect("Trained model should be saved successfully");
+
+    Ok(())
 }
 
 pub trait MultiLabelClassification<B: Backend> {
@@ -170,136 +290,4 @@ impl<B: Backend> ValidStep<ClassificationBatch<B>, MultiLabelClassificationOutpu
     ) -> MultiLabelClassificationOutput<B> {
         self.forward_classification(batch.images, batch.targets)
     }
-}
-
-#[derive(Config)]
-pub struct TrainingConfig {
-    #[config(default = 5)]
-    pub num_epochs: usize,
-
-    #[config(default = 24)]
-    pub batch_size: usize,
-
-    #[config(default = 4)]
-    pub num_workers: usize,
-
-    #[config(default = 42)]
-    pub seed: u64,
-
-    #[config(default = 1e-3)]
-    pub learning_rate: f64,
-
-    #[config(default = 5e-5)]
-    pub weight_decay: f32,
-
-    #[config(default = 70)]
-    pub train_percentage: u8,
-
-    pub num_classes: usize,
-}
-
-fn create_artifact_dir(artifact_dir: &str) {
-    // Remove existing artifacts before to get an accurate learner summary
-    std::fs::remove_dir_all(artifact_dir).ok();
-    std::fs::create_dir_all(artifact_dir).ok();
-}
-
-pub fn train<B: AutodiffBackend>(
-    args: &Args,
-    device: &B::Device,
-) -> anyhow::Result<()> {
-    let artifact_dir = args.artifact_dir.as_ref();
-    create_artifact_dir(artifact_dir);
-
-    let disk_cache = DiskCacheConfig::default();
-
-    let prefab = PREFAB_RESNET_MAP.expect_lookup_prefab(&args.resnet_prefab);
-
-    let weights = prefab
-        .expect_lookup_pretrained_weights(&args.resnet_pretrained)
-        .fetch_weights(&disk_cache)
-        .expect("Failed to fetch pretrained weights");
-
-    let resnet_config = prefab
-        .to_config()
-        .with_activation(ActivationConfig::Gelu)
-        .to_structure();
-
-    let model: ResNet<B> = resnet_config
-        .init(device)
-        .load_pytorch_weights(weights)
-        .expect("Failed to load pretrained weights")
-        .with_classes(CLASSES.len())
-        .with_stochastic_drop_block(args.drop_block_prob)
-        .with_stochastic_path_depth(args.drop_path_prob);
-
-    // Config
-    let training_config = TrainingConfig::new(CLASSES.len())
-        .with_learning_rate(args.learning_rate)
-        .with_num_epochs(args.num_epochs)
-        .with_batch_size(args.batch_size);
-
-    let optimizer = AdamConfig::new()
-        .with_weight_decay(Some(WeightDecayConfig::new(training_config.weight_decay)))
-        .init();
-
-    training_config
-        .save(format!("{artifact_dir}/config.json"))
-        .expect("Config should be saved successfully");
-
-    B::seed(training_config.seed);
-
-    // Dataloaders
-    let batcher_train = ClassificationBatcher::<B>::new(device.clone());
-    let batcher_valid = ClassificationBatcher::<B::InnerBackend>::new(device.clone());
-
-    let (train, valid) = ImageFolderDataset::planet_train_val_split(
-        training_config.train_percentage,
-        training_config.seed,
-    )
-    .unwrap();
-
-    let dataloader_train = DataLoaderBuilder::new(batcher_train)
-        .batch_size(training_config.batch_size)
-        .shuffle(training_config.seed)
-        .num_workers(training_config.num_workers)
-        .build(ShuffledDataset::with_seed(train, training_config.seed));
-
-    let dataloader_test = DataLoaderBuilder::new(batcher_valid)
-        .batch_size(training_config.batch_size)
-        .num_workers(training_config.num_workers)
-        .build(valid);
-
-    // Learner config
-    let learner = LearnerBuilder::new(artifact_dir)
-        .metric_train_numeric(HammingScore::new())
-        .metric_valid_numeric(HammingScore::new())
-        .metric_train_numeric(LossMetric::new())
-        .metric_valid_numeric(LossMetric::new())
-        .with_file_checkpointer(CompactRecorder::new())
-        .early_stopping(MetricEarlyStoppingStrategy::new(
-            &LossMetric::<B>::new(),
-            Aggregate::Mean,
-            Direction::Lowest,
-            Split::Valid,
-            StoppingCondition::NoImprovementSince {
-                n_epochs: args.patience,
-            },
-        ))
-        .devices(vec![device.clone()])
-        .num_epochs(training_config.num_epochs)
-        .summary()
-        .build(model, optimizer, training_config.learning_rate);
-
-    // Training
-    let now = Instant::now();
-    let model_trained = learner.fit(dataloader_train, dataloader_test);
-    let elapsed = now.elapsed().as_secs();
-    println!("Training completed in {}m{}s", (elapsed / 60), elapsed % 60);
-
-    model_trained
-        .save_file(format!("{artifact_dir}/model"), &CompactRecorder::new())
-        .expect("Trained model should be saved successfully");
-
-    Ok(())
 }
