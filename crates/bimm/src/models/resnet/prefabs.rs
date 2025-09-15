@@ -84,14 +84,3 @@ impl From<ResNetPreFabContract> for ResNetPreFabStructure {
         config.to_structure_prefab()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_resnet18_torchvision() {
-        println!("{:#?}", RESNET18_PREFAB);
-        assert!(false);
-    }
-}
