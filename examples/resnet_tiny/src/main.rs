@@ -2,6 +2,7 @@
 extern crate core;
 
 use bimm::cache::disk::DiskCacheConfig;
+use bimm::compat::activation_wrapper::ActivationConfig;
 use bimm::models::resnet::{PREFAB_RESNET_MAP, ResNet};
 use bimm_firehose::burn::batcher::{
     BatcherInputAdapter, BatcherOutputAdapter, FirehoseExecutorBatcher,
@@ -23,7 +24,6 @@ use burn::backend::{Autodiff, Cuda};
 use burn::data::dataloader::{DataLoaderBuilder, Dataset};
 use burn::data::dataset::transform::ShuffledDataset;
 use burn::lr_scheduler::cosine::CosineAnnealingLrSchedulerConfig;
-use burn::nn::PReluConfig;
 use burn::nn::loss::CrossEntropyLossConfig;
 use burn::optim::AdamConfig;
 use burn::optim::decay::WeightDecayConfig;
@@ -63,35 +63,27 @@ pub struct Args {
     seed: u64,
 
     /// Batch size for processing
-    #[arg(short, long, default_value_t = 128)]
+    #[arg(short, long, default_value_t = 512)]
     batch_size: usize,
 
     /// Number of workers for data loading.
-    #[arg(long, default_value = "4")]
+    #[arg(long, default_value = "2")]
     num_workers: Option<usize>,
 
     /// Number of epochs to train the model.
     #[arg(long, default_value = "100")]
     num_epochs: usize,
 
-    /// Embedding ratio: ``ratio * channels * patch_size * patch_size``
-    #[arg(long, default_value = "1.25")]
-    embed_ratio: f64,
-
-    /// Ratio of oversampling the training dataset.
-    #[arg(long, default_value = "2.5")]
-    oversample_ratio: f64,
-
     /// Drop Block Rate
     #[arg(long, default_value = "0.15")]
     drop_block_rate: f64,
 
     /// Learning rate for the optimizer.
-    #[arg(long, default_value = "1.0e-4")]
+    #[arg(long, default_value = "1.0e-6")]
     learning_rate: f64,
 
     /// Learning rate decay gamma.
-    #[arg(long, default_value = "0.9997")]
+    #[arg(long, default_value = "0.999975")]
     lr_gamma: f64,
 
     /// Directory to save the artifacts.
@@ -107,11 +99,11 @@ pub struct Args {
     validation_root: String,
 
     /// Resnet Model Config
-    #[arg(long, default_value = "resnet101")]
+    #[arg(long, default_value = "resnet34")]
     resnet_prefab: String,
 
     /// Resnet Pretrained
-    #[arg(long, default_value = None)]
+    #[arg(long, default_value = "tv_in1k")]
     resnet_pretrained: Option<String>,
 
     /// Drop Block Prob
@@ -119,11 +111,11 @@ pub struct Args {
     drop_block_prob: f64,
 
     /// Drop Path Prob
-    #[arg(long, default_value = "0.2")]
+    #[arg(long, default_value = "0.15")]
     drop_path_prob: f64,
 
     /// Early stopping patience
-    #[arg(long, default_value = "6")]
+    #[arg(long, default_value = "20")]
     patience: usize,
 }
 
@@ -161,19 +153,19 @@ pub fn backend_main<B: AutodiffBackend>(
 
     let resnet_config = prefab
         .to_config()
-        .with_activation(PReluConfig::new().into())
+        .with_activation(ActivationConfig::Gelu)
         .to_structure();
 
     let resnet: ResNet<B> = resnet_config.init(device);
 
     let resnet: ResNet<B> = match &args.resnet_pretrained {
-        None => resnet,
         Some(pretrained) => {
             let weights = prefab
                 .expect_lookup_pretrained_weights(pretrained)
                 .fetch_weights(&DiskCacheConfig::default())?;
             resnet.load_pytorch_weights(weights)?
         }
+        None => resnet,
     }
     .with_classes(num_classes)
     .with_stochastic_drop_block(args.drop_block_prob)

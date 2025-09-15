@@ -8,6 +8,7 @@ mod dataset;
 use crate::data::{ClassificationBatch, ClassificationBatcher};
 use crate::dataset::{CLASSES, PlanetLoader, download};
 use bimm::cache::disk::DiskCacheConfig;
+use bimm::compat::activation_wrapper::ActivationConfig;
 use bimm::models::resnet::{PREFAB_RESNET_MAP, ResNet};
 use burn::backend::{Autodiff, Cuda};
 use burn::config::Config;
@@ -21,14 +22,15 @@ use burn::optim::decay::WeightDecayConfig;
 use burn::prelude::{Int, Tensor};
 use burn::record::CompactRecorder;
 use burn::tensor::backend::{AutodiffBackend, Backend};
+use burn::train::metric::store::{Aggregate, Direction, Split};
 use burn::train::metric::{HammingScore, LossMetric};
 use burn::train::{
-    LearnerBuilder, MultiLabelClassificationOutput, TrainOutput, TrainStep, ValidStep,
+    LearnerBuilder, MetricEarlyStoppingStrategy, MultiLabelClassificationOutput, StoppingCondition,
+    TrainOutput, TrainStep, ValidStep,
 };
 use clap::{Parser, arg};
 use core::clone::Clone;
 use std::time::Instant;
-
 /*
 tracel-ai/models reference:
 | Split | Metric                         | Min.     | Epoch    | Max.     | Epoch    |
@@ -38,22 +40,28 @@ tracel-ai/models reference:
 | Valid | Hamming Score @ Threshold(0.5) | 88.490   | 1        | 93.843   | 3        |
 | Valid | Loss                           | 0.168    | 3        | 0.512    | 1        |
 
-
-$ --drop-path-prob=0.1 --drop-block-prob=0.2 --num-epochs=30 --batch-size=32 --learning-rate=1e-4
+resnet18
+$ --drop-path-prob=0.1 --drop-block-prob=0.2 --learning-rate=1e-4
 | Split | Metric                         | Min.     | Epoch    | Max.     | Epoch    |
 |-------|--------------------------------|----------|----------|----------|----------|
 | Train | Hamming Score @ Threshold(0.5) | 82.958   | 1        | 97.916   | 28       |
 | Train | Loss                           | 0.072    | 28       | 0.515    | 1        |
 | Valid | Hamming Score @ Threshold(0.5) | 91.765   | 1        | 95.706   | 12       |
 | Valid | Loss                           | 0.123    | 17       | 0.411    | 1        |
+
+resnet34
+$ --drop-path-prob=0.15 --drop-block-prob=0.25 --learning-rate=1e-5
+| Split | Metric                         | Min.     | Epoch    | Max.     | Epoch    |
+|-------|--------------------------------|----------|----------|----------|----------|
+| Train | Hamming Score @ Threshold(0.5) | 72.588   | 1        | 96.050   | 58       |
+| Train | Loss                           | 0.132    | 58       | 0.737    | 1        |
+| Valid | Hamming Score @ Threshold(0.5) | 78.137   | 1        | 95.255   | 43       |
+| Valid | Loss                           | 0.130    | 60       | 0.691    | 1        |
  */
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
-    // /// Number of classes in the pretrained weights.
-    // #[arg(long, default_value = "1000")]
-    // pretrained_classes: usize,
     /// Directory to save the artifacts.
     #[arg(long, default_value = "/tmp/resnet-finetune")]
     artifact_dir: String,
@@ -63,15 +71,15 @@ pub struct Args {
     batch_size: usize,
 
     /// Number of workers for data loading.
-    #[arg(long, default_value = "0")]
+    #[arg(long, default_value = "2")]
     num_workers: Option<usize>,
 
     /// Number of epochs to train the model.
-    #[arg(long, default_value = "20")]
+    #[arg(long, default_value = "60")]
     num_epochs: usize,
 
     /// Resnet Model Config
-    #[arg(long, default_value = "resnet18")]
+    #[arg(long, default_value = "resnet34")]
     resnet_prefab: String,
 
     /// Resnet Pretrained
@@ -83,12 +91,16 @@ pub struct Args {
     drop_block_prob: f64,
 
     /// Drop Path Prob
-    #[arg(long, default_value = "0.0")]
+    #[arg(long, default_value = "0.1")]
     drop_path_prob: f64,
 
     /// Learning rate
-    #[arg(long, default_value = "1e-4")]
+    #[arg(long, default_value = "1e-5")]
     pub learning_rate: f64,
+
+    /// Early stopping patience
+    #[arg(long, default_value = "10")]
+    patience: usize,
 }
 
 #[allow(dead_code)]
@@ -210,7 +222,7 @@ pub fn train<B: AutodiffBackend>(
 
     let resnet_config = prefab
         .to_config()
-        // .with_activation(PReluConfig::new().into())
+        .with_activation(ActivationConfig::Gelu)
         .to_structure();
 
     let model: ResNet<B> = resnet_config
@@ -265,6 +277,15 @@ pub fn train<B: AutodiffBackend>(
         .metric_train_numeric(LossMetric::new())
         .metric_valid_numeric(LossMetric::new())
         .with_file_checkpointer(CompactRecorder::new())
+        .early_stopping(MetricEarlyStoppingStrategy::new(
+            &LossMetric::<B>::new(),
+            Aggregate::Mean,
+            Direction::Lowest,
+            Split::Valid,
+            StoppingCondition::NoImprovementSince {
+                n_epochs: args.patience,
+            },
+        ))
         .devices(vec![device.clone()])
         .num_epochs(training_config.num_epochs)
         .summary()
