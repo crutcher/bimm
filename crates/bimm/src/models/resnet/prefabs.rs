@@ -43,44 +43,44 @@ pub static RESNET18_TORCHVISION: StaticPretrainedWeightsDescriptor =
     };
 
 /// `ResNet18` pretrained on `ImageNet`.
-pub static RESNET18_PREFAB: StaticResNetPreFabContract = StaticResNetPreFabContract {
+pub static RESNET18_PREFAB: StaticResNetPreFabContractConfig = StaticResNetPreFabContractConfig {
     name: "resnet18",
     description: "ResNet18 pretrained on ImageNet",
     builder: || ResNetContractConfig::new(RESNET18_BLOCKS, 1000),
 };
 
-/// Static builder for [`ResNetPreFabContract`].
-pub type StaticResNetPreFabContract = StaticPreFabConfig<ResNetContractConfig>;
+/// Static builder for [`ResNetPreFabContractConfig`].
+pub type StaticResNetPreFabContractConfig = StaticPreFabConfig<ResNetContractConfig>;
 
 /// A [`ResNetContractConfig`] Well-Known Pre-Fab.
-pub type ResNetPreFabContract = PreFabConfig<ResNetContractConfig>;
+pub type ResNetPreFabContractConfig = PreFabConfig<ResNetContractConfig>;
 
-/// Static builder for [`ResNetPreFabContract`].
-pub type StaticResNetPreFabStructure = StaticPreFabConfig<ResNetStructureConfig>;
+/// Static builder for [`ResNetPreFabContractConfig`].
+pub type StaticResNetPreFabStructureConfig = StaticPreFabConfig<ResNetStructureConfig>;
 
 /// A [`ResNetStructureConfig`] Well-Known Pre-Fab.
-pub type ResNetPreFabStructure = PreFabConfig<ResNetStructureConfig>;
+pub type ResNetPreFabStructureConfig = PreFabConfig<ResNetStructureConfig>;
 
-impl From<&StaticResNetPreFabContract> for ResNetPreFabStructure {
-    fn from(config: &StaticResNetPreFabContract) -> Self {
-        config.to_prefab().into()
+impl From<&StaticResNetPreFabContractConfig> for ResNetPreFabStructureConfig {
+    fn from(config: &StaticResNetPreFabContractConfig) -> Self {
+        config.to_prefab().to_structure_prefab()
     }
 }
 
-impl ResNetPreFabContract {
-    /// Convert to a [`ResNetPreFabStructure`].
-    pub fn to_structure_prefab(self) -> ResNetPreFabStructure {
-        let builder = self.builder;
-        ResNetPreFabStructure {
-            name: self.name,
-            description: self.description,
+impl ResNetPreFabContractConfig {
+    /// Convert to a [`ResNetPreFabStructureConfig`].
+    pub fn to_structure_prefab(&self) -> ResNetPreFabStructureConfig {
+        let builder = self.builder.clone();
+        ResNetPreFabStructureConfig {
+            name: self.name.clone(),
+            description: self.description.clone(),
             builder: Arc::new(move || builder().to_structure()),
         }
     }
 }
 
-impl From<ResNetPreFabContract> for ResNetPreFabStructure {
-    fn from(config: ResNetPreFabContract) -> Self {
+impl From<&ResNetPreFabContractConfig> for ResNetPreFabStructureConfig {
+    fn from(config: &ResNetPreFabContractConfig) -> Self {
         config.to_structure_prefab()
     }
 }

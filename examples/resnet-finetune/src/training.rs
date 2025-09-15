@@ -1,7 +1,9 @@
 use crate::Args;
 use crate::data::{ClassificationBatch, ClassificationBatcher};
 use crate::dataset::{CLASSES, PlanetLoader};
+use bimm::cache::disk::DiskCacheConfig;
 use bimm::cache::weights;
+use bimm::models::resnet::prefabs::{RESNET18_PREFAB, RESNET18_TORCHVISION};
 use bimm::models::resnet::{RESNET34_BLOCKS, ResNet, ResNetContractConfig};
 use burn::data::dataloader::DataLoaderBuilder;
 use burn::data::dataset::transform::ShuffledDataset;
@@ -105,51 +107,55 @@ pub fn train<B: AutodiffBackend>(
     let artifact_dir = args.artifact_dir.as_ref();
     create_artifact_dir(artifact_dir);
 
+    let disk_cache = DiskCacheConfig::default();
+
+    let resnet_config = RESNET18_PREFAB
+        .new_config()
+        // .with_activation(PReluConfig::new().into())
+        .to_structure();
+
+    let weight_descriptor = RESNET18_TORCHVISION.to_descriptor();
+
     // Config
-    let config = TrainingConfig::new(CLASSES.len())
+    let training_config = TrainingConfig::new(CLASSES.len())
         .with_learning_rate(args.learning_rate)
         .with_num_epochs(args.num_epochs)
         .with_batch_size(args.batch_size);
 
     let optimizer = AdamConfig::new()
-        .with_weight_decay(Some(WeightDecayConfig::new(config.weight_decay)))
+        .with_weight_decay(Some(WeightDecayConfig::new(training_config.weight_decay)))
         .init();
 
-    config
+    training_config
         .save(format!("{artifact_dir}/config.json"))
         .expect("Config should be saved successfully");
 
-    B::seed(config.seed);
+    B::seed(training_config.seed);
 
     // Dataloaders
     let batcher_train = ClassificationBatcher::<B>::new(device.clone());
     let batcher_valid = ClassificationBatcher::<B::InnerBackend>::new(device.clone());
 
-    let (train, valid) =
-        ImageFolderDataset::planet_train_val_split(config.train_percentage, config.seed).unwrap();
+    let (train, valid) = ImageFolderDataset::planet_train_val_split(
+        training_config.train_percentage,
+        training_config.seed,
+    )
+    .unwrap();
 
     let dataloader_train = DataLoaderBuilder::new(batcher_train)
-        .batch_size(config.batch_size)
-        .shuffle(config.seed)
-        .num_workers(config.num_workers)
-        .build(ShuffledDataset::with_seed(train, config.seed));
+        .batch_size(training_config.batch_size)
+        .shuffle(training_config.seed)
+        .num_workers(training_config.num_workers)
+        .build(ShuffledDataset::with_seed(train, training_config.seed));
 
     let dataloader_test = DataLoaderBuilder::new(batcher_valid)
-        .batch_size(config.batch_size)
-        .num_workers(config.num_workers)
+        .batch_size(training_config.batch_size)
+        .num_workers(training_config.num_workers)
         .build(valid);
 
-    // let pretrained_weights = &args.pretrained_weights;
-    //let pretrained_weights = "https://github.com/huggingface/pytorch-image-models/releases/download/v0.1-rsb-weights/resnet34_a1_0-46f8f793.pth";
-    let pretrained_weights = "https://download.pytorch.org/models/resnet34-b627a593.pth";
-
-    let weights_path = weights::fetch_model_weights(pretrained_weights)?;
-
-    let model: ResNet<B> = ResNetContractConfig::new(RESNET34_BLOCKS, 1000)
-        // .with_activation(PReluConfig::new().into())
-        .to_structure()
+    let model: ResNet<B> = resnet_config
         .init(device)
-        .load_pytorch_weights(weights_path)
+        .load_pytorch_weights(weight_descriptor.fetch_weights_to_disk_cache(&disk_cache)?)
         .expect("Model should be loaded successfully")
         .with_classes(CLASSES.len())
         .with_stochastic_drop_block(args.drop_block_prob)
@@ -163,9 +169,9 @@ pub fn train<B: AutodiffBackend>(
         .metric_valid_numeric(LossMetric::new())
         .with_file_checkpointer(CompactRecorder::new())
         .devices(vec![device.clone()])
-        .num_epochs(config.num_epochs)
+        .num_epochs(training_config.num_epochs)
         .summary()
-        .build(model, optimizer, config.learning_rate);
+        .build(model, optimizer, training_config.learning_rate);
 
     // Training
     let now = Instant::now();

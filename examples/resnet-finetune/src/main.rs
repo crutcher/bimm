@@ -83,13 +83,6 @@ $ --drop-path-prob=0.1 --drop-block-prob=0.1 --num-epochs=15 --batch-size=32
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
-    /// Url of the pretrained weights.
-    #[arg(
-        long,
-        default_value = "https://download.pytorch.org/models/resnet18-f37072fd.pth"
-    )]
-    pretrained_weights: String,
-
     // /// Number of classes in the pretrained weights.
     // #[arg(long, default_value = "1000")]
     // pretrained_classes: usize,

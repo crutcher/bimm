@@ -32,6 +32,11 @@ where
             builder: Arc::new(builder),
         }
     }
+
+    /// Build a new config.
+    pub fn new_config(&self) -> C {
+        (self.builder)()
+    }
 }
 
 impl<C> From<&StaticPreFabConfig<C>> for PreFabConfig<C>
