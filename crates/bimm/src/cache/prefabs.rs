@@ -158,21 +158,21 @@ where
 
 /// Static builder for a [`PreFabMap`].
 #[derive(Debug)]
-pub struct StaticPreFabMap<'a, C>
+pub struct StaticPreFabMap<C>
 where
     C: 'static + Config + Debug + Clone,
 {
     /// Name of the prefab map.
-    pub name: &'a str,
+    pub name: &'static str,
 
     /// Description of the prefab map.
-    pub description: &'a str,
+    pub description: &'static str,
 
     /// List of prefabs.
-    pub items: &'a [&'a StaticPreFabConfig<C>],
+    pub items: &'static [&'static StaticPreFabConfig<C>],
 }
 
-impl<'a, C> StaticPreFabMap<'a, C>
+impl<C> StaticPreFabMap<C>
 where
     C: 'static + Config + Debug + Clone,
 {

@@ -1,39 +1,15 @@
 //! # Pretrained `ResNet` Models and Configs
 
-use crate::cache::prefabs::{PreFabConfig, PreFabMap, StaticPreFabConfig, StaticPreFabMap};
+use crate::cache::prefabs::{PreFabConfig, StaticPreFabConfig, StaticPreFabMap};
 use crate::cache::weights::{StaticPretrainedWeightsDescriptor, StaticPretrainedWeightsMap};
 use crate::models::resnet::{ResNetContractConfig, ResNetStructureConfig};
 use std::sync::Arc;
 
-/// Static builder for [`ResNetPreFabContractConfig`].
-pub type StaticResNetPreFabContractConfig = StaticPreFabConfig<ResNetContractConfig>;
-/// A [`ResNetContractConfig`] Well-Known Pre-Fab.
-pub type ResNetPreFabContractConfig = PreFabConfig<ResNetContractConfig>;
-/// Static builder for [`ResNetPreFabContractConfig`].
-pub type StaticResNetPreFabStructureConfig = StaticPreFabConfig<ResNetStructureConfig>;
-/// A [`ResNetStructureConfig`] Well-Known Pre-Fab.
-pub type ResNetPreFabStructureConfig = PreFabConfig<ResNetStructureConfig>;
-
-impl From<&StaticResNetPreFabContractConfig> for ResNetPreFabStructureConfig {
-    fn from(config: &StaticResNetPreFabContractConfig) -> Self {
-        config.to_prefab().to_structure_prefab()
-    }
-}
-
-/// Static builder for [`ResNetPreFabContractMap`].
-pub type StaticResNetPreFabContractMap<'a> = StaticPreFabMap<'a, ResNetContractConfig>;
-/// A map of [`ResNetContractConfig`]s.
-pub type ResNetPreFabContractMap = PreFabMap<ResNetContractConfig>;
-/// Static builder for [`ResNetPreFabStructureMap`].
-pub type StaticResNetPreFabStructureMap<'a> = StaticPreFabMap<'a, ResNetStructureConfig>;
-/// A map of [`ResNetStructureConfig`]s.
-pub type ResNetPreFabStructureMap = PreFabMap<ResNetStructureConfig>;
-
-impl ResNetPreFabContractConfig {
-    /// Convert to a [`ResNetPreFabStructureConfig`].
-    pub fn to_structure_prefab(&self) -> ResNetPreFabStructureConfig {
+impl PreFabConfig<ResNetContractConfig> {
+    /// Convert to a prefab for [`ResNetStructureConfig`].
+    pub fn to_structure_prefab(&self) -> PreFabConfig<ResNetStructureConfig> {
         let builder = self.builder.clone();
-        ResNetPreFabStructureConfig {
+        PreFabConfig {
             name: self.name.clone(),
             description: self.description.clone(),
             builder: Arc::new(move || builder().to_structure()),
@@ -42,18 +18,24 @@ impl ResNetPreFabContractConfig {
     }
 }
 
-impl From<&ResNetPreFabContractConfig> for ResNetPreFabStructureConfig {
-    fn from(config: &ResNetPreFabContractConfig) -> Self {
+impl From<&StaticPreFabConfig<ResNetContractConfig>> for PreFabConfig<ResNetStructureConfig> {
+    fn from(config: &StaticPreFabConfig<ResNetContractConfig>) -> Self {
+        config.to_prefab().to_structure_prefab()
+    }
+}
+
+impl From<&PreFabConfig<ResNetContractConfig>> for PreFabConfig<ResNetStructureConfig> {
+    fn from(config: &PreFabConfig<ResNetContractConfig>) -> Self {
         config.to_structure_prefab()
     }
 }
 /// Pretrained [`super::ResNet`] configs and weights.
-pub static PREFAB_RESNET_MAP: StaticResNetPreFabContractMap = StaticResNetPreFabContractMap {
+pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreFabMap {
     name: "resnet",
     description: "Well-Know ResNet configs",
 
     items: &[
-        &StaticResNetPreFabContractConfig {
+        &StaticPreFabConfig {
             name: "resnet18",
             description: "ResNet-18 [2, 2, 2, 2] BasicBlocks",
             builder: || ResNetContractConfig::new([2, 2, 2, 2], 1000),
@@ -68,7 +50,7 @@ pub static PREFAB_RESNET_MAP: StaticResNetPreFabContractMap = StaticResNetPreFab
                 }],
             }),
         },
-        &StaticResNetPreFabContractConfig {
+        &StaticPreFabConfig {
             name: "resnet34",
             description: "ResNet-34 [3, 4, 6, 3] BasicBlocks",
             builder: || ResNetContractConfig::new([3, 4, 6, 3], 1000),
@@ -85,7 +67,7 @@ pub static PREFAB_RESNET_MAP: StaticResNetPreFabContractMap = StaticResNetPreFab
         },
         /*
         FIXME: The loaded weights have a downsample that the config does not have.
-        &StaticResNetPreFabContractConfig {
+        &StaticPreFabConfig {
             name: "resnet50",
             description: "ResNet-50 [3, 4, 6, 3] Bottleneck",
             builder: || ResNetContractConfig::new([3, 4, 6, 3], 1000).with_bottleneck(true),
