@@ -79,9 +79,6 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
                 }],
             }),
         },
-        /*
-        FIXME: The loaded weights have a downsample that the config does not have.
-        DeserializeError("Candle Tensor error: invalid Zip archive: Could not find central directory end")
         &StaticPreFabConfig {
             name: "resnet50",
             description: "ResNet-50 [3, 4, 6, 3] Bottleneck",
@@ -89,6 +86,9 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
 
             weights: Some(&StaticPretrainedWeightsMap {
                 items: &[
+                    /*
+                    FIXME: The loaded weights have a downsample that the config does not have.
+                    DeserializeError("Candle Tensor error: invalid Zip archive: Could not find central directory end")
                     &StaticPretrainedWeightsDescriptor {
                         name: "tv_in1k",
                         description: "ResNet-50 pretrained on ImageNet",
@@ -103,9 +103,15 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
                         origin: Some("https://github.com/pytorch/vision"),
                         urls: &["https://download.pytorch.org/models/resnet50-11ad3fa6.pth"],
                     },
+                    */
                 ],
             }),
         },
-         */
+        &StaticPreFabConfig {
+            name: "resnet101",
+            description: "ResNet-101 [3, 4, 23, 3] Bottleneck",
+            builder: || ResNetContractConfig::new([3, 4, 6, 3], 1000).with_bottleneck(true),
+            weights: None,
+        },
     ],
 };

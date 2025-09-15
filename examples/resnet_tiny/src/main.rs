@@ -23,6 +23,7 @@ use burn::backend::{Autodiff, Cuda};
 use burn::data::dataloader::{DataLoaderBuilder, Dataset};
 use burn::data::dataset::transform::ShuffledDataset;
 use burn::lr_scheduler::cosine::CosineAnnealingLrSchedulerConfig;
+use burn::nn::PReluConfig;
 use burn::nn::loss::CrossEntropyLossConfig;
 use burn::optim::AdamConfig;
 use burn::optim::decay::WeightDecayConfig;
@@ -62,7 +63,7 @@ pub struct Args {
     seed: u64,
 
     /// Batch size for processing
-    #[arg(short, long, default_value_t = 32)]
+    #[arg(short, long, default_value_t = 128)]
     batch_size: usize,
 
     /// Number of workers for data loading.
@@ -106,19 +107,19 @@ pub struct Args {
     validation_root: String,
 
     /// Resnet Model Config
-    #[arg(long, default_value = "resnet18")]
+    #[arg(long, default_value = "resnet101")]
     resnet_prefab: String,
 
     /// Resnet Pretrained
-    #[arg(long, default_value = "tv_in1k")]
-    resnet_pretrained: String,
+    #[arg(long, default_value = None)]
+    resnet_pretrained: Option<String>,
 
     /// Drop Block Prob
-    #[arg(long, default_value = "0.2")]
+    #[arg(long, default_value = "0.25")]
     drop_block_prob: f64,
 
     /// Drop Path Prob
-    #[arg(long, default_value = "0.0")]
+    #[arg(long, default_value = "0.2")]
     drop_path_prob: f64,
 
     /// Early stopping patience
@@ -156,25 +157,27 @@ pub fn backend_main<B: AutodiffBackend>(
 
     let device = &devices[0];
 
-    let disk_cache = DiskCacheConfig::default();
-
     let prefab = PREFAB_RESNET_MAP.expect_lookup_prefab(&args.resnet_prefab);
-
-    let weights = prefab
-        .expect_lookup_pretrained_weights(&args.resnet_pretrained)
-        .fetch_weights(&disk_cache)?;
 
     let resnet_config = prefab
         .to_config()
-        // .with_activation(PReluConfig::new().into())
+        .with_activation(PReluConfig::new().into())
         .to_structure();
 
-    let resnet: ResNet<B> = resnet_config
-        .init(device)
-        .load_pytorch_weights(weights)?
-        .with_classes(num_classes)
-        .with_stochastic_drop_block(args.drop_block_prob)
-        .with_stochastic_path_depth(args.drop_path_prob);
+    let resnet: ResNet<B> = resnet_config.init(device);
+
+    let resnet: ResNet<B> = match &args.resnet_pretrained {
+        None => resnet,
+        Some(pretrained) => {
+            let weights = prefab
+                .expect_lookup_pretrained_weights(pretrained)
+                .fetch_weights(&DiskCacheConfig::default())?;
+            resnet.load_pytorch_weights(weights)?
+        }
+    }
+    .with_classes(num_classes)
+    .with_stochastic_drop_block(args.drop_block_prob)
+    .with_stochastic_path_depth(args.drop_path_prob);
 
     let model: Model<B> = Model { resnet };
 
