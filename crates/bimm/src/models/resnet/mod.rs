@@ -3,35 +3,6 @@
 //! Implementation of the *`ResNet`* family of models for image recognition.
 //! See: [arXiv:1512.03385v1 [cs.CV]](<https://arxiv.org/abs/1512.03385>)
 //!
-//! ## Example
-//!
-//! Example of building a pretrained ResNet-18 module:
-//! ```rust,no_run
-//! use bimm::cache::weights::fetch_model_weights;
-//! use bimm::models::resnet::{ResNet, ResNetContractConfig};
-//! use burn::backend::NdArray;
-//!
-//! let device = Default::default();
-//!
-//! let source =
-//!     "https://download.pytorch.org/models/resnet18-f37072fd.pth";
-//! let source_classes = 1000;
-//! let weights_path= fetch_model_weights(source).unwrap();
-//!
-//! let my_classes = 10;
-//!
-//! let model: ResNet<NdArray> = ResNetContractConfig::resnet18(source_classes)
-//!     .to_structure()
-//!     .init(&device)
-//!     .load_pytorch_weights(weights_path)
-//!     .expect("Model should be loaded successfully")
-//!     .with_classes(my_classes)
-//!     // Enable (drop_block_prob) stochastic block drops for training:
-//!     .with_stochastic_drop_block(0.2)
-//!     // Enable (drop_path_prob) stochastic depth for training:
-//!     .with_stochastic_path_depth(0.1);
-//! ```
-//!
 //! ## Configuration
 //!
 //! This module uses 2-layer configuration.

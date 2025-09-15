@@ -35,15 +35,16 @@ use crate::models::resnet::{RESNET18_BLOCKS, ResNetContractConfig, ResNetStructu
 use std::sync::Arc;
 
 /// ResNet-18 pretrained weights.
-pub static PRETRAINED_RESNET18_MAP: StaticPretrainedWeightsMap = StaticPretrainedWeightsMap {
-    name: "resnet-18",
-    description: "ResNet-18 pretrained weights.",
-    items: &[&StaticPretrainedWeightsDescriptor {
-        name: "resnet18",
-        description: "ResNet18 pretrained on ImageNet",
-        urls: &["https://download.pytorch.org/models/resnet18-f37072fd.pth"],
-    }],
-};
+pub static PRETRAINED_RESNET18_WEIGHT_MAP: StaticPretrainedWeightsMap =
+    StaticPretrainedWeightsMap {
+        name: "resnet-18",
+        description: "ResNet-18 pretrained weights.",
+        items: &[&StaticPretrainedWeightsDescriptor {
+            name: "resnet18",
+            description: "ResNet18 pretrained on ImageNet",
+            urls: &["https://download.pytorch.org/models/resnet18-f37072fd.pth"],
+        }],
+    };
 
 /// `ResNet18` pretrained on `ImageNet`.
 pub static RESNET18_PREFAB: StaticResNetPreFabContractConfig = StaticResNetPreFabContractConfig {

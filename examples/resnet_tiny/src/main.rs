@@ -1,8 +1,9 @@
 #![recursion_limit = "256"]
 extern crate core;
 
-use bimm::cache::weights;
-use bimm::models::resnet::resnet_model::{RESNET101_BLOCKS, ResNet, ResNetContractConfig};
+use bimm::cache::disk::DiskCacheConfig;
+use bimm::models::resnet::pretrained::{PREFAB_RESNET_CONTRACTS, PRETRAINED_RESNET18_WEIGHT_MAP};
+use bimm::models::resnet::resnet_model::ResNet;
 use bimm_firehose::burn::batcher::{
     BatcherInputAdapter, BatcherOutputAdapter, FirehoseExecutorBatcher,
 };
@@ -23,7 +24,6 @@ use burn::backend::{Autodiff, Cuda};
 use burn::data::dataloader::{DataLoaderBuilder, Dataset};
 use burn::data::dataset::transform::ShuffledDataset;
 use burn::lr_scheduler::cosine::CosineAnnealingLrSchedulerConfig;
-use burn::nn::PReluConfig;
 use burn::nn::loss::CrossEntropyLossConfig;
 use burn::optim::AdamConfig;
 use burn::optim::decay::WeightDecayConfig;
@@ -106,13 +106,6 @@ pub struct Args {
     #[arg(long)]
     validation_root: String,
 
-    /// Url of the pretrained weights.
-    #[arg(
-        long,
-        default_value = "https://download.pytorch.org/models/resnet18-f37072fd.pth"
-    )]
-    pretrained_weights: String,
-
     /// Drop Block Prob
     #[arg(long, default_value = "0.2")]
     drop_block_prob: f64,
@@ -156,17 +149,22 @@ pub fn backend_main<B: AutodiffBackend>(
 
     let device = &devices[0];
 
-    //let pretrained_weights = "https://download.pytorch.org/models/resnet34-b627a593.pth";
-    let pretrained_weights = "https://download.pytorch.org/models/resnet101-63fe2227.pth";
+    let disk_cache = DiskCacheConfig::default();
 
-    let weights = weights::fetch_model_weights(pretrained_weights)?;
+    let resnet_config = PREFAB_RESNET_CONTRACTS
+        .to_prefab_map()
+        .expect_lookup_by_name("resnet-18")
+        .new_config()
+        // .with_activation(PReluConfig::new().into())
+        .to_structure();
 
-    let resnet: ResNet<B> = ResNetContractConfig::new(RESNET101_BLOCKS, 1000)
-        .with_bottleneck(true)
-        .with_activation(PReluConfig::new().into())
-        .to_structure()
+    let weight_descriptor = PRETRAINED_RESNET18_WEIGHT_MAP
+        .to_directory()
+        .expect_lookup_by_name("resnet-18");
+
+    let resnet: ResNet<B> = resnet_config
         .init(device)
-        .load_pytorch_weights(weights)?
+        .load_pytorch_weights(weight_descriptor.fetch_weights_to_disk_cache(&disk_cache)?)?
         .with_classes(num_classes)
         .with_stochastic_drop_block(args.drop_block_prob)
         .with_stochastic_path_depth(args.drop_path_prob);

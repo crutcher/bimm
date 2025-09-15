@@ -4,7 +4,7 @@ use crate::dataset::{CLASSES, PlanetLoader};
 use bimm::cache::disk::DiskCacheConfig;
 use bimm::cache::weights;
 use bimm::models::resnet::pretrained::{
-    PREFAB_RESNET_CONTRACTS, PRETRAINED_RESNET18_MAP, RESNET18_PREFAB,
+    PREFAB_RESNET_CONTRACTS, PRETRAINED_RESNET18_WEIGHT_MAP, RESNET18_PREFAB,
 };
 use bimm::models::resnet::{RESNET34_BLOCKS, ResNet, ResNetContractConfig};
 use burn::data::dataloader::DataLoaderBuilder;
@@ -112,15 +112,12 @@ pub fn train<B: AutodiffBackend>(
     let disk_cache = DiskCacheConfig::default();
 
     let resnet_config = PREFAB_RESNET_CONTRACTS
-        .to_prefab_map()
-        .expect_lookup_by_name("resnet18");
-
-    let resnet_config = RESNET18_PREFAB
+        .expect_lookup_by_name("resnet-18")
         .new_config()
         // .with_activation(PReluConfig::new().into())
         .to_structure();
 
-    let weight_descriptor = PRETRAINED_RESNET18_MAP
+    let weight_descriptor = PRETRAINED_RESNET18_WEIGHT_MAP
         .to_directory()
         .expect_lookup_by_name("resnet-18");
 
@@ -163,8 +160,7 @@ pub fn train<B: AutodiffBackend>(
 
     let model: ResNet<B> = resnet_config
         .init(device)
-        .load_pytorch_weights(weight_descriptor.fetch_weights_to_disk_cache(&disk_cache)?)
-        .expect("Model should be loaded successfully")
+        .load_pytorch_weights(weight_descriptor.fetch_weights_to_disk_cache(&disk_cache)?)?
         .with_classes(CLASSES.len())
         .with_stochastic_drop_block(args.drop_block_prob)
         .with_stochastic_path_depth(args.drop_path_prob);

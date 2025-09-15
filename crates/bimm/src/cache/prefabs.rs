@@ -145,6 +145,39 @@ where
                 .collect(),
         }
     }
+
+    /// Lookup a prefab.
+    pub fn lookup_by_name(
+        &self,
+        name: &str,
+    ) -> Option<PreFabConfig<C>> {
+        self.items
+            .iter()
+            .find(|c| c.name == name)
+            .map(|c| c.to_prefab())
+    }
+
+    /// Lookup a prefab.
+    pub fn try_lookup_by_name(
+        &self,
+        name: &str,
+    ) -> anyhow::Result<PreFabConfig<C>> {
+        match self.lookup_by_name(name) {
+            Some(d) => Ok(d),
+            None => bail!("PreFab not found: {}", name),
+        }
+    }
+
+    /// Lookup a prefab.
+    pub fn expect_lookup_by_name(
+        &self,
+        name: &str,
+    ) -> PreFabConfig<C> {
+        match self.try_lookup_by_name(name) {
+            Ok(p) => p,
+            Err(e) => panic!("{}", e),
+        }
+    }
 }
 
 /// A map of [`PreFabConfig`]s.
