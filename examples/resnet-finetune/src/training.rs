@@ -3,7 +3,9 @@ use crate::data::{ClassificationBatch, ClassificationBatcher};
 use crate::dataset::{CLASSES, PlanetLoader};
 use bimm::cache::disk::DiskCacheConfig;
 use bimm::cache::weights;
-use bimm::models::resnet::prefabs::{RESNET18_PREFAB, RESNET18_TORCHVISION};
+use bimm::models::resnet::pretrained::{
+    PREFAB_RESNET_CONTRACTS, PRETRAINED_RESNET18_MAP, RESNET18_PREFAB,
+};
 use bimm::models::resnet::{RESNET34_BLOCKS, ResNet, ResNetContractConfig};
 use burn::data::dataloader::DataLoaderBuilder;
 use burn::data::dataset::transform::ShuffledDataset;
@@ -109,12 +111,18 @@ pub fn train<B: AutodiffBackend>(
 
     let disk_cache = DiskCacheConfig::default();
 
+    let resnet_config = PREFAB_RESNET_CONTRACTS
+        .to_prefab_map()
+        .expect_lookup_by_name("resnet18");
+
     let resnet_config = RESNET18_PREFAB
         .new_config()
         // .with_activation(PReluConfig::new().into())
         .to_structure();
 
-    let weight_descriptor = RESNET18_TORCHVISION.to_descriptor();
+    let weight_descriptor = PRETRAINED_RESNET18_MAP
+        .to_directory()
+        .expect_lookup_by_name("resnet-18");
 
     // Config
     let training_config = TrainingConfig::new(CLASSES.len())

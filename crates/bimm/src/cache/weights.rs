@@ -1,7 +1,9 @@
 //! # Module / Weight Caches
 
 use crate::cache::disk::DiskCacheConfig;
+use anyhow::bail;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 const X25: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_IBM_SDLC);
@@ -107,6 +109,88 @@ impl PretrainedWeightsDescriptor {
         let resource = pretrained_weights_resource_key(cache_key);
 
         disk_cache.fetch_resource(url, &resource)
+    }
+}
+
+/// Static [`PretrainedWeightsMap`] builder.
+#[derive(Debug)]
+pub struct StaticPretrainedWeightsMap<'a> {
+    /// Name of the directory.
+    pub name: &'a str,
+
+    /// Description of the directory.
+    pub description: &'a str,
+
+    /// List of static descriptors.
+    pub items: &'a [&'a StaticPretrainedWeightsDescriptor<'a>],
+}
+
+impl<'a> StaticPretrainedWeightsMap<'a> {
+    /// Convert to a [`PretrainedWeightsMap`].
+    pub fn to_directory(&self) -> PretrainedWeightsMap {
+        PretrainedWeightsMap {
+            name: self.name.to_string(),
+            description: self.description.to_string(),
+            items: self
+                .items
+                .iter()
+                .map(|d| {
+                    let desc = d.to_descriptor();
+                    (desc.name.clone(), desc)
+                })
+                .collect(),
+        }
+    }
+}
+
+impl<'a> From<&StaticPretrainedWeightsMap<'a>> for PretrainedWeightsMap {
+    fn from(directory: &StaticPretrainedWeightsMap) -> Self {
+        directory.to_directory()
+    }
+}
+
+/// Directory of [`PretrainedWeightsDescriptor`]s.
+#[derive(Debug, Clone)]
+pub struct PretrainedWeightsMap {
+    /// Name of the directory.
+    pub name: String,
+
+    /// Description of the directory.
+    pub description: String,
+
+    /// Map of descriptors.
+    pub items: BTreeMap<String, PretrainedWeightsDescriptor>,
+}
+
+impl PretrainedWeightsMap {
+    /// Lookup a descriptor by name.
+    pub fn lookup_by_name(
+        &self,
+        name: &str,
+    ) -> Option<PretrainedWeightsDescriptor> {
+        self.items.get(name).cloned()
+    }
+
+    /// Lookup a descriptor.
+    pub fn try_lookup_by_name(
+        &self,
+        name: &str,
+    ) -> anyhow::Result<PretrainedWeightsDescriptor> {
+        match self.lookup_by_name(name) {
+            Some(d) => Ok(d),
+            None => bail!("Descriptor not found: {}", name),
+        }
+    }
+
+    /// Lookup a descriptor.
+    pub fn expect_lookup_by_name(
+        &self,
+        name: &str,
+    ) -> PretrainedWeightsDescriptor {
+        match self.try_lookup_by_name(name) {
+            Ok(p) => p,
+            Err(e) => panic!("{}", e),
+        }
     }
 }
 

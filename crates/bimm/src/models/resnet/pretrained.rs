@@ -29,24 +29,34 @@
 // PreFab 1:N PreTrained
 //   (every PreFab may have multiple PreTraineds, every PreTrained has a unique PreFab)
 
-use crate::cache::prefabs::{PreFabConfig, StaticPreFabConfig};
-use crate::cache::weights::StaticPretrainedWeightsDescriptor;
+use crate::cache::prefabs::{PreFabConfig, PreFabMap, StaticPreFabConfig, StaticPreFabMap};
+use crate::cache::weights::{StaticPretrainedWeightsDescriptor, StaticPretrainedWeightsMap};
 use crate::models::resnet::{RESNET18_BLOCKS, ResNetContractConfig, ResNetStructureConfig};
 use std::sync::Arc;
 
-/// `ResNet18` pretrained on `ImageNet`.
-pub static RESNET18_TORCHVISION: StaticPretrainedWeightsDescriptor =
-    StaticPretrainedWeightsDescriptor {
+/// ResNet-18 pretrained weights.
+pub static PRETRAINED_RESNET18_MAP: StaticPretrainedWeightsMap = StaticPretrainedWeightsMap {
+    name: "resnet-18",
+    description: "ResNet-18 pretrained weights.",
+    items: &[&StaticPretrainedWeightsDescriptor {
         name: "resnet18",
         description: "ResNet18 pretrained on ImageNet",
         urls: &["https://download.pytorch.org/models/resnet18-f37072fd.pth"],
-    };
+    }],
+};
 
 /// `ResNet18` pretrained on `ImageNet`.
 pub static RESNET18_PREFAB: StaticResNetPreFabContractConfig = StaticResNetPreFabContractConfig {
-    name: "resnet18",
-    description: "ResNet18 pretrained on ImageNet",
+    name: "resnet-18",
+    description: "ResNet-18 [2, 2, 2, 2] BasicBlocks",
     builder: || ResNetContractConfig::new(RESNET18_BLOCKS, 1000),
+};
+
+/// `ResNet18` pretrained on `ImageNet`.
+pub static PREFAB_RESNET_CONTRACTS: StaticResNetPreFabContractMap = StaticResNetPreFabContractMap {
+    name: "resnet",
+    description: "Well-Know ResNet configs",
+    items: &[&RESNET18_PREFAB],
 };
 
 /// Static builder for [`ResNetPreFabContractConfig`].
@@ -84,3 +94,15 @@ impl From<&ResNetPreFabContractConfig> for ResNetPreFabStructureConfig {
         config.to_structure_prefab()
     }
 }
+
+/// Static builder for [`ResNetPreFabContractMap`].
+pub type StaticResNetPreFabContractMap<'a> = StaticPreFabMap<'a, ResNetContractConfig>;
+
+/// A map of [`ResNetContractConfig`]s.
+pub type ResNetPreFabContractMap = PreFabMap<ResNetContractConfig>;
+
+/// Static builder for [`ResNetPreFabStructureMap`].
+pub type StaticResNetPreFabStructureMap<'a> = StaticPreFabMap<'a, ResNetStructureConfig>;
+
+/// A map of [`ResNetStructureConfig`]s.
+pub type ResNetPreFabStructureMap = PreFabMap<ResNetStructureConfig>;
