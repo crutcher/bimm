@@ -190,7 +190,7 @@ where
     }
 
     /// Lookup a prefab.
-    pub fn lookup_prefab(
+    pub fn lookup(
         &self,
         name: &str,
     ) -> Option<PreFabConfig<C>> {
@@ -201,22 +201,22 @@ where
     }
 
     /// Lookup a prefab.
-    pub fn try_lookup_prefab(
+    pub fn try_lookup(
         &self,
         name: &str,
     ) -> anyhow::Result<PreFabConfig<C>> {
-        match self.lookup_prefab(name) {
+        match self.lookup(name) {
             Some(d) => Ok(d),
             None => bail!("PreFab not found: {}", name),
         }
     }
 
     /// Lookup a prefab.
-    pub fn expect_lookup_prefab(
+    pub fn expect_lookup(
         &self,
         name: &str,
     ) -> PreFabConfig<C> {
-        match self.try_lookup_prefab(name) {
+        match self.try_lookup(name) {
             Ok(p) => p,
             Err(e) => panic!("{}", e),
         }
@@ -244,7 +244,7 @@ where
     C: 'static + Config + Debug + Clone,
 {
     /// Lookup a prefab.
-    pub fn lookup_by_name(
+    pub fn lookup(
         &self,
         name: &str,
     ) -> Option<PreFabConfig<C>> {
@@ -252,22 +252,22 @@ where
     }
 
     /// Lookup a prefab.
-    pub fn try_lookup_by_name(
+    pub fn try_lookup(
         &self,
         name: &str,
     ) -> anyhow::Result<PreFabConfig<C>> {
-        match self.lookup_by_name(name) {
+        match self.lookup(name) {
             Some(d) => Ok(d),
             None => bail!("PreFab not found: {}", name),
         }
     }
 
     /// Lookup a prefab.
-    pub fn expect_lookup_by_name(
+    pub fn expect_lookup(
         &self,
         name: &str,
     ) -> PreFabConfig<C> {
-        match self.try_lookup_by_name(name) {
+        match self.try_lookup(name) {
             Ok(p) => p,
             Err(e) => panic!("{}", e),
         }

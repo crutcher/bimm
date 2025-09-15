@@ -49,4 +49,5 @@ pub mod resnet_model;
 pub mod stems;
 pub mod util;
 
+pub use pretrained::*;
 pub use resnet_model::*;

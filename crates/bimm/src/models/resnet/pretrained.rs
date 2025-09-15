@@ -1,60 +1,9 @@
-//! # `ResNet` Model Loaders
-
-// Loader goals:
-//
-// * named pretrained models:
-//   `&str` -> `Loader`.
-// * For all: build a structure config
-//   Loader -> `ResNetStructureConfig`.
-// * For some: build a contract config
-//   Loader -> `ResNetContractConfig`.
-// * For either config: an opportunity to edit the config before loading.
-//
-// For weight sources:
-// There is a `1:N` relationship between model configs and weight sources.
-//
-// The symbolic id of a source, and the load path to pull that weight set,
-// may be distinct. Weights are generally published as URLs; but in a pre-built
-// model, they may be loaded from another location.
-//
-// PreFab - a well known model config.
-// PreTrained - a pretrained model.
-//
-// name 1:1 PreFab
-//   (every PreFab has unique name)
-//
-// name 1:1 PreTrained
-//   (every PreTrained has unique name)
-//
-// PreFab 1:N PreTrained
-//   (every PreFab may have multiple PreTraineds, every PreTrained has a unique PreFab)
+//! # Pretrained `ResNet` Models and Configs
 
 use crate::cache::prefabs::{PreFabConfig, PreFabMap, StaticPreFabConfig, StaticPreFabMap};
 use crate::cache::weights::{StaticPretrainedWeightsDescriptor, StaticPretrainedWeightsMap};
 use crate::models::resnet::{RESNET18_BLOCKS, ResNetContractConfig, ResNetStructureConfig};
 use std::sync::Arc;
-
-/// `ResNet18` pretrained on `ImageNet`.
-pub static PRETRAINED_RESNETS: StaticResNetPreFabContractMap = StaticResNetPreFabContractMap {
-    name: "resnet",
-    description: "Well-Know ResNet configs",
-
-    items: &[&StaticResNetPreFabContractConfig {
-        name: "resnet-18",
-        description: "ResNet-18 [2, 2, 2, 2] BasicBlocks",
-        builder: || ResNetContractConfig::new(RESNET18_BLOCKS, 1000),
-
-        weights: Some(&StaticPretrainedWeightsMap {
-            items: &[&StaticPretrainedWeightsDescriptor {
-                name: "tv_in1k",
-                description: "ResNet18 pretrained on ImageNet",
-                license: Some("bsd-3-clause"),
-                origin: Some("https://github.com/pytorch/vision"),
-                urls: &["https://download.pytorch.org/models/resnet18-f37072fd.pth"],
-            }],
-        }),
-    }],
-};
 
 /// Static builder for [`ResNetPreFabContractConfig`].
 pub type StaticResNetPreFabContractConfig = StaticPreFabConfig<ResNetContractConfig>;
@@ -104,3 +53,25 @@ pub type StaticResNetPreFabStructureMap<'a> = StaticPreFabMap<'a, ResNetStructur
 
 /// A map of [`ResNetStructureConfig`]s.
 pub type ResNetPreFabStructureMap = PreFabMap<ResNetStructureConfig>;
+
+/// `ResNet18` pretrained on `ImageNet`.
+pub static PRETRAINED_RESNETS: StaticResNetPreFabContractMap = StaticResNetPreFabContractMap {
+    name: "resnet",
+    description: "Well-Know ResNet configs",
+
+    items: &[&StaticResNetPreFabContractConfig {
+        name: "resnet-18",
+        description: "ResNet-18 [2, 2, 2, 2] BasicBlocks",
+        builder: || ResNetContractConfig::new(RESNET18_BLOCKS, 1000),
+
+        weights: Some(&StaticPretrainedWeightsMap {
+            items: &[&StaticPretrainedWeightsDescriptor {
+                name: "tv_in1k",
+                description: "ResNet18 pretrained on ImageNet",
+                license: Some("bsd-3-clause"),
+                origin: Some("https://github.com/pytorch/vision"),
+                urls: &["https://download.pytorch.org/models/resnet18-f37072fd.pth"],
+            }],
+        }),
+    }],
+};

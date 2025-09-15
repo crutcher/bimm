@@ -2,8 +2,7 @@
 extern crate core;
 
 use bimm::cache::disk::DiskCacheConfig;
-use bimm::models::resnet::pretrained::PRETRAINED_RESNETS;
-use bimm::models::resnet::resnet_model::ResNet;
+use bimm::models::resnet::{PRETRAINED_RESNETS, ResNet};
 use bimm_firehose::burn::batcher::{
     BatcherInputAdapter, BatcherOutputAdapter, FirehoseExecutorBatcher,
 };
@@ -159,7 +158,7 @@ pub fn backend_main<B: AutodiffBackend>(
 
     let disk_cache = DiskCacheConfig::default();
 
-    let prefab = PRETRAINED_RESNETS.expect_lookup_prefab(&args.resnet_prefab);
+    let prefab = PRETRAINED_RESNETS.expect_lookup(&args.resnet_prefab);
 
     let weights = prefab
         .expect_lookup_weights(&args.resnet_pretrained)
