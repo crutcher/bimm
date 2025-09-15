@@ -8,7 +8,7 @@ mod dataset;
 use crate::data::{ClassificationBatch, ClassificationBatcher};
 use crate::dataset::{CLASSES, PlanetLoader, download};
 use bimm::cache::disk::DiskCacheConfig;
-use bimm::models::resnet::{PRETRAINED_RESNETS, ResNet};
+use bimm::models::resnet::{PREFAB_RESNET_MAP, ResNet};
 use burn::backend::{Autodiff, Cuda};
 use burn::config::Config;
 use burn::data::dataloader::DataLoaderBuilder;
@@ -71,7 +71,7 @@ pub struct Args {
     num_epochs: usize,
 
     /// Resnet Model Config
-    #[arg(long, default_value = "resnet-18")]
+    #[arg(long, default_value = "resnet18")]
     resnet_prefab: String,
 
     /// Resnet Pretrained
@@ -201,7 +201,7 @@ pub fn train<B: AutodiffBackend>(
 
     let disk_cache = DiskCacheConfig::default();
 
-    let prefab = PRETRAINED_RESNETS.expect_lookup(&args.resnet_prefab);
+    let prefab = PREFAB_RESNET_MAP.expect_lookup(&args.resnet_prefab);
 
     let weights = prefab
         .expect_lookup_weights(&args.resnet_pretrained)

@@ -2,7 +2,7 @@
 
 use crate::cache::prefabs::{PreFabConfig, PreFabMap, StaticPreFabConfig, StaticPreFabMap};
 use crate::cache::weights::{StaticPretrainedWeightsDescriptor, StaticPretrainedWeightsMap};
-use crate::models::resnet::{RESNET18_BLOCKS, ResNetContractConfig, ResNetStructureConfig};
+use crate::models::resnet::{ResNetContractConfig, ResNetStructureConfig};
 use std::sync::Arc;
 
 /// Static builder for [`ResNetPreFabContractConfig`].
@@ -55,23 +55,67 @@ pub type StaticResNetPreFabStructureMap<'a> = StaticPreFabMap<'a, ResNetStructur
 pub type ResNetPreFabStructureMap = PreFabMap<ResNetStructureConfig>;
 
 /// `ResNet18` pretrained on `ImageNet`.
-pub static PRETRAINED_RESNETS: StaticResNetPreFabContractMap = StaticResNetPreFabContractMap {
+pub static PREFAB_RESNET_MAP: StaticResNetPreFabContractMap = StaticResNetPreFabContractMap {
     name: "resnet",
     description: "Well-Know ResNet configs",
 
-    items: &[&StaticResNetPreFabContractConfig {
-        name: "resnet-18",
-        description: "ResNet-18 [2, 2, 2, 2] BasicBlocks",
-        builder: || ResNetContractConfig::new(RESNET18_BLOCKS, 1000),
+    items: &[
+        &StaticResNetPreFabContractConfig {
+            name: "resnet18",
+            description: "ResNet-18 [2, 2, 2, 2] BasicBlocks",
+            builder: || ResNetContractConfig::new([2, 2, 2, 2], 1000),
 
-        weights: Some(&StaticPretrainedWeightsMap {
-            items: &[&StaticPretrainedWeightsDescriptor {
-                name: "tv_in1k",
-                description: "ResNet18 pretrained on ImageNet",
-                license: Some("bsd-3-clause"),
-                origin: Some("https://github.com/pytorch/vision"),
-                urls: &["https://download.pytorch.org/models/resnet18-f37072fd.pth"],
-            }],
-        }),
-    }],
+            weights: Some(&StaticPretrainedWeightsMap {
+                items: &[&StaticPretrainedWeightsDescriptor {
+                    name: "tv_in1k",
+                    description: "ResNet18 pretrained on ImageNet",
+                    license: Some("bsd-3-clause"),
+                    origin: Some("https://github.com/pytorch/vision"),
+                    urls: &["https://download.pytorch.org/models/resnet18-f37072fd.pth"],
+                }],
+            }),
+        },
+        &StaticResNetPreFabContractConfig {
+            name: "resnet34",
+            description: "ResNet-34 [3, 4, 6, 3] BasicBlocks",
+            builder: || ResNetContractConfig::new([3, 4, 6, 3], 1000),
+
+            weights: Some(&StaticPretrainedWeightsMap {
+                items: &[&StaticPretrainedWeightsDescriptor {
+                    name: "tv_in1k",
+                    description: "ResNet-34 pretrained on ImageNet",
+                    license: Some("bsd-3-clause"),
+                    origin: Some("https://github.com/pytorch/vision"),
+                    urls: &["https://download.pytorch.org/models/resnet34-b627a593.pth"],
+                }],
+            }),
+        },
+        /*
+        FIXME: The loaded weights have a downsample that the config does not have.
+        &StaticResNetPreFabContractConfig {
+            name: "resnet50",
+            description: "ResNet-50 [3, 4, 6, 3] Bottleneck",
+            builder: || ResNetContractConfig::new([3, 4, 6, 3], 1000).with_bottleneck(true),
+
+            weights: Some(&StaticPretrainedWeightsMap {
+                items: &[
+                    &StaticPretrainedWeightsDescriptor {
+                        name: "tv_in1k",
+                        description: "ResNet-50 pretrained on ImageNet",
+                        license: Some("bsd-3-clause"),
+                        origin: Some("https://github.com/pytorch/vision"),
+                        urls: &["https://download.pytorch.org/models/resnet50-0676ba61.pth"],
+                    },
+                    &StaticPretrainedWeightsDescriptor {
+                        name: "tv_in2k",
+                        description: "ResNet-50 pretrained on ImageNet",
+                        license: Some("bsd-3-clause"),
+                        origin: Some("https://github.com/pytorch/vision"),
+                        urls: &["https://download.pytorch.org/models/resnet50-11ad3fa6.pth"],
+                    },
+                ],
+            }),
+        },
+         */
+    ],
 };
