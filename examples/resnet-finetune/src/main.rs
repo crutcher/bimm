@@ -201,14 +201,14 @@ pub fn train<B: AutodiffBackend>(
 
     let disk_cache = DiskCacheConfig::default();
 
-    let prefab = PREFAB_RESNET_MAP.expect_lookup(&args.resnet_prefab);
+    let prefab = PREFAB_RESNET_MAP.expect_lookup_prefab(&args.resnet_prefab);
 
     let weights = prefab
-        .expect_lookup_weights(&args.resnet_pretrained)
-        .fetch_weights_to_disk_cache(&disk_cache)?;
+        .expect_lookup_pretrained_weights(&args.resnet_pretrained)
+        .fetch_weights(&disk_cache)?;
 
     let resnet_config = prefab
-        .new_config()
+        .to_config()
         // .with_activation(PReluConfig::new().into())
         .to_structure();
 

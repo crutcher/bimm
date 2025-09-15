@@ -3,6 +3,32 @@
 //! Implementation of the *`ResNet`* family of models for image recognition.
 //! See: [arXiv:1512.03385v1 [cs.CV]](<https://arxiv.org/abs/1512.03385>)
 //!
+//! ## Example
+//!
+//! ```rust,no_run
+//! use burn::backend::NdArray;
+//! use bimm::cache::disk::DiskCacheConfig;
+//! use bimm::models::resnet::{PREFAB_RESNET_MAP, ResNet};
+//!
+//! let device = Default::default();
+//!
+//! let prefab = PREFAB_RESNET_MAP.expect_lookup_prefab("resnet18");
+//!
+//! let weights = prefab
+//!     .expect_lookup_pretrained_weights("tv_in1k")
+//!     .fetch_weights(&DiskCacheConfig::default())
+//!     .expect("Failed to fetch weights");
+//!
+//! let model: ResNet<NdArray> = prefab
+//!     .to_config()
+//!     .to_structure()
+//!     .init(&device)
+//!     .load_pytorch_weights(weights)
+//!     .expect("Failed to load weights")
+//!     .with_classes(10)
+//!     .with_stochastic_drop_block(0.2);
+//! ```
+//!
 //! ## Configuration
 //!
 //! This module uses 2-layer configuration.

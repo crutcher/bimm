@@ -114,7 +114,7 @@ impl PretrainedWeightsDescriptor {
     /// # Returns
     ///
     /// The disk location of the cached weights.
-    pub fn fetch_weights_to_disk_cache(
+    pub fn fetch_weights(
         &self,
         disk_cache: &DiskCacheConfig,
     ) -> anyhow::Result<PathBuf> {

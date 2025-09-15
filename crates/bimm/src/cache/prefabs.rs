@@ -43,7 +43,7 @@ where
     }
 
     /// Build a new config.
-    pub fn new_config(&self) -> C {
+    pub fn to_config(&self) -> C {
         (self.builder)()
     }
 }
@@ -106,7 +106,7 @@ where
             .field("description", &self.description);
 
         if pretty {
-            handle.field("config", &self.new_config());
+            handle.field("config", &self.to_config());
         }
 
         handle.finish()
@@ -118,12 +118,12 @@ where
     C: 'static + Config + Debug + Clone,
 {
     /// Build a new config.
-    pub fn new_config(&self) -> C {
+    pub fn to_config(&self) -> C {
         (self.builder)()
     }
 
     /// Lookup a descriptor.
-    pub fn lookup_weights(
+    pub fn lookup_pretrained_weights(
         &self,
         name: &str,
     ) -> Option<PretrainedWeightsDescriptor> {
@@ -134,22 +134,22 @@ where
     }
 
     /// Lookup a descriptor.
-    pub fn try_lookup_weights(
+    pub fn try_lookup_pretrained_weights(
         &self,
         name: &str,
     ) -> anyhow::Result<PretrainedWeightsDescriptor> {
-        match self.lookup_weights(name) {
+        match self.lookup_pretrained_weights(name) {
             Some(d) => Ok(d),
             None => bail!("Descriptor not found: {}", name),
         }
     }
 
     /// Lookup a descriptor.
-    pub fn expect_lookup_weights(
+    pub fn expect_lookup_pretrained_weights(
         &self,
         name: &str,
     ) -> PretrainedWeightsDescriptor {
-        match self.try_lookup_weights(name) {
+        match self.try_lookup_pretrained_weights(name) {
             Ok(p) => p,
             Err(e) => panic!("{}", e),
         }
@@ -190,7 +190,7 @@ where
     }
 
     /// Lookup a prefab.
-    pub fn lookup(
+    pub fn lookup_prefab(
         &self,
         name: &str,
     ) -> Option<PreFabConfig<C>> {
@@ -201,22 +201,22 @@ where
     }
 
     /// Lookup a prefab.
-    pub fn try_lookup(
+    pub fn try_lookup_prefab(
         &self,
         name: &str,
     ) -> anyhow::Result<PreFabConfig<C>> {
-        match self.lookup(name) {
+        match self.lookup_prefab(name) {
             Some(d) => Ok(d),
             None => bail!("PreFab not found: {}", name),
         }
     }
 
     /// Lookup a prefab.
-    pub fn expect_lookup(
+    pub fn expect_lookup_prefab(
         &self,
         name: &str,
     ) -> PreFabConfig<C> {
-        match self.try_lookup(name) {
+        match self.try_lookup_prefab(name) {
             Ok(p) => p,
             Err(e) => panic!("{}", e),
         }
@@ -244,7 +244,7 @@ where
     C: 'static + Config + Debug + Clone,
 {
     /// Lookup a prefab.
-    pub fn lookup(
+    pub fn lookup_prefab(
         &self,
         name: &str,
     ) -> Option<PreFabConfig<C>> {
@@ -252,22 +252,22 @@ where
     }
 
     /// Lookup a prefab.
-    pub fn try_lookup(
+    pub fn try_lookup_prefab(
         &self,
         name: &str,
     ) -> anyhow::Result<PreFabConfig<C>> {
-        match self.lookup(name) {
+        match self.lookup_prefab(name) {
             Some(d) => Ok(d),
             None => bail!("PreFab not found: {}", name),
         }
     }
 
     /// Lookup a prefab.
-    pub fn expect_lookup(
+    pub fn expect_lookup_prefab(
         &self,
         name: &str,
     ) -> PreFabConfig<C> {
-        match self.try_lookup(name) {
+        match self.try_lookup_prefab(name) {
             Ok(p) => p,
             Err(e) => panic!("{}", e),
         }
