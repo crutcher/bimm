@@ -48,6 +48,8 @@ pub static PRETRAINED_RESNETS: StaticResNetPreFabContractMap = StaticResNetPreFa
             items: &[&StaticPretrainedWeightsDescriptor {
                 name: "tv_in1k",
                 description: "ResNet18 pretrained on ImageNet",
+                license: Some("bsd-3-clause"),
+                origin: Some("https://github.com/pytorch/vision"),
                 urls: &["https://download.pytorch.org/models/resnet18-f37072fd.pth"],
             }],
         }),

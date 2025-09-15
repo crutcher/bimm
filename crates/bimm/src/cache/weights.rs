@@ -53,6 +53,12 @@ pub struct StaticPretrainedWeightsDescriptor<'a> {
     /// Description of the model.
     pub description: &'a str,
 
+    /// License.
+    pub license: Option<&'a str>,
+
+    /// Source URL.
+    pub origin: Option<&'a str>,
+
     /// URL to download the weights from.
     pub urls: &'a [&'a str],
 }
@@ -63,6 +69,8 @@ impl<'a> StaticPretrainedWeightsDescriptor<'a> {
         PretrainedWeightsDescriptor {
             name: self.name.to_string(),
             description: self.description.to_string(),
+            license: self.license.map(|s| s.to_string()),
+            origin: self.origin.map(|s| s.to_string()),
             urls: self.urls.iter().map(|s| s.to_string()).collect(),
         }
     }
@@ -82,6 +90,12 @@ pub struct PretrainedWeightsDescriptor {
 
     /// Description of the model.
     pub description: String,
+
+    /// License.
+    pub license: Option<String>,
+
+    /// Source URL.
+    pub origin: Option<String>,
 
     /// URL to download the weights from.
     pub urls: Vec<String>,
@@ -190,6 +204,8 @@ mod tests {
             name: "my_model",
             description: "some description of my model.",
             urls: &["foo", "bar"],
+            license: Some("MIT"),
+            origin: Some("https://github.com/my_org/my_model"),
         };
         let d_desc = s_desc.to_descriptor();
 

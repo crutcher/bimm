@@ -159,9 +159,11 @@ pub fn backend_main<B: AutodiffBackend>(
 
     let disk_cache = DiskCacheConfig::default();
 
-    let prefab = PRETRAINED_RESNETS.expect_lookup_by_name(&args.resnet_prefab);
+    let prefab = PRETRAINED_RESNETS.expect_lookup_prefab(&args.resnet_prefab);
 
-    let weight_descriptor = prefab.expect_lookup_weights(&args.resnet_pretrained);
+    let weights = prefab
+        .expect_lookup_weights(&args.resnet_pretrained)
+        .fetch_weights_to_disk_cache(&disk_cache)?;
 
     let resnet_config = prefab
         .new_config()
@@ -170,7 +172,7 @@ pub fn backend_main<B: AutodiffBackend>(
 
     let resnet: ResNet<B> = resnet_config
         .init(device)
-        .load_pytorch_weights(weight_descriptor.fetch_weights_to_disk_cache(&disk_cache)?)?
+        .load_pytorch_weights(weights)?
         .with_classes(num_classes)
         .with_stochastic_drop_block(args.drop_block_prob)
         .with_stochastic_path_depth(args.drop_path_prob);
