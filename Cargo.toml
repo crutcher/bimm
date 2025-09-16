@@ -32,7 +32,7 @@ burn = "^0.18.0"
 burn-import = "^0.18.0"
 dirs = "^6.0.0"
 
-bimm-contracts = "^0.4.1"
+bimm-contracts = "^0.4.2"
 
 # Burn coupled-dependencies
 globwalk = "^0.9.1"

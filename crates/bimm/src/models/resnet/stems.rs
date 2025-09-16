@@ -65,10 +65,12 @@
 
 use crate::compat::activation_wrapper::ActivationConfig;
 use crate::compat::normalization_wrapper::NormalizationConfig;
-use crate::layers::blocks::cna::CNA2dConfig;
+use crate::layers::blocks::cna::{CNA2d, CNA2dConfig};
+use burn::module::Module;
 use burn::nn::PaddingConfig2d;
 use burn::nn::conv::Conv2dConfig;
-use burn::nn::pool::MaxPool2dConfig;
+use burn::nn::pool::{MaxPool2d, MaxPool2dConfig};
+use burn::prelude::{Backend, Tensor};
 
 /// stem contract configuration.
 #[derive(Debug, Clone, Default)]
@@ -147,4 +149,38 @@ pub struct ResNetStemStructureConfig {
 
     /// The pooling layer.
     pub pool: Option<MaxPool2dConfig>,
+}
+
+/// stem impl.
+#[derive(Module, Debug)]
+pub struct ResNetStem<B: Backend> {
+    /// The first convolution.
+    pub cna1: CNA2d<B>,
+    /// The second convolution.
+    pub cna2: Option<CNA2d<B>>,
+    /// The third convolution.
+    pub cna3: Option<CNA2d<B>>,
+    /// The pooling.
+    pub pool: Option<MaxPool2d>,
+}
+
+impl<B: Backend> ResNetStem<B> {
+    /// forward pass.
+    pub fn forward(
+        &self,
+        input: Tensor<B, 4>,
+    ) -> Tensor<B, 4> {
+        let mut x = input;
+        x = self.cna1.forward(x);
+        if let Some(cna2) = &self.cna2 {
+            x = cna2.forward(x);
+        }
+        if let Some(cna3) = &self.cna3 {
+            x = cna3.forward(x);
+        }
+        if let Some(pool) = &self.pool {
+            x = pool.forward(x);
+        }
+        x
+    }
 }

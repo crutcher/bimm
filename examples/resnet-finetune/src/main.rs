@@ -115,8 +115,12 @@ pub struct Args {
     pub weight_decay: f32,
 }
 
+/// Log config.
+///
+/// Only exists for logging.
 #[derive(Config, Debug)]
-struct LogConfig {
+#[allow(clippy::too_many_arguments)]
+pub struct LogConfig {
     seed: u64,
     train_percentage: u8,
     batch_size: usize,
