@@ -39,11 +39,11 @@
 //!     if aa_layer is not None:
 //!         if issubclass(aa_layer, nn.AvgPool2d):
 //!             self.maxpool = aa_layer(2)
-//!     else:
-//!         self.maxpool = nn.Sequential(*[
-//!             nn.MaxPool2d(kernel_size=3, stride=1, padding=1),
-//!             aa_layer(channels=inplanes, stride=2)
-//!         ])
+//!         else:
+//!             self.maxpool = nn.Sequential(*[
+//!                 nn.MaxPool2d(kernel_size=3, stride=1, padding=1),
+//!                 aa_layer(channels=inplanes, stride=2)
+//!             ])
 //!     else:
 //!         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 //! ```
@@ -62,29 +62,17 @@
 //!   ]
 //! ```
 //!
-use crate::compat::activation_wrapper::{Activation, ActivationConfig};
-use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig, ConvNorm2dMeta};
-use crate::models::resnet::util::CONV_INTO_RELU_INITIALIZER;
-use burn::config::Config;
-use burn::nn::Initializer;
-use burn::prelude::{Backend, Module};
-use burn::tensor::Tensor;
 
-/// [`Stem`] Meta API.
-pub trait StemMeta {
-    /// The number of input channels.
-    fn in_planes(&self) -> usize;
+use crate::compat::activation_wrapper::ActivationConfig;
+use crate::compat::normalization_wrapper::NormalizationConfig;
+use crate::layers::blocks::cna::CNA2dConfig;
+use burn::nn::PaddingConfig2d;
+use burn::nn::conv::Conv2dConfig;
+use burn::nn::pool::MaxPool2dConfig;
 
-    /// The number of output channels.
-    fn out_planes(&self) -> usize;
-
-    /// The stride of the first convolution.
-    fn stride(&self) -> [usize; 2];
-}
-
-/// [`Stem`] configuration.
+/// stem contract configuration.
 #[derive(Debug, Clone, Default)]
-pub enum StemAbstractConfig {
+pub enum ResNetStemContractConfig {
     /// Default; single 7x7 convolution with stride 2.
     #[default]
     Default,
@@ -108,109 +96,55 @@ pub enum StemAbstractConfig {
     },
 }
 
-/// [`StemStage`] configuration.
-#[derive(Config, Debug)]
-pub struct StemStageConfig {
-    /// Convolution + Normalization layer.
-    pub conv_norm: ConvNorm2dConfig,
+impl ResNetStemContractConfig {
+    /// Convert to a [`ResNetStemStructureConfig`].
+    pub fn to_structure(
+        &self,
+        in_channels: usize,
+        normalization: NormalizationConfig,
+        activation: ActivationConfig,
+    ) -> ResNetStemStructureConfig {
+        match self {
+            ResNetStemContractConfig::Default => (),
+            _ => unimplemented!("{:?}", self),
+        }
 
-    /// Activation function.
-    #[config(default = "ActivationConfig::Relu")]
-    pub activation: ActivationConfig,
+        let cna1 = CNA2dConfig {
+            conv: Conv2dConfig::new([in_channels, 64], [7, 7])
+                .with_stride([2, 2])
+                .with_padding(PaddingConfig2d::Explicit(3, 3))
+                .with_bias(false),
+            norm: normalization.clone(),
+            act: activation.clone(),
+        };
 
-    /// Initializer for the convolutional layers.
-    #[config(default = "CONV_INTO_RELU_INITIALIZER.clone()")]
-    pub initializer: Initializer,
-}
+        let pool = Some(
+            MaxPool2dConfig::new([3, 3])
+                .with_strides([2, 2])
+                .with_padding(PaddingConfig2d::Explicit(1, 1)),
+        );
 
-impl StemMeta for StemStageConfig {
-    fn in_planes(&self) -> usize {
-        self.conv_norm.in_channels()
-    }
-
-    fn out_planes(&self) -> usize {
-        self.conv_norm.out_channels()
-    }
-
-    fn stride(&self) -> [usize; 2] {
-        *self.conv_norm.stride()
-    }
-}
-
-impl StemStageConfig {
-    /// Initialize the [`StemStage`].
-    pub fn init<B: Backend>(
-        self,
-        device: &B::Device,
-    ) -> StemStage<B> {
-        StemStage {
-            conv_norm: self
-                .conv_norm
-                .with_initializer(self.initializer)
-                .init(device),
-
-            activation: self.activation.init(device),
+        ResNetStemStructureConfig {
+            cna1,
+            cna2: None,
+            cna3: None,
+            pool,
         }
     }
 }
 
-/// `ResNet` [`StemStage`].
-#[derive(Module, Debug)]
-pub struct StemStage<B: Backend> {
-    /// Convolution + Normalization layer.
-    pub conv_norm: ConvNorm2d<B>,
+/// stem contract configuration.
+#[derive(Debug, Clone)]
+pub struct ResNetStemStructureConfig {
+    /// The first convolution.
+    pub cna1: CNA2dConfig,
 
-    /// Activation function.
-    pub activation: Activation<B>,
-}
+    /// The second convolution.
+    pub cna2: Option<CNA2dConfig>,
 
-impl<B: Backend> StemStage<B> {
-    /// Forward pass.
-    pub fn forward(
-        &self,
-        input: Tensor<B, 4>,
-    ) -> Tensor<B, 4> {
-        let x = self.conv_norm.forward(input);
-        self.activation.forward(x)
-    }
-}
+    /// The third convolution.
+    pub cna3: Option<CNA2dConfig>,
 
-/// [`Stem]` configuration.
-#[derive(Config, Debug)]
-pub struct StemConfig {
-    /// Stem stages.
-    pub stages: Vec<StemStageConfig>,
-}
-
-impl StemConfig {
-    /// Initialize a [`Stem`].
-    pub fn init<B: Backend>(
-        self,
-        device: &B::Device,
-    ) -> Stem<B> {
-        // TODO: check that the stages have valid input/output sizes.
-        Stem {
-            stages: self
-                .stages
-                .into_iter()
-                .map(|stage| stage.init(device))
-                .collect(),
-        }
-    }
-}
-
-/// `ResNet` Input [`Stem`] Module.
-#[derive(Module, Debug)]
-pub struct Stem<B: Backend> {
-    stages: Vec<StemStage<B>>,
-}
-
-impl<B: Backend> Stem<B> {
-    /// Forward pass.
-    pub fn forward(
-        &self,
-        input: Tensor<B, 4>,
-    ) -> Tensor<B, 4> {
-        self.stages.iter().fold(input, |x, stage| stage.forward(x))
-    }
+    /// The pooling layer.
+    pub pool: Option<MaxPool2dConfig>,
 }
