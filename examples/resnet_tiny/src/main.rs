@@ -66,6 +66,10 @@ pub struct Args {
     #[arg(short, long, default_value_t = 512)]
     batch_size: usize,
 
+    /// Grads accumulation size for processing
+    #[arg(short, long, default_value_t = 8)]
+    grads_accumulation: usize,
+
     /// Number of workers for data loading.
     #[arg(long, default_value = "2")]
     num_workers: Option<usize>,
@@ -79,11 +83,11 @@ pub struct Args {
     drop_block_rate: f64,
 
     /// Learning rate for the optimizer.
-    #[arg(long, default_value = "1.0e-6")]
+    #[arg(long, default_value = "1.0e-4")]
     learning_rate: f64,
 
     /// Learning rate decay gamma.
-    #[arg(long, default_value = "0.999975")]
+    #[arg(long, default_value = "0.999997")]
     lr_gamma: f64,
 
     /// Directory to save the artifacts.
@@ -107,11 +111,11 @@ pub struct Args {
     resnet_pretrained: Option<String>,
 
     /// Drop Block Prob
-    #[arg(long, default_value = "0.25")]
+    #[arg(long, default_value = "0.20")]
     drop_block_prob: f64,
 
     /// Drop Path Prob
-    #[arg(long, default_value = "0.15")]
+    #[arg(long, default_value = "0.0")]
     drop_path_prob: f64,
 
     /// Early stopping patience
@@ -315,6 +319,7 @@ pub fn backend_main<B: AutodiffBackend>(
             },
         ))
         .devices(devices.clone())
+        .grads_accumulation(args.grads_accumulation)
         .num_epochs(args.num_epochs)
         .summary()
         .build(model, optim_config.init(), lr_scheduler);

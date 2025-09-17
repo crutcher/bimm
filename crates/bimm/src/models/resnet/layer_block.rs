@@ -243,16 +243,13 @@ impl LayerBlockStructureConfig {
         O: Into<Option<DropBlockOptions>>,
     {
         let options = options.into();
-        self.map_blocks(&mut |_, block| block.with_drop_block(options.clone()))
-    }
-
-    /// Update the drop path probability.
-    pub fn with_drop_path_prob(
-        self,
-        prob: f64,
-    ) -> Self {
-        let prob = expect_probability(prob);
-        self.map_blocks(&mut |_, block| block.with_drop_path_prob(prob))
+        self.map_blocks(&mut |idx, block| {
+            if idx == 0 {
+                block.with_drop_block(None)
+            } else {
+                block.with_drop_block(options.clone())
+            }
+        })
     }
 }
 

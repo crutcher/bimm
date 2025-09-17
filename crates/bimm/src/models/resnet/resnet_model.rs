@@ -214,13 +214,13 @@ impl ResNetStructureConfig {
     ) -> Self {
         let drop_path_rate = expect_probability(drop_path_rate);
 
-        let net_num_blocks = self.layers.iter().map(|b| b.len()).sum::<usize>();
+        let net_num_blocks = self.layers.iter().map(|b| b.len()).sum::<usize>() - self.layers.len();
         let mut net_block_idx = 0;
-        let mut update_drop_path = |_idx: usize, block: ResidualBlockStructureConfig| {
+        let mut update_drop_path = |idx: usize, block: ResidualBlockStructureConfig| {
             // stochastic depth linear decay rule
             let block_dpr = drop_path_rate * (net_block_idx as f64) / ((net_num_blocks - 1) as f64);
             net_block_idx += 1;
-            if block_dpr > 0.0 {
+            if idx != 0 && block_dpr > 0.0 {
                 block.with_drop_path_prob(block_dpr)
             } else {
                 block

@@ -75,11 +75,15 @@ pub struct Args {
     artifact_dir: String,
 
     /// Batch size for processing
-    #[arg(short, long, default_value_t = 32)]
+    #[arg(short, long, default_value_t = 24)]
     batch_size: usize,
 
+    /// Grads accumulation size for processing
+    #[arg(short, long, default_value_t = 8)]
+    grads_accumulation: usize,
+
     /// Number of workers for data loading.
-    #[arg(long, default_value = "2")]
+    #[arg(long, default_value = "4")]
     num_workers: usize,
 
     /// Number of epochs to train the model.
@@ -103,11 +107,11 @@ pub struct Args {
     drop_path_prob: f64,
 
     /// Learning rate
-    #[arg(long, default_value = "1e-5")]
+    #[arg(long, default_value_t = 5e-5)]
     pub learning_rate: f64,
 
     /// Early stopping patience
-    #[arg(long, default_value = "10")]
+    #[arg(long, default_value_t = 10)]
     patience: usize,
 
     /// Optimizer Weight decay.
@@ -115,43 +119,50 @@ pub struct Args {
     pub weight_decay: f32,
 }
 
-/// Log config.
-///
-/// Only exists for logging.
-#[derive(Config, Debug)]
 #[allow(clippy::too_many_arguments)]
-pub struct LogConfig {
-    seed: u64,
-    train_percentage: u8,
-    batch_size: usize,
-    num_epochs: usize,
-    resnet_prefab: String,
-    resnet_pretrained: String,
-    drop_block_prob: f64,
-    drop_path_prob: f64,
-    learning_rate: f64,
-    patience: usize,
-    weight_decay: f32,
-    resnet: ResNetContractConfig,
-}
+mod local {
+    use bimm::models::resnet::ResNetContractConfig;
+    use burn::config::Config;
 
-fn main() {
+    /// Log config.
+    ///
+    /// Only exists for logging.
+    #[derive(Config, Debug)]
+    pub struct LogConfig {
+        pub seed: u64,
+        pub train_percentage: u8,
+        pub batch_size: usize,
+        pub num_epochs: usize,
+        pub resnet_prefab: String,
+        pub resnet_pretrained: String,
+        pub drop_block_prob: f64,
+        pub drop_path_prob: f64,
+        pub learning_rate: f64,
+        pub patience: usize,
+        pub weight_decay: f32,
+        pub resnet: ResNetContractConfig,
+    }
+}
+use local::*;
+
+fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     let _source_tree = download();
 
     let device = Default::default();
-    train::<Autodiff<Cuda>>(&args, &device);
+    train::<Autodiff<Cuda>>(&args, &device)
 }
 
+#[must_use]
 pub fn train<B: AutodiffBackend>(
     args: &Args,
     device: &B::Device,
 ) -> anyhow::Result<()> {
     // Remove existing artifacts before to get an accurate learner summary
     let artifact_dir: &str = args.artifact_dir.as_ref();
-    std::fs::remove_dir_all(artifact_dir)?;
-    std::fs::create_dir_all(artifact_dir)?;
+    std::fs::remove_dir_all(artifact_dir);
+    std::fs::create_dir_all(artifact_dir).expect("Failed to create artifacts directory");
 
     B::seed(args.seed);
 
@@ -232,6 +243,7 @@ pub fn train<B: AutodiffBackend>(
             },
         ))
         .devices(vec![device.clone()])
+        .grads_accumulation(args.grads_accumulation)
         .num_epochs(args.num_epochs)
         .summary()
         .build(model, optimizer, args.learning_rate);
