@@ -32,7 +32,8 @@ burn = "^0.18.0"
 burn-import = "^0.18.0"
 dirs = "^6.0.0"
 
-bimm-contracts = "^0.4.2"
+# bimm-contracts = "^0.4.2"
+bimm-contracts = { branch = "main", git = "https://github.com/crutcher/bimm-contracts", version = "^0.4.3" }
 
 # Burn coupled-dependencies
 globwalk = "^0.9.1"

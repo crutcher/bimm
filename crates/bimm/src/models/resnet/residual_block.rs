@@ -372,7 +372,7 @@ mod tests {
             &output,
             &[
                 ("batch", batch_size),
-                ("out_planes", planes),
+                ("out_channels", planes),
                 ("out_height", out_height),
                 ("out_width", out_width)
             ],
