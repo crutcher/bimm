@@ -330,7 +330,8 @@ dependencies = [
 [[package]]
 name = "bimm-contracts"
 version = "0.4.3"
-source = "git+https://github.com/crutcher/bimm-contracts?branch=main#ab60a89dd8e96dc66daff5a3a63a4fed61bb2924"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05fea0a4a77085c23d8152ef530e352d55685ed53ccf3e472e98ca3b3d9344ca"
 dependencies = [
  "bimm-contracts-macros",
  "burn",
@@ -339,7 +340,8 @@ dependencies = [
 [[package]]
 name = "bimm-contracts-macros"
 version = "0.4.3"
-source = "git+https://github.com/crutcher/bimm-contracts?branch=main#ab60a89dd8e96dc66daff5a3a63a4fed61bb2924"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0288b5bde15af46b915afbfebc29d7231ab245ea54f82864f5ee92f430e069cb"
 dependencies = [
  "proc-macro2",
  "quote",

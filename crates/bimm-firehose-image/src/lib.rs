@@ -40,12 +40,6 @@ mod tests {
     use indoc::indoc;
     use std::sync::Arc;
 
-    #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-    pub struct TensorDescription {
-        pub shape: Vec<usize>,
-        pub dtype: burn::tensor::DType,
-    }
-
     #[test]
     fn test_example() -> anyhow::Result<()> {
         let temp_dir = tempfile::tempdir().unwrap();
