@@ -12,7 +12,7 @@ description = "bimm-firehose image processing support"
 workspace = true
 
 [dependencies]
-bimm-firehose = { version = "0.3.6", path = "../bimm-firehose" }
+bimm-firehose = { version = "0.3.7", path = "../bimm-firehose" }
 
 burn = { workspace = true, features = ["dataset", "vision", "ndarray"] }
 serde = { workspace = true, features = ["derive"] }
