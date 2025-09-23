@@ -36,15 +36,18 @@ let model: ResNet<Wgpu> = prefab
 ```
 
 * [bimm::cache](https://docs.rs/bimm/latest/bimm/cache) - weight loading cache.
+* [bimm::compat](https://docs.rs/bimm/latest/bimm/compat) - future-porting burn mechanisms.
+    * [bimm::compat::activation_wrapper::Activation](https://docs.rs/bimm/latest/bimm/compat/activation_wrapper/enum.Activation.html) -
+      activation layer abstraction wrapper.
+    * [bimm::compat::normalization_wrapper::Normalization](https://docs.rs/bimm/latest/bimm/compat/normalization_wrapper/enum.Normalization.html) -
+      normalization layer abstraction wrapper.
 * [bimm::layers](https://docs.rs/bimm/latest/bimm/layers) - reusable neural network modules.
-    * [bimm::layers::activation](https://docs.rs/bimm/latest/bimm/layers/activation) - activation
-      layers.
-        * [bimm::layers::activation::Activation](https://docs.rs/bimm/latest/bimm/layers/activation/enum.Activation.html)
-            - activation layer abstraction wrapper.
     * [bimm::layers::blocks](https://docs.rs/bimm/latest/bimm/layers/blocks) - miscellaneous
       blocks.
-        * [bimm::layers::blocks::conv_norm](https://docs.rs/bimm/latest/bimm/layers/blocks/conv_norm) -
+        * [bimm::layers::blocks::conv_norm::ConvNorm2d](https://docs.rs/bimm/latest/bimm/layers/blocks/conv_norm) -
           ``Conv2d + BatchNorm2d`` block.
+        * [bimm::layers::blocks::cna::CNA2d](https://docs.rs/bimm/latest/bimm/layers/blocks/conv_norm) -
+          ``Conv2d + Normalization + Activation`` block.
     * [bimm::layers::drop](https://docs.rs/bimm/latest/bimm/layers/drop) - dropout layers.
         * [bimm::layers::drop::drop_block](https://docs.rs/bimm/latest/bimm/layers/drop/drop_block) -
           2d drop
