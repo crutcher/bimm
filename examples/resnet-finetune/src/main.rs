@@ -8,7 +8,6 @@ mod dataset;
 use crate::data::{ClassificationBatch, ClassificationBatcher};
 use crate::dataset::{CLASSES, PlanetLoader, download};
 use bimm::cache::disk::DiskCacheConfig;
-use bimm::compat::activation_wrapper::ActivationConfig;
 use bimm::models::resnet::{PREFAB_RESNET_MAP, ResNet, ResNetContractConfig};
 use burn::backend::{Autodiff, Cuda};
 use burn::config::Config;
@@ -16,6 +15,7 @@ use burn::data::dataloader::DataLoaderBuilder;
 use burn::data::dataset::transform::ShuffledDataset;
 use burn::data::dataset::vision::ImageFolderDataset;
 use burn::module::Module;
+use burn::nn::activation::ActivationConfig;
 use burn::nn::loss::BinaryCrossEntropyLossConfig;
 use burn::optim::AdamConfig;
 use burn::optim::decay::WeightDecayConfig;
@@ -25,8 +25,8 @@ use burn::tensor::backend::{AutodiffBackend, Backend};
 use burn::train::metric::store::{Aggregate, Direction, Split};
 use burn::train::metric::{HammingScore, LossMetric};
 use burn::train::{
-    LearnerBuilder, MetricEarlyStoppingStrategy, MultiLabelClassificationOutput, StoppingCondition,
-    TrainOutput, TrainStep, ValidStep,
+    LearnerBuilder, LearningStrategy, MetricEarlyStoppingStrategy, MultiLabelClassificationOutput,
+    StoppingCondition, TrainOutput, TrainStep, ValidStep,
 };
 use clap::{Parser, arg};
 use core::clone::Clone;
@@ -164,7 +164,7 @@ pub fn train<B: AutodiffBackend>(
     std::fs::remove_dir_all(artifact_dir);
     std::fs::create_dir_all(artifact_dir).expect("Failed to create artifacts directory");
 
-    B::seed(args.seed);
+    B::seed(device, args.seed);
 
     let disk_cache = DiskCacheConfig::default();
 
@@ -219,7 +219,7 @@ pub fn train<B: AutodiffBackend>(
         .batch_size(args.batch_size)
         .shuffle(args.seed)
         .num_workers(args.num_workers)
-        .build(ShuffledDataset::with_seed(train, args.seed));
+        .build(ShuffledDataset::new(train, args.seed));
 
     let dataloader_test = DataLoaderBuilder::new(batcher_valid)
         .batch_size(args.batch_size)
@@ -242,7 +242,7 @@ pub fn train<B: AutodiffBackend>(
                 n_epochs: args.patience,
             },
         ))
-        .devices(vec![device.clone()])
+        .learning_strategy(LearningStrategy::SingleDevice(device.clone()))
         .grads_accumulation(args.grads_accumulation)
         .num_epochs(args.num_epochs)
         .summary()
@@ -255,6 +255,7 @@ pub fn train<B: AutodiffBackend>(
     println!("Training completed in {}m{}s", (elapsed / 60), elapsed % 60);
 
     model_trained
+        .model
         .save_file(format!("{artifact_dir}/model"), &CompactRecorder::new())
         .expect("Trained model should be saved successfully");
 

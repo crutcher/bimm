@@ -63,12 +63,12 @@
 //! ```
 //!
 
-use crate::compat::activation_wrapper::ActivationConfig;
-use crate::compat::normalization_wrapper::NormalizationConfig;
 use crate::layers::blocks::cna::{CNA2d, CNA2dConfig};
 use burn::module::Module;
 use burn::nn::PaddingConfig2d;
+use burn::nn::activation::ActivationConfig;
 use burn::nn::conv::Conv2dConfig;
+use burn::nn::norm::NormalizationConfig;
 use burn::nn::pool::{MaxPool2d, MaxPool2dConfig};
 use burn::prelude::{Backend, Tensor};
 

@@ -86,7 +86,7 @@ pub struct ConvNorm2d<B: Backend> {
     pub conv: Conv2d<B>,
 
     /// Internal Norm Layer.
-    pub norm: BatchNorm<B, 2>,
+    pub norm: BatchNorm<B>,
 }
 
 impl<B: Backend> ConvNorm2dMeta for ConvNorm2d<B> {

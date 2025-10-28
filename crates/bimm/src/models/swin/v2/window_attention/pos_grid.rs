@@ -165,7 +165,7 @@ pub fn window_attention_relative_position_index<B: Backend>(
     let s = Tensor::<B, 1, Int>::from_data([2 * window_shape[1] - 1, 1], device);
     let rel = rel.mul(s.unsqueeze());
 
-    let rel: Tensor<B, 2, Int> = rel.sum_dim(2).squeeze(2);
+    let rel: Tensor<B, 2, Int> = rel.sum_dim(2).squeeze_dim::<2>(2);
 
     rel
 }

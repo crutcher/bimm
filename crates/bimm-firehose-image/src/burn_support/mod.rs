@@ -94,7 +94,7 @@ pub fn image_to_f32_tensor<B: Backend>(
     let pixvec = image_to_pixeldepth_vec(image);
     let data: Vec<f32> = pixvec
         .iter()
-        .map(|p| pixeldepth_support::pixel_depth_to_f32(p.clone()))
+        .map(|p| pixeldepth_support::pixel_depth_to_f32(*p))
         .collect();
 
     Tensor::from_data_dtype(

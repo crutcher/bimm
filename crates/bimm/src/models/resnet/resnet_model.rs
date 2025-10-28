@@ -13,8 +13,6 @@
 //! [`ResNet`] implements [`Module`], and provides
 //! [`ResNet::forward`].
 
-use crate::compat::activation_wrapper::{Activation, ActivationConfig};
-use crate::compat::normalization_wrapper::NormalizationConfig;
 use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig};
 use crate::layers::drop::drop_block::DropBlockOptions;
 use crate::models::resnet::layer_block::{
@@ -26,7 +24,9 @@ use crate::models::resnet::util::CONV_INTO_RELU_INITIALIZER;
 use crate::utility::probability::expect_probability;
 use burn::module::Module;
 use burn::nn::BatchNormConfig;
+use burn::nn::activation::{Activation, ActivationConfig};
 use burn::nn::conv::Conv2dConfig;
+use burn::nn::norm::NormalizationConfig;
 use burn::nn::pool::{AdaptiveAvgPool2d, AdaptiveAvgPool2dConfig, MaxPool2d, MaxPool2dConfig};
 use burn::nn::{Initializer, Linear, LinearConfig, PaddingConfig2d};
 use burn::prelude::{Backend, Config, Tensor};

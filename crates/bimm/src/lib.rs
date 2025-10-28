@@ -5,8 +5,6 @@
 //!
 //! * [`cache`] - weight loading cache.
 //! * [`compat`] - compat code, ported or planned for an upcoming release of ``burn``.
-//!   * [`compat::activation_wrapper::Activation`] - activation layer abstraction wrapper.
-//!   * [`compat::normalization_wrapper::Normalization`] - norm layer abstraction wrapper.
 //! * [`layers`] - reusable neural network modules.
 //!   * [`layers::blocks`] - miscellaneous blocks.
 //!     * [`layers::blocks::cna::CNA2d`] - ``Conv2d + Normalization + Activation`` block.

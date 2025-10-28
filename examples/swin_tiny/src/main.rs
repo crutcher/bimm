@@ -34,7 +34,7 @@ use burn::train::metric::{
     AccuracyMetric, CpuMemory, CpuUse, CudaMetric, LearningRateMetric, LossMetric,
     TopKAccuracyMetric,
 };
-use burn::train::{ClassificationOutput, LearnerBuilder};
+use burn::train::{ClassificationOutput, LearnerBuilder, LearningStrategy};
 use burn::train::{TrainOutput, TrainStep, ValidStep};
 use clap::{Parser, arg};
 use rand::{Rng, rng};
@@ -100,7 +100,7 @@ pub struct Args {
 }
 
 /// Config for training the model.
-#[derive(Config)]
+#[derive(Config, Debug)]
 pub struct TrainingConfig {
     /// The inner model config.
     pub model: ModelConfig,
@@ -113,8 +113,8 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     type B = Autodiff<Cuda>;
 
-    let devices = vec![Default::default()];
-    backend_main::<B>(&args, devices)
+    let device = Default::default();
+    backend_main::<B>(&args, &device)
 }
 
 /// Create the artifact directory for saving training artifacts.
@@ -127,7 +127,7 @@ fn create_artifact_dir(artifact_dir: &str) {
 /// Train the model with the given configuration and devices.
 pub fn backend_main<B: AutodiffBackend>(
     args: &Args,
-    devices: Vec<B::Device>,
+    device: &B::Device,
 ) -> anyhow::Result<()> {
     let h: usize = 32;
     let w: usize = 32;
@@ -151,7 +151,7 @@ pub fn backend_main<B: AutodiffBackend>(
     .with_attn_drop_rate(0.2)
     .with_drop_rate(0.2);
 
-    B::seed(args.seed);
+    B::seed(device, args.seed);
 
     let training_config = TrainingConfig::new(
         ModelConfig {
@@ -306,11 +306,11 @@ pub fn backend_main<B: AutodiffBackend>(
             StoppingCondition::NoImprovementSince { n_epochs: 6 },
         ))
          */
-        .devices(devices.clone())
+        .learning_strategy(LearningStrategy::SingleDevice(device.clone()))
         .num_epochs(args.num_epochs)
         .summary()
         .build(
-            training_config.model.init::<B>(&devices[0]),
+            training_config.model.init::<B>(device),
             training_config.optimizer.init(),
             lr_scheduler,
         );
@@ -318,6 +318,7 @@ pub fn backend_main<B: AutodiffBackend>(
     let model_trained = learner.fit(train_dataloader, validation_dataloader);
 
     model_trained
+        .model
         .save_file(format!("{artifact_dir}/model"), &CompactRecorder::new())
         .expect("Trained model should be saved successfully");
 

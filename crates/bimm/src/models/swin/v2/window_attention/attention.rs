@@ -1,4 +1,3 @@
-use crate::compat::activation_wrapper::ActivationConfig;
 use crate::models::swin::v2::window_attention::{
     OffsetGridRelativePositionBias, RelativePositionBiasConfig, RelativePositionBiasMeta,
     apply_attention_mask,
@@ -6,6 +5,7 @@ use crate::models::swin::v2::window_attention::{
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::config::Config;
 use burn::module::{Module, Param, ParamId};
+use burn::nn::activation::ActivationConfig;
 use burn::nn::{Dropout, DropoutConfig, Linear, LinearConfig};
 use burn::prelude::{Backend, Tensor};
 use burn::tensor::activation::softmax;

@@ -1,12 +1,12 @@
 //! # The `ResNet` Downsample Implementation.
 
 use crate::compat::conv_shape::expect_conv_output_shape;
-use crate::compat::normalization_wrapper::{Normalization, NormalizationConfig};
 use crate::models::resnet::util::scalar_to_array;
 use crate::models::resnet::util::{build_square_conv2d_padding_config, get_square_conv2d_padding};
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::nn::BatchNormConfig;
 use burn::nn::conv::{Conv2d, Conv2dConfig};
+use burn::nn::norm::{Normalization, NormalizationConfig};
 use burn::prelude::{Backend, Config, Module, Tensor};
 
 /// [`ResNetDownsample`] Meta trait.

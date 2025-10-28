@@ -1,17 +1,16 @@
 //! # Operational Block for Swin Transformer v2.
+use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
 use crate::models::swin::v2::window_attention::{
     WindowAttention, WindowAttentionConfig, WindowAttentionMeta, sw_attn_mask,
 };
 use crate::models::swin::v2::windowing::{window_partition, window_reverse};
+use bimm_contracts::{assert_shape_contract_periodically, define_shape_contract};
 use burn::config::Config;
 use burn::module::Module;
+use burn::nn::activation::{Activation, ActivationConfig};
 use burn::nn::{Dropout, DropoutConfig, LayerNorm, LayerNormConfig, Linear, LinearConfig};
 use burn::prelude::{Backend, Tensor};
 use burn::tensor::BasicOps;
-
-use crate::compat::activation_wrapper::{Activation, ActivationConfig};
-use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
-use bimm_contracts::{assert_shape_contract_periodically, define_shape_contract};
 
 /// Common meta-interface for `BlockMlp` config.
 pub trait BlockMlpMeta {

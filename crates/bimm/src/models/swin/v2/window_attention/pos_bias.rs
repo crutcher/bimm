@@ -1,4 +1,3 @@
-use crate::compat::activation_wrapper::{Activation, ActivationConfig};
 use crate::models::swin::v2::window_attention::{
     window_attention_relative_position_index, window_log1p_relative_offset_grid,
 };
@@ -6,6 +5,7 @@ use bimm_contracts::assert_shape_contract_periodically;
 use burn::config::Config;
 use burn::module::Module;
 use burn::nn;
+use burn::nn::activation::{Activation, ActivationConfig};
 use burn::prelude::{Backend, Int, Tensor};
 use burn::tensor::activation::sigmoid;
 

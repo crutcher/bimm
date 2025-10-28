@@ -11,7 +11,7 @@ use crate::utility::probability::expect_probability;
 use bimm_contracts::unpack_shape_contract;
 use burn::config::Config;
 use burn::module::{Content, Module, ModuleDisplay, ModuleDisplayDefault};
-use burn::prelude::{Backend, Tensor};
+use burn::prelude::{Backend, Float, Tensor};
 use burn::tensor::module::max_pool2d;
 use burn::tensor::{DType, Distribution};
 use serde::{Deserialize, Serialize};
@@ -299,7 +299,7 @@ fn drop_block_2d_drop_filter_<B: Backend>(
 
     if !partial_edge_blocks {
         selection = selection
-            * kernels::conv2d_kernel_midpoint_filter([h, w], kernel_shape, device)
+            * kernels::conv2d_kernel_midpoint_filter::<B, Float>([h, w], kernel_shape, device)
                 .unsqueeze_dims::<4>(&[0, 1])
                 .cast(dtype);
     }

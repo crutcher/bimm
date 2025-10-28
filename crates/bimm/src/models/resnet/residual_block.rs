@@ -17,8 +17,7 @@
 //! [`ResidualBlock`] can also be constructed via:
 //! * [`From<BasicBlock<B>>`](`BasicBlock`),
 //! * [`From<BottleneckBlock<B>>`](`BottleneckBlock`).
-use crate::compat::activation_wrapper::ActivationConfig;
-use crate::compat::normalization_wrapper::NormalizationConfig;
+
 use crate::layers::drop::drop_block::DropBlockOptions;
 use crate::models::resnet::basic_block::{BasicBlock, BasicBlockConfig, BasicBlockMeta};
 use crate::models::resnet::bottleneck::{
@@ -27,6 +26,8 @@ use crate::models::resnet::bottleneck::{
 use crate::models::resnet::util::stride_div_output_resolution;
 use crate::utility::probability::expect_probability;
 use burn::nn::BatchNormConfig;
+use burn::nn::activation::ActivationConfig;
+use burn::nn::norm::NormalizationConfig;
 use burn::prelude::{Backend, Config, Module, Tensor};
 
 /// Abstract [`ResidualBlock`] Config.

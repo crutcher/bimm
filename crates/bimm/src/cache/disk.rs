@@ -9,7 +9,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 /// Cache Policy
-#[derive(Config)]
+#[derive(Config, Debug)]
 pub struct DiskCacheConfig {
     /// Key for the root cache directory.
     #[config(default = "\"bimm\".to_string()")]

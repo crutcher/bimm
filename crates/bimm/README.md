@@ -67,6 +67,8 @@ let model: ResNet<Wgpu> = prefab
 
 #### Recent Changes
 
+* **0.19.0**
+    * Bumped to track `burn` 0.19.0.
 * **0.3.3**
     * Preview of ResNet-18 support.
 * **0.3.2**

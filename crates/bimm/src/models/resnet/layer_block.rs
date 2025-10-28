@@ -11,8 +11,6 @@
 //! [`LayerBlock`] implements [`Module`], and provides
 //! [`LayerBlock::forward`].
 
-use crate::compat::activation_wrapper::ActivationConfig;
-use crate::compat::normalization_wrapper::NormalizationConfig;
 use crate::layers::drop::drop_block::DropBlockOptions;
 use crate::models::resnet::residual_block::{
     ResidualBlock, ResidualBlockContractConfig, ResidualBlockMeta, ResidualBlockStructureConfig,
@@ -22,6 +20,8 @@ use crate::utility::probability::expect_probability;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::config::Config;
 use burn::nn::BatchNormConfig;
+use burn::nn::activation::ActivationConfig;
+use burn::nn::norm::NormalizationConfig;
 use burn::prelude::{Backend, Module, Tensor};
 
 /// Abstract [`LayerBlock`] Config.

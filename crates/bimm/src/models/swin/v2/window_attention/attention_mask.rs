@@ -207,15 +207,16 @@ mod tests {
                 let window = res
                     .clone()
                     .slice(s![bi, wi, .., ..])
-                    .squeeze::<4>(0)
-                    .squeeze::<3>(0);
+                    .squeeze_dim::<4>(0)
+                    .squeeze_dim::<3>(0);
 
-                let wmask: Tensor<NdArray, 2> = mask.clone().slice(s![wi, .., ..]).squeeze::<2>(0);
+                let wmask: Tensor<NdArray, 2> =
+                    mask.clone().slice(s![wi, .., ..]).squeeze_dim::<2>(0);
 
                 for hi in 0..num_heads {
-                    let hattn = window.clone().slice(s![hi, .., ..]).squeeze::<2>(0);
+                    let h_attn = window.clone().slice(s![hi, .., ..]).squeeze_dim::<2>(0);
 
-                    hattn.to_data().assert_eq(&wmask.to_data(), true);
+                    h_attn.to_data().assert_eq(&wmask.to_data(), true);
                 }
             }
         }

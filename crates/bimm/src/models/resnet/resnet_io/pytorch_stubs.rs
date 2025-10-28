@@ -4,7 +4,6 @@
 //! These are stub modules to smooth over loading issues with the current version
 //! of `burn-import`. There is insufficient information in loaded weights to
 //! derive information about stateless modules (such as ``Activation::Relu``).
-use crate::compat::normalization_wrapper::Normalization;
 use crate::layers::blocks::cna::CNA2d;
 use crate::layers::blocks::conv_norm::ConvNorm2d;
 use crate::models::resnet::basic_block::BasicBlock;
@@ -15,6 +14,7 @@ use crate::models::resnet::residual_block::ResidualBlock;
 use crate::models::resnet::resnet_model::ResNet;
 use burn::module::Module;
 use burn::nn::conv::{Conv2d, Conv2dRecord};
+use burn::nn::norm::Normalization;
 use burn::nn::{BatchNorm, BatchNormRecord, Linear};
 use burn::prelude::Backend;
 use burn::record::{FullPrecisionSettings, Recorder};
@@ -39,7 +39,7 @@ pub fn load_resnet_stub_record<B: Backend>(
 #[derive(Module, Debug)]
 pub struct ResNetStub<B: Backend> {
     pub conv1: Conv2d<B>,
-    pub bn1: BatchNorm<B, 2>,
+    pub bn1: BatchNorm<B>,
     pub layers: Vec<LayerBlockStub<B>>,
     pub fc: Linear<B>,
 }
@@ -126,7 +126,7 @@ pub fn copy_downsample_weights<B: Backend>(
 #[derive(Module, Debug)]
 pub struct DownsampleStub<B: Backend> {
     pub conv: Conv2d<B>,
-    pub bn: BatchNorm<B, 2>,
+    pub bn: BatchNorm<B>,
 }
 
 impl<B: Backend> DownsampleStubRecord<B> {
@@ -146,7 +146,7 @@ impl<B: Backend> DownsampleStubRecord<B> {
 
 pub fn copy_cna_weights<B: Backend>(
     conv: Conv2dRecord<B>,
-    bn: BatchNormRecord<B, 2>,
+    bn: BatchNormRecord<B>,
     target: CNA2d<B>,
 ) -> CNA2d<B> {
     match target.norm {
@@ -161,7 +161,7 @@ pub fn copy_cna_weights<B: Backend>(
 
 pub fn copy_conv_norm_weights<B: Backend>(
     conv: Conv2dRecord<B>,
-    bn: BatchNormRecord<B, 2>,
+    bn: BatchNormRecord<B>,
     target: ConvNorm2d<B>,
 ) -> ConvNorm2d<B> {
     ConvNorm2d {
@@ -173,9 +173,9 @@ pub fn copy_conv_norm_weights<B: Backend>(
 #[derive(Module, Debug)]
 pub struct BasicBlockStub<B: Backend> {
     pub conv1: Conv2d<B>,
-    pub bn1: BatchNorm<B, 2>,
+    pub bn1: BatchNorm<B>,
     pub conv2: Conv2d<B>,
-    pub bn2: BatchNorm<B, 2>,
+    pub bn2: BatchNorm<B>,
     pub downsample: Option<DownsampleStub<B>>,
 }
 
@@ -196,11 +196,11 @@ impl<B: Backend> BasicBlockStubRecord<B> {
 #[derive(Module, Debug)]
 pub struct BottleneckStub<B: Backend> {
     pub conv1: Conv2d<B>,
-    pub bn1: BatchNorm<B, 2>,
+    pub bn1: BatchNorm<B>,
     pub conv2: Conv2d<B>,
-    pub bn2: BatchNorm<B, 2>,
+    pub bn2: BatchNorm<B>,
     pub conv3: Conv2d<B>,
-    pub bn3: BatchNorm<B, 2>,
+    pub bn3: BatchNorm<B>,
     pub downsample: Option<DownsampleStub<B>>,
 }
 

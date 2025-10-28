@@ -11,15 +11,15 @@
 //! [`BottleneckBlock`] implements [`Module`], and provides
 //! [`BottleneckBlock::forward`].
 
-use crate::compat::activation_wrapper::ActivationConfig;
-use crate::compat::normalization_wrapper::NormalizationConfig;
 use crate::layers::blocks::cna::{AbstractCNA2dConfig, CNA2d, CNA2dConfig, CNA2dMeta};
 use crate::layers::drop::drop_block::{DropBlock2d, DropBlock2dConfig, DropBlockOptions};
 use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
 use crate::models::resnet::downsample::{ResNetDownsample, ResNetDownsampleConfig};
 use crate::models::resnet::util::{scalar_to_array, stride_div_output_resolution};
 use crate::utility::probability::expect_probability;
+use burn::nn::activation::ActivationConfig;
 use burn::nn::conv::Conv2dConfig;
+use burn::nn::norm::NormalizationConfig;
 use burn::nn::{BatchNormConfig, PaddingConfig2d};
 use burn::prelude::{Backend, Config, Module, Tensor};
 
@@ -464,6 +464,7 @@ impl<B: Backend> BottleneckBlock<B> {
 mod tests {
     use super::*;
     use burn::backend::NdArray;
+    use burn::nn::activation::ActivationConfig;
 
     #[test]
     fn test_basic_block_config() {

@@ -2,7 +2,6 @@
 extern crate core;
 
 use bimm::cache::disk::DiskCacheConfig;
-use bimm::compat::activation_wrapper::ActivationConfig;
 use bimm::models::resnet::{PREFAB_RESNET_MAP, ResNet};
 use bimm_firehose::burn::batcher::{
     BatcherInputAdapter, BatcherOutputAdapter, FirehoseExecutorBatcher,
@@ -24,6 +23,7 @@ use burn::backend::{Autodiff, Cuda};
 use burn::data::dataloader::{DataLoaderBuilder, Dataset};
 use burn::data::dataset::transform::ShuffledDataset;
 use burn::lr_scheduler::cosine::CosineAnnealingLrSchedulerConfig;
+use burn::nn::activation::ActivationConfig;
 use burn::nn::loss::CrossEntropyLossConfig;
 use burn::optim::AdamConfig;
 use burn::optim::decay::WeightDecayConfig;
@@ -36,7 +36,8 @@ use burn::train::metric::{
     TopKAccuracyMetric,
 };
 use burn::train::{
-    ClassificationOutput, LearnerBuilder, MetricEarlyStoppingStrategy, StoppingCondition,
+    ClassificationOutput, LearnerBuilder, LearningStrategy, MetricEarlyStoppingStrategy,
+    StoppingCondition,
 };
 use burn::train::{TrainOutput, TrainStep, ValidStep};
 use clap::{Parser, arg};
@@ -127,8 +128,8 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     type B = Autodiff<Cuda>;
 
-    let devices = vec![Default::default()];
-    backend_main::<B>(&args, devices)
+    let device = Default::default();
+    backend_main::<B>(&args, &device)
 }
 
 /// Create the artifact directory for saving training artifacts.
@@ -141,7 +142,7 @@ fn create_artifact_dir(artifact_dir: &str) {
 /// Train the model with the given configuration and devices.
 pub fn backend_main<B: AutodiffBackend>(
     args: &Args,
-    devices: Vec<B::Device>,
+    device: &B::Device,
 ) -> anyhow::Result<()> {
     let image_shape = ImageShape {
         height: 32,
@@ -149,9 +150,7 @@ pub fn backend_main<B: AutodiffBackend>(
     };
     let num_classes = 10;
 
-    B::seed(args.seed);
-
-    let device = &devices[0];
+    B::seed(device, args.seed);
 
     let prefab = PREFAB_RESNET_MAP.expect_lookup_prefab(&args.resnet_prefab);
 
@@ -210,7 +209,7 @@ pub fn backend_main<B: AutodiffBackend>(
     let train_dataloader = {
         let ds = path_scanning::image_dataset_for_folder(args.training_root.clone())?;
 
-        let ds = ShuffledDataset::with_seed(ds, args.seed);
+        let ds = ShuffledDataset::new(ds, args.seed);
         // let num_samples = (args.oversample_ratio * (ds.len() as f64)).ceil() as usize;
         // let ds = SamplerDataset::with_replacement(ds, num_samples);
         train_size = ds.len();
@@ -318,7 +317,7 @@ pub fn backend_main<B: AutodiffBackend>(
                 n_epochs: args.patience,
             },
         ))
-        .devices(devices.clone())
+        .learning_strategy(LearningStrategy::SingleDevice(device.clone()))
         .grads_accumulation(args.grads_accumulation)
         .num_epochs(args.num_epochs)
         .summary()
@@ -327,6 +326,7 @@ pub fn backend_main<B: AutodiffBackend>(
     let model_trained = learner.fit(train_dataloader, validation_dataloader);
 
     model_trained
+        .model
         .save_file(format!("{artifact_dir}/model"), &CompactRecorder::new())
         .expect("Trained model should be saved successfully");
 

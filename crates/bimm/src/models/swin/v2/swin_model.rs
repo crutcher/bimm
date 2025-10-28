@@ -517,7 +517,7 @@ impl<B: Backend> SwinTransformerV2<B> {
         let x = input.swap_dims(1, 2);
         let x = self.head_avgpool.forward(x);
         // B C 1
-        x.squeeze(2)
+        x.squeeze_dim::<2>(2)
         // B C
     }
 
