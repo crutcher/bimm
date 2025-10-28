@@ -11,9 +11,9 @@ workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
-bimm = { version = "0.19.0", path = "../../crates/bimm" }
+bimm = { version = "0.19.1", path = "../../crates/bimm" }
 
-burn = { workspace = true, features = ["network", "train", "autodiff", "vision", "cuda"] }
+burn = { workspace = true, features = ["network", "train", "autodiff", "vision"] }
 
 clap = { workspace = true, features = ["derive"] }
 
@@ -24,7 +24,9 @@ rand = { workspace = true }
 serde = { workspace = true, features = ["std", "derive"] }
 tar = { workspace = true }
 
-
 [features]
 default = []
+wgpu = ["burn/wgpu"]
+cuda = ["burn/cuda"]
+metal = ["burn/metal"]
 

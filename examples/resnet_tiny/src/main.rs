@@ -19,7 +19,7 @@ use bimm_firehose_image::augmentation::orientation::flip::HorizontalFlipStage;
 use bimm_firehose_image::burn_support::{ImageToTensorData, stack_tensor_data_column};
 use bimm_firehose_image::loader::{ImageLoader, ResizeSpec};
 use bimm_firehose_image::{ColorType, ImageShape};
-use burn::backend::{Autodiff, Cuda};
+use burn::backend::Autodiff;
 use burn::data::dataloader::{DataLoaderBuilder, Dataset};
 use burn::data::dataset::transform::ShuffledDataset;
 use burn::lr_scheduler::cosine::CosineAnnealingLrSchedulerConfig;
@@ -126,10 +126,15 @@ pub struct Args {
 
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
-    type B = Autodiff<Cuda>;
 
-    let device = Default::default();
-    backend_main::<B>(&args, &device)
+    #[cfg(feature = "wgpu")]
+    return backend_main::<Autodiff<burn::backend::Wgpu>>(&args);
+
+    #[cfg(feature = "cuda")]
+    return backend_main::<Autodiff<burn::backend::Cuda>>(&args);
+
+    #[cfg(feature = "metal")]
+    return backend_main::<Autodiff<burn::backend::Metal>>(&args);
 }
 
 /// Create the artifact directory for saving training artifacts.
@@ -140,17 +145,16 @@ fn create_artifact_dir(artifact_dir: &str) {
 }
 
 /// Train the model with the given configuration and devices.
-pub fn backend_main<B: AutodiffBackend>(
-    args: &Args,
-    device: &B::Device,
-) -> anyhow::Result<()> {
+pub fn backend_main<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
+    let device: B::Device = Default::default();
+
     let image_shape = ImageShape {
         height: 32,
         width: 32,
     };
     let num_classes = 10;
 
-    B::seed(device, args.seed);
+    B::seed(&device, args.seed);
 
     let prefab = PREFAB_RESNET_MAP.expect_lookup_prefab(&args.resnet_prefab);
 
@@ -159,7 +163,7 @@ pub fn backend_main<B: AutodiffBackend>(
         .with_activation(ActivationConfig::Gelu)
         .to_structure();
 
-    let resnet: ResNet<B> = resnet_config.init(device);
+    let resnet: ResNet<B> = resnet_config.init(&device);
 
     let resnet: ResNet<B> = match &args.resnet_pretrained {
         Some(pretrained) => {

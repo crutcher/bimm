@@ -9,7 +9,7 @@ use crate::data::{ClassificationBatch, ClassificationBatcher};
 use crate::dataset::{CLASSES, PlanetLoader, download};
 use bimm::cache::disk::DiskCacheConfig;
 use bimm::models::resnet::{PREFAB_RESNET_MAP, ResNet, ResNetContractConfig};
-use burn::backend::{Autodiff, Cuda};
+use burn::backend::Autodiff;
 use burn::config::Config;
 use burn::data::dataloader::DataLoaderBuilder;
 use burn::data::dataset::transform::ShuffledDataset;
@@ -150,21 +150,26 @@ fn main() -> anyhow::Result<()> {
 
     let _source_tree = download();
 
-    let device = Default::default();
-    train::<Autodiff<Cuda>>(&args, &device)
+    #[cfg(feature = "wgpu")]
+    return train::<Autodiff<burn::backend::Wgpu>>(&args);
+
+    #[cfg(feature = "cuda")]
+    return train::<Autodiff<burn::backend::Cuda>>(&args);
+
+    #[cfg(feature = "metal")]
+    return train::<Autodiff<burn::backend::Metal>>(&args);
 }
 
 #[must_use]
-pub fn train<B: AutodiffBackend>(
-    args: &Args,
-    device: &B::Device,
-) -> anyhow::Result<()> {
+pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
+    let device: B::Device = Default::default();
+
     // Remove existing artifacts before to get an accurate learner summary
     let artifact_dir: &str = args.artifact_dir.as_ref();
     std::fs::remove_dir_all(artifact_dir);
     std::fs::create_dir_all(artifact_dir).expect("Failed to create artifacts directory");
 
-    B::seed(device, args.seed);
+    B::seed(&device, args.seed);
 
     let disk_cache = DiskCacheConfig::default();
 
@@ -180,7 +185,7 @@ pub fn train<B: AutodiffBackend>(
     let model: ResNet<B> = resnet_config
         .clone()
         .to_structure()
-        .init(device)
+        .init(&device)
         .load_pytorch_weights(weights)
         .expect("Failed to load pretrained weights")
         .with_classes(CLASSES.len())

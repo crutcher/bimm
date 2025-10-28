@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" focusToolWindowBeforeRun="true">
     <option name="buildProfileId" value="test" />
-    <option name="command" value="test" />
+    <option name="command" value="test --features wgpu" />
     <option name="workingDirectory" value="file://$PROJECT_DIR$" />
     <envs>
       <env name="CINIC10_PATH" value="/media/Data/CINIC-10" />

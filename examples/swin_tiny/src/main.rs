@@ -19,7 +19,7 @@ use bimm_firehose_image::augmentation::orientation::flip::HorizontalFlipStage;
 use bimm_firehose_image::burn_support::{ImageToTensorData, stack_tensor_data_column};
 use bimm_firehose_image::loader::{ImageLoader, ResizeSpec};
 use bimm_firehose_image::{ColorType, ImageShape};
-use burn::backend::{Autodiff, Cuda};
+use burn::backend::Autodiff;
 use burn::config::Config;
 use burn::data::dataloader::{DataLoaderBuilder, Dataset};
 use burn::data::dataset::transform::SamplerDataset;
@@ -111,10 +111,15 @@ pub struct TrainingConfig {
 
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
-    type B = Autodiff<Cuda>;
 
-    let device = Default::default();
-    backend_main::<B>(&args, &device)
+    #[cfg(feature = "wgpu")]
+    return backend_main::<Autodiff<burn::backend::Wgpu>>(&args);
+
+    #[cfg(feature = "cuda")]
+    return backend_main::<Autodiff<burn::backend::Cuda>>(&args);
+
+    #[cfg(feature = "metal")]
+    return backend_main::<Autodiff<burn::backend::Metal>>(&args);
 }
 
 /// Create the artifact directory for saving training artifacts.
@@ -125,10 +130,9 @@ fn create_artifact_dir(artifact_dir: &str) {
 }
 
 /// Train the model with the given configuration and devices.
-pub fn backend_main<B: AutodiffBackend>(
-    args: &Args,
-    device: &B::Device,
-) -> anyhow::Result<()> {
+pub fn backend_main<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
+    let device: B::Device = Default::default();
+
     let h: usize = 32;
     let w: usize = 32;
     let image_dimensions = [h, w];
@@ -151,7 +155,7 @@ pub fn backend_main<B: AutodiffBackend>(
     .with_attn_drop_rate(0.2)
     .with_drop_rate(0.2);
 
-    B::seed(device, args.seed);
+    B::seed(&device, args.seed);
 
     let training_config = TrainingConfig::new(
         ModelConfig {
@@ -310,7 +314,7 @@ pub fn backend_main<B: AutodiffBackend>(
         .num_epochs(args.num_epochs)
         .summary()
         .build(
-            training_config.model.init::<B>(device),
+            training_config.model.init::<B>(&device),
             training_config.optimizer.init(),
             lr_scheduler,
         );

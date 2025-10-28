@@ -411,7 +411,7 @@ mod tests {
         let output = block.forward(input);
 
         assert_shape_contract!(
-            ["batch", "out_channels", "out_height", "out_width"],
+            ["batch", "out_planes", "out_height", "out_width"],
             &output,
             &[
                 ("batch", batch_size),
