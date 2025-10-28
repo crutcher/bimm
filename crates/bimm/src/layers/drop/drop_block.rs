@@ -6,7 +6,6 @@
 use crate::layers::drop::size_config::SizeConfig;
 use crate::utility::burn::kernels;
 use crate::utility::burn::noise::NoiseConfig;
-use crate::utility::burn::shape::shape_to_ranges;
 use crate::utility::probability::expect_probability;
 use bimm_contracts::unpack_shape_contract;
 use burn::config::Config;
@@ -15,6 +14,7 @@ use burn::prelude::{Backend, Float, Tensor};
 use burn::tensor::module::max_pool2d;
 use burn::tensor::{DType, Distribution};
 use serde::{Deserialize, Serialize};
+use std::ops::Range;
 
 /// Configuration for `DropBlock`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -308,7 +308,7 @@ fn drop_block_2d_drop_filter_<B: Backend>(
 
     // Clip even-kernel padding artifacts.
     if (kh % 2) == 0 || (kw % 2) == 0 {
-        let mut ranges = shape_to_ranges::<4>(selection.shape());
+        let mut ranges: [Range<usize>; 4] = selection.shape().into_ranges().try_into().unwrap();
         ranges[2].start = ((kh % 2) == 0) as usize;
         ranges[3].start = ((kw % 2) == 0) as usize;
 
