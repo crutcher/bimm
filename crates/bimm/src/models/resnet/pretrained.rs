@@ -44,18 +44,36 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
                 items: &[
                     &StaticPretrainedWeightsDescriptor {
                         name: "tv_in1k",
-                        description: "ResNet18 pretrained on ImageNet",
+                        description: "ResNet-18 pretrained on ImageNet",
                         license: Some("bsd-3-clause"),
                         origin: Some("https://github.com/pytorch/vision"),
                         urls: &["https://download.pytorch.org/models/resnet18-f37072fd.pth"],
                     },
                     &StaticPretrainedWeightsDescriptor {
                         name: "a1_in1k",
-                        description: "ResNet18 pretrained on ImageNet",
+                        description: "ResNet-18 pretrained on ImageNet",
                         license: None,
                         origin: Some("https://github.com/huggingface/pytorch-image-models"),
                         urls: &[
                             "https://github.com/huggingface/pytorch-image-models/releases/download/v0.1-rsb-weights/resnet18_a1_0-d63eafa0.pth",
+                        ],
+                    },
+                    &StaticPretrainedWeightsDescriptor {
+                        name: "a2_in1k",
+                        description: "ResNet-18 pretrained on ImageNet",
+                        license: None,
+                        origin: Some("https://github.com/huggingface/pytorch-image-models"),
+                        urls: &[
+                            "https://github.com/huggingface/pytorch-image-models/releases/download/v0.1-rsb-weights/resnet18_a2_0-b61bd467.pth",
+                        ],
+                    },
+                    &StaticPretrainedWeightsDescriptor {
+                        name: "a3_in1k",
+                        description: "ResNet-18 pretrained on ImageNet",
+                        license: None,
+                        origin: Some("https://github.com/huggingface/pytorch-image-models"),
+                        urls: &[
+                            "https://github.com/huggingface/pytorch-image-models/releases/download/v0.1-rsb-weights/resnet18_a3_0-40c531c8.pth",
                         ],
                     },
                 ],
@@ -67,13 +85,59 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
             builder: || ResNetContractConfig::new([3, 4, 6, 3], 1000),
 
             weights: Some(&StaticPretrainedWeightsMap {
-                items: &[&StaticPretrainedWeightsDescriptor {
-                    name: "tv_in1k",
-                    description: "ResNet-34 pretrained on ImageNet",
-                    license: Some("bsd-3-clause"),
-                    origin: Some("https://github.com/pytorch/vision"),
-                    urls: &["https://download.pytorch.org/models/resnet34-b627a593.pth"],
-                }],
+                items: &[
+                    &StaticPretrainedWeightsDescriptor {
+                        name: "tv_in1k",
+                        description: "ResNet-34 pretrained on ImageNet",
+                        license: Some("bsd-3-clause"),
+                        origin: Some("https://github.com/pytorch/vision"),
+                        urls: &["https://download.pytorch.org/models/resnet34-b627a593.pth"],
+                    },
+                    &StaticPretrainedWeightsDescriptor {
+                        name: "a1_in1k",
+                        description: "ResNet-34 pretrained on ImageNet",
+                        license: None,
+                        origin: Some(
+                            "https://github.com/huggingface/pytorch-image-models/releases",
+                        ),
+                        urls: &[
+                            "https://github.com/huggingface/pytorch-image-models/releases/download/v0.1-rsb-weights/resnet34_a1_0-46f8f793.pth",
+                        ],
+                    },
+                    &StaticPretrainedWeightsDescriptor {
+                        name: "a2_in1k",
+                        description: "ResNet-34 pretrained on ImageNet",
+                        license: None,
+                        origin: Some(
+                            "https://github.com/huggingface/pytorch-image-models/releases",
+                        ),
+                        urls: &[
+                            "https://github.com/huggingface/pytorch-image-models/releases/download/v0.1-rsb-weights/resnet34_a2_0-82d47d71.pth",
+                        ],
+                    },
+                    &StaticPretrainedWeightsDescriptor {
+                        name: "a3_in1k",
+                        description: "ResNet-34 pretrained on ImageNet",
+                        license: None,
+                        origin: Some(
+                            "https://github.com/huggingface/pytorch-image-models/releases",
+                        ),
+                        urls: &[
+                            "https://github.com/huggingface/pytorch-image-models/releases/download/v0.1-rsb-weights/resnet34_a3_0-a20cabb6.pth",
+                        ],
+                    },
+                    &StaticPretrainedWeightsDescriptor {
+                        name: "bt_in1k",
+                        description: "ResNet-34 pretrained on ImageNet",
+                        license: None,
+                        origin: Some(
+                            "https://github.com/huggingface/pytorch-image-models/releases",
+                        ),
+                        urls: &[
+                            "https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-weights/resnet34-43635321.pth",
+                        ],
+                    },
+                ],
             }),
         },
         &StaticPreFabConfig {
@@ -84,8 +148,7 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
             weights: Some(&StaticPretrainedWeightsMap {
                 items: &[
                     /*
-                    FIXME: The loaded weights have a downsample that the config does not have.
-                    DeserializeError("Candle Tensor error: invalid Zip archive: Could not find central directory end")
+                    // ERROR: Some<Downsample> stub cannot be applied to None
                     &StaticPretrainedWeightsDescriptor {
                         name: "tv_in1k",
                         description: "ResNet-50 pretrained on ImageNet",
@@ -100,15 +163,30 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
                         origin: Some("https://github.com/pytorch/vision"),
                         urls: &["https://download.pytorch.org/models/resnet50-11ad3fa6.pth"],
                     },
-                    */
+                     */
                 ],
             }),
         },
         &StaticPreFabConfig {
             name: "resnet101",
             description: "ResNet-101 [3, 4, 23, 3] Bottleneck",
-            builder: || ResNetContractConfig::new([3, 4, 6, 3], 1000).with_bottleneck(true),
-            weights: None,
+            builder: || ResNetContractConfig::new([3, 4, 23, 3], 1000).with_bottleneck(true),
+            weights: Some(&StaticPretrainedWeightsMap {
+                items: &[
+                    /*
+                    // ERROR: Some<Downsample> stub cannot be applied to None
+                    &StaticPretrainedWeightsDescriptor {
+                        name: "a1_in1k",
+                        description: "ResNet-101 pretrained on ImageNet",
+                        license: None,
+                        origin: Some("https://github.com/huggingface/pytorch-image-models/releases"),
+                        urls: &[
+                            "https://github.com/huggingface/pytorch-image-models/releases/download/v0.1-rsb-weights/resnet101_a1_0-cdcb52a9.pth",
+                        ],
+                    }
+                */
+                ],
+            }),
         },
     ],
 };
