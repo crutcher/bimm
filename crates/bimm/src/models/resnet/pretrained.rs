@@ -163,6 +163,17 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
                         origin: Some("https://github.com/pytorch/vision"),
                         urls: &["https://download.pytorch.org/models/resnet50-11ad3fa6.pth"],
                     },
+                    &StaticPretrainedWeightsDescriptor {
+                        name: "a1_in1k",
+                        description: "ResNet-50 pretrained on ImageNet",
+                        license: Some("bsd-3-clause"),
+                        origin: Some(
+                            "https://github.com/huggingface/pytorch-image-models/releases",
+                        ),
+                        urls: &[
+                            "https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-rsb-weights/resnet50_a1_0-14fe96d1.pth",
+                        ],
+                    },
                      */
                 ],
             }),
