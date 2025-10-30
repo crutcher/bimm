@@ -16,6 +16,9 @@ cargo run --release -p resnet_finetune
 This will list all available pretrained models:
 
 ```terminaloutput
-$ cargo run --release -p resnet_finetune -- --model list
-
+$ cargo run --release -p resnet_finetune -- --pretrained list
+Available pretrained models:
+- "resnet18.tv_in1k": ResNet18 pretrained on ImageNet
+- "resnet18.a1_in1k": ResNet18 pretrained on ImageNet
+- "resnet34.tv_in1k": ResNet-34 pretrained on ImageNet
 ```
