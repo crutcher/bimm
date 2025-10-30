@@ -93,7 +93,7 @@ pub struct Args {
     /// Pretrained Resnet Model.
     /// Use "list" to list all available pretrained models.
     #[arg(long, default_value = "resnet34.tv_in1k")]
-    resnet_pretrained: String,
+    pretrained: String,
 
     /// Drop Block Prob
     #[arg(long, default_value = "0.2")]
@@ -162,7 +162,7 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     let device: B::Device = Default::default();
 
     // TODO: lift to clap parser.
-    if args.resnet_pretrained == "list" {
+    if args.pretrained == "list" {
         println!("Available pretrained models:");
         for prefab in PREFAB_RESNET_MAP.items {
             if let Some(weights) = prefab.weights {
@@ -174,7 +174,7 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         return Ok(());
     }
     let [resnet_prefab, resnet_pretrained] = args
-        .resnet_pretrained
+        .pretrained
         .splitn(2, ".")
         .map(|s| s.to_string())
         .collect::<Vec<String>>()
