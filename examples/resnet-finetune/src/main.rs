@@ -170,7 +170,10 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
             println!("{cfg:?}");
             if let Some(weights) = prefab.weights {
                 for item in weights.items {
-                    println!("  - \"{}.{}\"", prefab.name, item.name);
+                    println!(
+                        "  - \"{}.{}\": {}",
+                        prefab.name, item.name, item.description
+                    );
                 }
             }
         }
