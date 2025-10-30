@@ -49,8 +49,6 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
                         origin: Some("https://github.com/pytorch/vision"),
                         urls: &["https://download.pytorch.org/models/resnet18-f37072fd.pth"],
                     },
-                    /*
-                    DeserializeError("Candle Tensor error: invalid Zip archive: Could not find central directory end")
                     &StaticPretrainedWeightsDescriptor {
                         name: "a1_in1k",
                         description: "ResNet18 pretrained on ImageNet",
@@ -60,7 +58,6 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
                             "https://github.com/huggingface/pytorch-image-models/releases/download/v0.1-rsb-weights/resnet18_a1_0-d63eafa0.pth",
                         ],
                     },
-                    */
                 ],
             }),
         },
