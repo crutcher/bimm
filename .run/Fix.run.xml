@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Fix" type="CargoCommandRunConfiguration" factoryName="Cargo Command" focusToolWindowBeforeRun="true">
     <option name="buildProfileId" value="test" />
-    <option name="command" value="clippy --fix --allow-dirty --allow-staged --features wgpu" />
+    <option name="command" value="clippy --fix --allow-dirty --allow-staged --features cuda" />
     <option name="workingDirectory" value="file://$PROJECT_DIR$" />
     <envs>
       <env name="CINIC10_PATH" value="$CINIC10_PATH$" />

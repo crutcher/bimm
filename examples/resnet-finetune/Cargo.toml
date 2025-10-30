@@ -15,6 +15,9 @@ bimm = { version = "0.19.1", path = "../../crates/bimm" }
 
 burn = { workspace = true, features = ["train", "fusion", "autotune", "network", "vision"] }
 
+# Bug in burn/cuda deps; pinned to force "nvrtc" for cudarc:
+cudarc = { workspace = true, features = ["nvrtc"], optional = true }
+
 clap = { workspace = true, features = ["derive"] }
 
 # Dataset files

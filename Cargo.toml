@@ -28,6 +28,10 @@ burn = "^0.19.0"
 burn-import = "^0.19.0"
 dirs = "^6.0.0"
 
+# Bug in burn/cuda deps; pinned to force "nvrtc" for cudarc:
+# > cudarc = { workspace = true, features = ["nvrtc"], optional = true }
+cudarc = "0.16.6"
+
 bimm-contracts = "^0.19.0"
 
 # Burn coupled-dependencies

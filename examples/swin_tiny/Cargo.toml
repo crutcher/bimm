@@ -17,6 +17,9 @@ bimm-firehose-image = { version = "0.19.1", path = "../../crates/bimm-firehose-i
 burn = { workspace = true, features = ["train", "fusion", "autotune", "vision", "dataset"] }
 serde = { workspace = true, features = ["derive"] }
 
+# Bug in burn/cuda deps; pinned to force "nvrtc" for cudarc:
+cudarc = { workspace = true, features = ["nvrtc"], optional = true }
+
 clap = { workspace = true, features = ["derive"] }
 
 rand = { workspace = true }
