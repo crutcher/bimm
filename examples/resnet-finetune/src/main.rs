@@ -166,6 +166,10 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         println!("Available pretrained models:");
         for prefab in PREFAB_RESNET_MAP.items {
             if let Some(weights) = prefab.weights {
+                if weights.items.is_empty() {
+                    continue;
+                }
+
                 let cfg = (prefab.builder)();
                 println!("* \"{}\"", prefab.name);
                 println!("{cfg:?}");
