@@ -44,14 +44,14 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
                 items: &[
                     &StaticPretrainedWeightsDescriptor {
                         name: "tv_in1k",
-                        description: "ResNet-18 pretrained on ImageNet",
+                        description: "TorchVision ResNet-18",
                         license: Some("bsd-3-clause"),
                         origin: Some("https://github.com/pytorch/vision"),
                         urls: &["https://download.pytorch.org/models/resnet18-f37072fd.pth"],
                     },
                     &StaticPretrainedWeightsDescriptor {
                         name: "a1_in1k",
-                        description: "ResNet-18 pretrained on ImageNet",
+                        description: "RSB Paper ResNet-18 a1",
                         license: None,
                         origin: Some("https://github.com/huggingface/pytorch-image-models"),
                         urls: &[
@@ -60,7 +60,7 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
                     },
                     &StaticPretrainedWeightsDescriptor {
                         name: "a2_in1k",
-                        description: "ResNet-18 pretrained on ImageNet",
+                        description: "RSB Paper ResNet-18 a2",
                         license: None,
                         origin: Some("https://github.com/huggingface/pytorch-image-models"),
                         urls: &[
@@ -69,7 +69,7 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
                     },
                     &StaticPretrainedWeightsDescriptor {
                         name: "a3_in1k",
-                        description: "ResNet-18 pretrained on ImageNet",
+                        description: "RSB Paper ResNet-18 a3",
                         license: None,
                         origin: Some("https://github.com/huggingface/pytorch-image-models"),
                         urls: &[
@@ -88,14 +88,14 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
                 items: &[
                     &StaticPretrainedWeightsDescriptor {
                         name: "tv_in1k",
-                        description: "ResNet-34 pretrained on ImageNet",
+                        description: "TorchVision ResNet-34",
                         license: Some("bsd-3-clause"),
                         origin: Some("https://github.com/pytorch/vision"),
                         urls: &["https://download.pytorch.org/models/resnet34-b627a593.pth"],
                     },
                     &StaticPretrainedWeightsDescriptor {
                         name: "a1_in1k",
-                        description: "ResNet-34 pretrained on ImageNet",
+                        description: "RSB Paper ResNet-32 a1",
                         license: None,
                         origin: Some(
                             "https://github.com/huggingface/pytorch-image-models/releases",
@@ -106,7 +106,7 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
                     },
                     &StaticPretrainedWeightsDescriptor {
                         name: "a2_in1k",
-                        description: "ResNet-34 pretrained on ImageNet",
+                        description: "RSB Paper ResNet-32 a2",
                         license: None,
                         origin: Some(
                             "https://github.com/huggingface/pytorch-image-models/releases",
@@ -117,7 +117,7 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
                     },
                     &StaticPretrainedWeightsDescriptor {
                         name: "a3_in1k",
-                        description: "ResNet-34 pretrained on ImageNet",
+                        description: "RSB Paper ResNet-32 a3",
                         license: None,
                         origin: Some(
                             "https://github.com/huggingface/pytorch-image-models/releases",
@@ -151,7 +151,7 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
                     // ERROR: Some<Downsample> stub cannot be applied to None
                     &StaticPretrainedWeightsDescriptor {
                         name: "tv_in1k",
-                        description: "ResNet-50 pretrained on ImageNet",
+                        description: "TorchVision ResNet-50",
                         license: Some("bsd-3-clause"),
                         origin: Some("https://github.com/pytorch/vision"),
                         urls: &["https://download.pytorch.org/models/resnet50-0676ba61.pth"],
