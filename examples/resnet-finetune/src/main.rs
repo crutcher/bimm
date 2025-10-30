@@ -90,12 +90,9 @@ pub struct Args {
     #[arg(long, default_value = "60")]
     num_epochs: usize,
 
-    /// Resnet Model Config
-    #[arg(long, default_value = "resnet34")]
-    resnet_prefab: String,
-
-    /// Resnet Pretrained
-    #[arg(long, default_value = "tv_in1k")]
+    /// Pretrained Resnet Model.
+    /// Use "list" to list all available pretrained models.
+    #[arg(long, default_value = "resnet34.tv_in1k")]
     resnet_pretrained: String,
 
     /// Drop Block Prob
@@ -164,6 +161,26 @@ fn main() -> anyhow::Result<()> {
 pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     let device: B::Device = Default::default();
 
+    // TODO: lift to clap parser.
+    if args.resnet_pretrained == "list" {
+        println!("Available pretrained models:");
+        for prefab in PREFAB_RESNET_MAP.items {
+            if let Some(weights) = prefab.weights {
+                for item in weights.items {
+                    println!("- \"{}.{}\": {}", prefab.name, item.name, item.description);
+                }
+            }
+        }
+        return Ok(());
+    }
+    let [resnet_prefab, resnet_pretrained] = args
+        .resnet_pretrained
+        .splitn(2, ".")
+        .map(|s| s.to_string())
+        .collect::<Vec<String>>()
+        .try_into()
+        .unwrap();
+
     // Remove existing artifacts before to get an accurate learner summary
     let artifact_dir: &str = args.artifact_dir.as_ref();
     std::fs::remove_dir_all(artifact_dir);
@@ -173,10 +190,10 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
 
     let disk_cache = DiskCacheConfig::default();
 
-    let prefab = PREFAB_RESNET_MAP.expect_lookup_prefab(&args.resnet_prefab);
+    let prefab = PREFAB_RESNET_MAP.expect_lookup_prefab(&resnet_prefab);
 
     let weights = prefab
-        .expect_lookup_pretrained_weights(&args.resnet_pretrained)
+        .expect_lookup_pretrained_weights(&resnet_pretrained)
         .fetch_weights(&disk_cache)
         .expect("Failed to fetch pretrained weights");
 
@@ -201,8 +218,8 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         train_percentage: args.train_percentage,
         batch_size: args.batch_size,
         num_epochs: args.num_epochs,
-        resnet_prefab: args.resnet_prefab.clone(),
-        resnet_pretrained: args.resnet_pretrained.clone(),
+        resnet_prefab: resnet_prefab.clone(),
+        resnet_pretrained: resnet_pretrained.clone(),
         drop_block_prob: args.drop_block_prob,
         drop_path_prob: args.drop_path_prob,
         learning_rate: args.learning_rate,
