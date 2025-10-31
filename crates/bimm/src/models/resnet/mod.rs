@@ -71,7 +71,7 @@
 //! * block attention
 
 pub mod basic_block;
-pub mod bottleneck;
+pub mod bottleneck_block;
 pub mod downsample;
 pub mod layer_block;
 pub mod pretrained;

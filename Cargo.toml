@@ -32,7 +32,7 @@ dirs = "^6.0.0"
 # > cudarc = { workspace = true, features = ["nvrtc"], optional = true }
 cudarc = "0.16.6"
 
-bimm-contracts = "^0.19.0"
+bimm-contracts = "^0.19.1"
 
 # Burn coupled-dependencies
 globwalk = "^0.9.1"

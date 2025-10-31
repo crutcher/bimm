@@ -15,6 +15,7 @@ use burn::data::dataloader::DataLoaderBuilder;
 use burn::data::dataset::transform::ShuffledDataset;
 use burn::data::dataset::vision::ImageFolderDataset;
 use burn::module::Module;
+use burn::nn::PReluConfig;
 use burn::nn::activation::ActivationConfig;
 use burn::nn::loss::BinaryCrossEntropyLossConfig;
 use burn::optim::AdamConfig;
@@ -208,7 +209,9 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .fetch_weights(&disk_cache)
         .expect("Failed to fetch pretrained weights");
 
-    let resnet_config = prefab.to_config().with_activation(ActivationConfig::Gelu);
+    let resnet_config = prefab
+        .to_config()
+        .with_activation(ActivationConfig::PRelu(PReluConfig::new()));
 
     let model: ResNet<B> = resnet_config
         .clone()

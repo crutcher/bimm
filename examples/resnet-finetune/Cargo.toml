@@ -25,6 +25,7 @@ csv = { workspace = true }
 flate2 = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true, features = ["std", "derive"] }
+serde_json = { workspace = true }
 tar = { workspace = true }
 
 [features]

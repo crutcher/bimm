@@ -38,7 +38,7 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
         &StaticPreFabConfig {
             name: "resnet18",
             description: "ResNet-18 [2, 2, 2, 2] BasicBlocks",
-            builder: || ResNetContractConfig::new([2, 2, 2, 2], 1000),
+            builder: || ResNetContractConfig::new(vec![2, 2, 2, 2], 1000),
 
             weights: Some(&StaticPretrainedWeightsMap {
                 items: &[
@@ -82,7 +82,7 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
         &StaticPreFabConfig {
             name: "resnet34",
             description: "ResNet-34 [3, 4, 6, 3] BasicBlocks",
-            builder: || ResNetContractConfig::new([3, 4, 6, 3], 1000),
+            builder: || ResNetContractConfig::new(vec![3, 4, 6, 3], 1000),
 
             weights: Some(&StaticPretrainedWeightsMap {
                 items: &[
@@ -143,12 +143,10 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
         &StaticPreFabConfig {
             name: "resnet50",
             description: "ResNet-50 [3, 4, 6, 3] Bottleneck",
-            builder: || ResNetContractConfig::new([3, 4, 6, 3], 1000).with_bottleneck(true),
+            builder: || ResNetContractConfig::new(vec![3, 4, 6, 3], 1000).with_bottleneck(true),
 
             weights: Some(&StaticPretrainedWeightsMap {
                 items: &[
-                    /*
-                    // ERROR: Some<Downsample> stub cannot be applied to None
                     &StaticPretrainedWeightsDescriptor {
                         name: "tv_in1k",
                         description: "TorchVision ResNet-50",
@@ -156,6 +154,8 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
                         origin: Some("https://github.com/pytorch/vision"),
                         urls: &["https://download.pytorch.org/models/resnet50-0676ba61.pth"],
                     },
+                    /*
+                    // ERROR: Some<Downsample> stub cannot be applied to None
                     &StaticPretrainedWeightsDescriptor {
                         name: "tv_in2k",
                         description: "ResNet-50 pretrained on ImageNet",
@@ -181,7 +181,7 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
         &StaticPreFabConfig {
             name: "resnet101",
             description: "ResNet-101 [3, 4, 23, 3] Bottleneck",
-            builder: || ResNetContractConfig::new([3, 4, 23, 3], 1000).with_bottleneck(true),
+            builder: || ResNetContractConfig::new(vec![3, 4, 23, 3], 1000).with_bottleneck(true),
             weights: Some(&StaticPretrainedWeightsMap {
                 items: &[
                     /*
