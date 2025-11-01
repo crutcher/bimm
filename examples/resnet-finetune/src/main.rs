@@ -83,6 +83,10 @@ pub struct Args {
     #[arg(short, long, default_value_t = 8)]
     grads_accumulation: usize,
 
+    /// Category smoothing factor for training.
+    #[arg(long, default_value = "0.1")]
+    smoothing: Option<f32>,
+
     /// Number of workers for data loading.
     #[arg(long, default_value = "4")]
     num_workers: usize,
@@ -209,9 +213,7 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .fetch_weights(&disk_cache)
         .expect("Failed to fetch pretrained weights");
 
-    let resnet_config = prefab
-        .to_config()
-        .with_activation(ActivationConfig::PRelu(PReluConfig::new()));
+    let resnet_config = prefab.to_config().with_activation(ActivationConfig::Gelu);
 
     let model: ResNet<B> = resnet_config
         .clone()
@@ -222,6 +224,11 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .with_classes(CLASSES.len())
         .with_stochastic_drop_block(args.drop_block_prob)
         .with_stochastic_path_depth(args.drop_path_prob);
+
+    let host: Host<B> = Host {
+        smoothing: args.smoothing,
+        resnet: model,
+    };
 
     let optimizer = AdamConfig::new()
         .with_weight_decay(Some(WeightDecayConfig::new(args.weight_decay)))
@@ -282,7 +289,7 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .grads_accumulation(args.grads_accumulation)
         .num_epochs(args.num_epochs)
         .summary()
-        .build(model, optimizer, args.learning_rate);
+        .build(host, optimizer, args.learning_rate);
 
     // Training
     let now = Instant::now();
@@ -292,10 +299,18 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
 
     model_trained
         .model
+        .resnet
         .save_file(format!("{artifact_dir}/model"), &CompactRecorder::new())
         .expect("Trained model should be saved successfully");
 
     Ok(())
+}
+
+#[derive(Module, Debug)]
+pub struct Host<B: Backend> {
+    pub smoothing: Option<f32>,
+
+    pub resnet: ResNet<B>,
 }
 
 pub trait MultiLabelClassification<B: Backend> {
@@ -306,15 +321,21 @@ pub trait MultiLabelClassification<B: Backend> {
     ) -> MultiLabelClassificationOutput<B>;
 }
 
-impl<B: Backend> MultiLabelClassification<B> for ResNet<B> {
+impl<B: Backend> MultiLabelClassification<B> for Host<B> {
     fn forward_classification(
         &self,
         images: Tensor<B, 4>,
         targets: Tensor<B, 2, Int>,
     ) -> MultiLabelClassificationOutput<B> {
-        let output = self.forward(images);
-        let loss = BinaryCrossEntropyLossConfig::new()
-            .with_logits(true)
+        let output = self.resnet.forward(images);
+
+        let mut loss_cfg = BinaryCrossEntropyLossConfig::new().with_logits(true);
+
+        if B::ad_enabled() {
+            loss_cfg = loss_cfg.with_smoothing(self.smoothing);
+        }
+
+        let loss = loss_cfg
             .init(&output.device())
             .forward(output.clone(), targets.clone());
 
@@ -323,7 +344,7 @@ impl<B: Backend> MultiLabelClassification<B> for ResNet<B> {
 }
 
 impl<B: AutodiffBackend> TrainStep<ClassificationBatch<B>, MultiLabelClassificationOutput<B>>
-    for ResNet<B>
+    for Host<B>
 {
     fn step(
         &self,
@@ -335,9 +356,7 @@ impl<B: AutodiffBackend> TrainStep<ClassificationBatch<B>, MultiLabelClassificat
     }
 }
 
-impl<B: Backend> ValidStep<ClassificationBatch<B>, MultiLabelClassificationOutput<B>>
-    for ResNet<B>
-{
+impl<B: Backend> ValidStep<ClassificationBatch<B>, MultiLabelClassificationOutput<B>> for Host<B> {
     fn step(
         &self,
         batch: ClassificationBatch<B>,
