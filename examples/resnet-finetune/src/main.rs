@@ -32,6 +32,7 @@ use burn::train::{
 use clap::{Parser, arg};
 use core::clone::Clone;
 use std::time::Instant;
+
 /*
 tracel-ai/models reference:
 | Split | Metric                         | Min.     | Epoch    | Max.     | Epoch    |
@@ -40,24 +41,6 @@ tracel-ai/models reference:
 | Train | Loss                           | 0.122    | 5        | 0.250    | 1        |
 | Valid | Hamming Score @ Threshold(0.5) | 88.490   | 1        | 93.843   | 3        |
 | Valid | Loss                           | 0.168    | 3        | 0.512    | 1        |
-
-resnet18
-$ --drop-path-prob=0.1 --drop-block-prob=0.2 --learning-rate=1e-4
-| Split | Metric                         | Min.     | Epoch    | Max.     | Epoch    |
-|-------|--------------------------------|----------|----------|----------|----------|
-| Train | Hamming Score @ Threshold(0.5) | 82.958   | 1        | 97.916   | 28       |
-| Train | Loss                           | 0.072    | 28       | 0.515    | 1        |
-| Valid | Hamming Score @ Threshold(0.5) | 91.765   | 1        | 95.706   | 12       |
-| Valid | Loss                           | 0.123    | 17       | 0.411    | 1        |
-
-resnet34
-$ --drop-path-prob=0.15 --drop-block-prob=0.25 --learning-rate=1e-5
-| Split | Metric                         | Min.     | Epoch    | Max.     | Epoch    |
-|-------|--------------------------------|----------|----------|----------|----------|
-| Train | Hamming Score @ Threshold(0.5) | 72.588   | 1        | 96.050   | 58       |
-| Train | Loss                           | 0.132    | 58       | 0.737    | 1        |
-| Valid | Hamming Score @ Threshold(0.5) | 78.137   | 1        | 95.255   | 43       |
-| Valid | Loss                           | 0.130    | 60       | 0.691    | 1        |
  */
 
 #[derive(Parser, Debug)]
