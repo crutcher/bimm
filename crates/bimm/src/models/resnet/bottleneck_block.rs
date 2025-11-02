@@ -2,13 +2,13 @@
 //!
 //! [`BottleneckBlock`] is the bottleneck form of the core `ResNet` convolution unit.
 //!
-//! [`BottleneckBlockMeta`] defines a common meta API for [`BottleneckBlock`]
+//! [`BottleneckBlockMeta`] defines a common meta-API for [`BottleneckBlock`]
 //! and [`BottleneckBlockConfig`].
 //!
-//! [`BottleneckBlockConfig`] implements [`Config`], and provides
+//! [`BottleneckBlockConfig`] implements [`Config`] and provides
 //! [`BottleneckBlockConfig::init`] to initialize a [`BottleneckBlock`].
 //!
-//! [`BottleneckBlock`] implements [`Module`], and provides
+//! [`BottleneckBlock`] implements [`Module`] and provides
 //! [`BottleneckBlock::forward`].
 
 use crate::layers::blocks::cna::{AbstractCNA2dConfig, CNA2d, CNA2dConfig, CNA2dMeta};
@@ -343,6 +343,10 @@ impl<B: Backend> BottleneckBlockMeta for BottleneckBlock<B> {
         self.cna3.out_channels()
     }
 
+    fn pinch_factor(&self) -> usize {
+        self.pinch_factor
+    }
+
     fn dilation(&self) -> usize {
         self.cna3.conv.dilation[0]
     }
@@ -357,10 +361,6 @@ impl<B: Backend> BottleneckBlockMeta for BottleneckBlock<B> {
 
     fn reduction_factor(&self) -> usize {
         self.reduction_factor
-    }
-
-    fn pinch_factor(&self) -> usize {
-        self.pinch_factor
     }
 
     fn first_planes(&self) -> usize {

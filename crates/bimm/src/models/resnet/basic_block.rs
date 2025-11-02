@@ -2,13 +2,13 @@
 //!
 //! [`BasicBlock`] is the core `ResNet` convolution unit.
 //!
-//! [`BasicBlockMeta`] defines a common meta API for [`BasicBlock`]
+//! [`BasicBlockMeta`] defines a common meta-API for [`BasicBlock`]
 //! and [`BasicBlockConfig`].
 //!
-//! [`BasicBlockConfig`] implements [`Config`], and provides
+//! [`BasicBlockConfig`] implements [`Config`] and provides
 //! [`BasicBlockConfig::init`] to initialize a [`BasicBlock`].
 //!
-//! [`BasicBlock`] implements [`Module`], and provides
+//! [`BasicBlock`] implements [`Module`] and provides
 //! [`BasicBlock::forward`].
 
 use crate::layers::blocks::cna::{AbstractCNA2dConfig, CNA2d, CNA2dConfig, CNA2dMeta};
@@ -35,8 +35,13 @@ pub trait BasicBlockMeta {
     /// Dilation rate for conv layers.
     fn dilation(&self) -> usize;
 
-    /// Optional dilation rate for the first conv.
+    /// Optional first-dilation override.
     fn first_dilation(&self) -> Option<usize>;
+
+    /// Resolved first dilation.
+    fn effective_first_dilation(&self) -> usize {
+        self.first_dilation().unwrap_or(self.dilation())
+    }
 
     /// Control factor for `first_planes()`
     fn reduction_factor(&self) -> usize;
@@ -74,13 +79,6 @@ pub trait BasicBlockMeta {
         input_resolution: [usize; 2],
     ) -> [usize; 2] {
         stride_div_output_resolution(input_resolution, self.stride())
-    }
-
-    /// Effective first dilation.
-    ///
-    /// Resolves `first_dilation()` vrs `dilation()`.
-    fn effective_first_dilation(&self) -> usize {
-        self.first_dilation().unwrap_or(self.dilation())
     }
 }
 
@@ -174,7 +172,6 @@ impl BasicBlockConfig {
         let out_planes = self.out_planes();
 
         let first_dilation = self.effective_first_dilation();
-        let dilation = self.dilation();
 
         let stride = self.stride();
 
@@ -207,8 +204,8 @@ impl BasicBlockConfig {
 
         let cna2: CNA2dConfig = cna_builder.build_config(
             Conv2dConfig::new([first_planes, out_planes], scalar_to_array(3))
-                .with_dilation(scalar_to_array(dilation))
-                .with_padding(PaddingConfig2d::Explicit(dilation, dilation))
+                .with_dilation(scalar_to_array(self.dilation))
+                .with_padding(PaddingConfig2d::Explicit(self.dilation, self.dilation))
                 .with_bias(false),
         );
 
@@ -265,6 +262,10 @@ impl<B: Backend> BasicBlockMeta for BasicBlock<B> {
         self.cna1.in_channels()
     }
 
+    fn out_planes(&self) -> usize {
+        self.cna2.out_channels()
+    }
+
     fn dilation(&self) -> usize {
         self.cna1.conv.dilation[0]
     }
@@ -281,10 +282,6 @@ impl<B: Backend> BasicBlockMeta for BasicBlock<B> {
 
     fn first_planes(&self) -> usize {
         self.cna1.out_channels()
-    }
-
-    fn out_planes(&self) -> usize {
-        self.cna2.out_channels()
     }
 
     fn stride(&self) -> usize {
