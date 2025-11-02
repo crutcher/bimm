@@ -5312,7 +5312,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "resnet-finetune"
+name = "resnet_finetune"
 version = "0.0.0"
 dependencies = [
  "anyhow",

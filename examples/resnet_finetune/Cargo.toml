@@ -1,5 +1,5 @@
 [package]
-name = "resnet-finetune"
+name = "resnet_finetune"
 publish = false
 rust-version.workspace = true
 edition.workspace = true
