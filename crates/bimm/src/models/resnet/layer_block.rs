@@ -310,6 +310,16 @@ impl<B: Backend> LayerBlockMeta for LayerBlock<B> {
 }
 
 impl<B: Backend> LayerBlock<B> {
+    /// Debug print.
+    pub fn debug_print(&self) {
+        println!("## LayerBlock: len={}", self.len());
+        for (idx, block) in self.blocks.iter().enumerate() {
+            println!("### block[{}]:", idx);
+            block.debug_print();
+            println!();
+        }
+    }
+
     /// Apply the layer block.
     pub fn forward(
         &self,
@@ -327,7 +337,10 @@ impl<B: Backend> LayerBlock<B> {
             &[("in_planes", self.in_planes()), ("stride", self.stride())],
         );
 
-        let x = self.blocks.iter().fold(input, |x, block| block.forward(x));
+        let mut x = input;
+        for block in self.blocks.iter() {
+            x = block.forward(x);
+        }
 
         assert_shape_contract_periodically!(
             ["batch", "out_planes", "out_height", "out_width"],

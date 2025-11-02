@@ -326,6 +326,20 @@ pub struct ResNet<B: Backend> {
 }
 
 impl<B: Backend> ResNet<B> {
+    /// Debug Printout.
+    pub fn debug_print(&self) {
+        for (idx, layer) in self.layers.iter().enumerate() {
+            println!(
+                "# Stage[{idx}]/{}:: {} :> {}",
+                layer.len(),
+                layer.in_planes(),
+                layer.out_planes()
+            );
+            layer.debug_print();
+            println!();
+        }
+    }
+
     /// Forward pass.
     pub fn forward(
         &self,
@@ -337,7 +351,10 @@ impl<B: Backend> ResNet<B> {
         let x = self.input_pool.forward(x);
 
         // Residual blocks
-        let x = self.layers.iter().fold(x, |x, layer| layer.forward(x));
+        let mut x = x;
+        for layer in self.layers.iter() {
+            x = layer.forward(x);
+        }
 
         // Head
         let x = self.output_pool.forward(x);
@@ -457,11 +474,17 @@ impl<B: Backend> ResNet<B> {
             ..self
         }
     }
+
+    /// Freeze the layers.
+    pub fn freeze_layers(self) -> Self {
+        self.map_layers(|layers| layers.into_iter().map(|layer| layer.no_grad()).collect())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use burn::backend::Wgpu;
 
     #[test]
     fn test_to_layers_34_basic() {
@@ -471,17 +494,34 @@ mod tests {
 
         println!("{:#?}", layers);
 
-        assert!(false);
+        // assert!(false);
     }
 
     #[test]
     fn test_to_layers_50_bottleneck() {
-        let cfg = ResNetContractConfig::new(RESNET50_BLOCKS.to_vec(), 1000).with_bottleneck(true);
+        type B = Wgpu;
+        let device = Default::default();
 
+        let cfg = ResNetContractConfig::new(RESNET50_BLOCKS.to_vec(), 1000).with_bottleneck(true);
         let layers = cfg.to_layer_contracts();
 
-        println!("{:#?}", layers);
+        let first_stage = layers[0].clone();
+        println!("block[0] cfg:\n{:#?}", first_stage);
+        println!();
 
-        assert!(false);
+        let blocks = first_stage
+            .to_block_contracts()
+            .into_iter()
+            .map(|b| b.to_structure())
+            .collect::<Vec<_>>();
+        println!("blocks ...");
+        println!("{:#?}", blocks);
+        println!();
+
+        let model: ResNet<B> = cfg.to_structure().init(&device);
+
+        model.debug_print();
+
+        // assert!(false);
     }
 }

@@ -184,18 +184,24 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
             builder: || ResNetContractConfig::new(vec![3, 4, 23, 3], 1000).with_bottleneck(true),
             weights: Some(&StaticPretrainedWeightsMap {
                 items: &[
-                    /*
-                    // ERROR: Some<Downsample> stub cannot be applied to None
+                    &StaticPretrainedWeightsDescriptor {
+                        name: "tv_in1k",
+                        description: "TorchVision ResNet-101",
+                        license: Some("bsd-3-clause"),
+                        origin: Some("https://github.com/pytorch/vision"),
+                        urls: &["https://download.pytorch.org/models/resnet101-63fe2227.pth"],
+                    },
                     &StaticPretrainedWeightsDescriptor {
                         name: "a1_in1k",
                         description: "ResNet-101 pretrained on ImageNet",
                         license: None,
-                        origin: Some("https://github.com/huggingface/pytorch-image-models/releases"),
+                        origin: Some(
+                            "https://github.com/huggingface/pytorch-image-models/releases",
+                        ),
                         urls: &[
                             "https://github.com/huggingface/pytorch-image-models/releases/download/v0.1-rsb-weights/resnet101_a1_0-cdcb52a9.pth",
                         ],
-                    }
-                */
+                    },
                 ],
             }),
         },

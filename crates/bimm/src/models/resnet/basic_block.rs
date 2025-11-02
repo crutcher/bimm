@@ -44,13 +44,13 @@ pub trait BasicBlockMeta {
     }
 
     /// Control factor for `first_planes()`
-    fn reduction_factor(&self) -> usize;
+    fn reduce_first(&self) -> usize;
 
     /// First conv/norm layer output channels.
     ///
-    /// ``first_planes = planes // reduction_factor``
+    /// ``first_planes = planes // reduce_first``
     fn first_planes(&self) -> usize {
-        self.out_planes() / self.reduction_factor()
+        self.out_planes() / self.reduce_first()
     }
 
     /// The stride of convolution.
@@ -95,7 +95,7 @@ pub struct BasicBlockConfig {
 
     /// Control factor for `first_planes()`
     #[config(default = 1)]
-    pub reduction_factor: usize,
+    pub reduce_first: usize,
 
     /// The stride of the downsample layer.
     #[config(default = 1)]
@@ -150,8 +150,8 @@ impl BasicBlockMeta for BasicBlockConfig {
         self.first_dilation
     }
 
-    fn reduction_factor(&self) -> usize {
-        self.reduction_factor
+    fn reduce_first(&self) -> usize {
+        self.reduce_first
     }
 
     fn stride(&self) -> usize {
@@ -210,7 +210,7 @@ impl BasicBlockConfig {
         );
 
         BasicBlock {
-            reduction_factor: self.reduction_factor,
+            reduce_first: self.reduce_first,
 
             downsample: downsample.as_ref().map(|cfg| cfg.clone().init(device)),
 
@@ -240,7 +240,7 @@ impl BasicBlockConfig {
 #[derive(Module, Debug)]
 pub struct BasicBlock<B: Backend> {
     /// Reduction factor.
-    pub reduction_factor: usize,
+    pub reduce_first: usize,
 
     /// Optional `DownSample` layer; for the residual connection.
     pub downsample: Option<ResNetDownsample<B>>,
@@ -276,8 +276,8 @@ impl<B: Backend> BasicBlockMeta for BasicBlock<B> {
         if d1 == d2 { None } else { Some(d1) }
     }
 
-    fn reduction_factor(&self) -> usize {
-        self.reduction_factor
+    fn reduce_first(&self) -> usize {
+        self.reduce_first
     }
 
     fn first_planes(&self) -> usize {
@@ -290,6 +290,16 @@ impl<B: Backend> BasicBlockMeta for BasicBlock<B> {
 }
 
 impl<B: Backend> BasicBlock<B> {
+    /// Debug Print.
+    pub fn debug_print(&self) {
+        println!("#### BasicBlock");
+        if self.downsample.is_some() {
+            println!("  downsample");
+        }
+        println!("  in_planes: {}", self.in_planes());
+        println!("  out_planes: {}", self.out_planes());
+    }
+
     /// Forward Pass.
     ///
     /// # Arguments
@@ -336,7 +346,7 @@ impl<B: Backend> BasicBlock<B> {
         // #[cfg(debug_assertions)]
         //  bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &identity, &out_bindings);
 
-        let x = self.cna1.hook_forward(input, |x| match &self.drop_block {
+        let x = self.cna1.map_forward(input, |x| match &self.drop_block {
             Some(drop_block) => drop_block.forward(x),
             None => x,
         });
@@ -355,7 +365,7 @@ impl<B: Backend> BasicBlock<B> {
 
         // TODO: anti-aliasing
 
-        let x = self.cna2.hook_forward(x, |x| {
+        let x = self.cna2.map_forward(x, |x| {
             // TODO: attention
 
             let x = match &self.drop_path {

@@ -25,6 +25,10 @@ use burn::record::CompactRecorder;
 use burn::tensor::backend::{AutodiffBackend, Backend};
 use burn::train::metric::store::{Aggregate, Direction, Split};
 use burn::train::metric::{HammingScore, LossMetric};
+use burn::train::renderer::{
+    EvaluationName, EvaluationProgress, MetricState, MetricsRenderer, MetricsRendererEvaluation,
+    MetricsRendererTraining, TrainingProgress,
+};
 use burn::train::{
     LearnerBuilder, LearningStrategy, MetricEarlyStoppingStrategy, MultiLabelClassificationOutput,
     StoppingCondition, TrainOutput, TrainStep, ValidStep,
@@ -32,7 +36,6 @@ use burn::train::{
 use clap::{Parser, arg};
 use core::clone::Clone;
 use std::time::Instant;
-
 /*
 tracel-ai/models reference:
 | Split | Metric                         | Min.     | Epoch    | Max.     | Epoch    |
@@ -82,6 +85,10 @@ pub struct Args {
     /// Use "list" to list all available pretrained models.
     #[arg(long, default_value = "resnet34.tv_in1k")]
     pretrained: String,
+
+    /// Freeze the body layers during training.
+    #[arg(long, default_value = "false")]
+    freeze_layers: bool,
 
     /// Drop Block Prob
     #[arg(long, default_value = "0.2")]
@@ -198,7 +205,7 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
 
     let resnet_config = prefab.to_config().with_activation(ActivationConfig::Gelu);
 
-    let model: ResNet<B> = resnet_config
+    let mut model: ResNet<B> = resnet_config
         .clone()
         .to_structure()
         .init(&device)
@@ -207,6 +214,10 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .with_classes(CLASSES.len())
         .with_stochastic_drop_block(args.drop_block_prob)
         .with_stochastic_path_depth(args.drop_path_prob);
+
+    if args.freeze_layers {
+        model = model.freeze_layers();
+    }
 
     let host: Host<B> = Host {
         smoothing: args.smoothing,
@@ -272,6 +283,10 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .grads_accumulation(args.grads_accumulation)
         .num_epochs(args.num_epochs)
         .summary()
+        /*
+        .renderer(CustomRenderer {})
+        .with_application_logger(None)
+         */
         .build(host, optimizer, args.learning_rate);
 
     // Training
@@ -287,6 +302,58 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .expect("Trained model should be saved successfully");
 
     Ok(())
+}
+
+struct CustomRenderer {}
+
+impl MetricsRendererTraining for CustomRenderer {
+    fn update_train(
+        &mut self,
+        _state: MetricState,
+    ) {
+    }
+
+    fn update_valid(
+        &mut self,
+        _state: MetricState,
+    ) {
+    }
+
+    fn render_train(
+        &mut self,
+        item: TrainingProgress,
+    ) {
+        dbg!(item);
+    }
+
+    fn render_valid(
+        &mut self,
+        item: TrainingProgress,
+    ) {
+        dbg!(item);
+    }
+}
+
+impl MetricsRenderer for CustomRenderer {
+    fn manual_close(&mut self) {
+        // Nothing to do.
+    }
+}
+
+impl MetricsRendererEvaluation for CustomRenderer {
+    fn update_test(
+        &mut self,
+        _name: EvaluationName,
+        _state: MetricState,
+    ) {
+    }
+
+    fn render_test(
+        &mut self,
+        item: EvaluationProgress,
+    ) {
+        dbg!(item);
+    }
 }
 
 #[derive(Module, Debug)]

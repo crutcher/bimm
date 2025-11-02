@@ -279,6 +279,14 @@ impl<B: Backend> ResidualBlockMeta for ResidualBlock<B> {
 }
 
 impl<B: Backend> ResidualBlock<B> {
+    /// Debug print.
+    pub fn debug_print(&self) {
+        match self {
+            Self::Basic(block) => block.debug_print(),
+            Self::Bottleneck(block) => block.debug_print(),
+        }
+    }
+
     /// Apply the wrapped block to the input.
     ///
     /// # Arguments
