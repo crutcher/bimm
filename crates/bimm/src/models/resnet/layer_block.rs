@@ -11,10 +11,11 @@
 //! [`LayerBlock`] implements [`Module`], and provides
 //! [`LayerBlock::forward`].
 
-use crate::layers::drop::drop_block::DropBlockOptions;
-use crate::models::resnet::residual_block::{
+use super::bottleneck_block::BottleneckPolicyConfig;
+use super::residual_block::{
     ResidualBlock, ResidualBlockContractConfig, ResidualBlockMeta, ResidualBlockStructureConfig,
 };
+use crate::layers::drop::drop_block::DropBlockOptions;
 use crate::models::resnet::util::stride_div_output_resolution;
 use crate::utility::probability::expect_probability;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
@@ -36,13 +37,21 @@ pub struct LayerBlockContractConfig {
     /// The number of output feature planes.
     pub out_planes: usize,
 
-    /// Should the first block downsample?
-    #[config(default = "false")]
-    pub downsample: bool,
+    /// Dilation rate for conv layers.
+    #[config(default = 1)]
+    pub dilation: usize,
 
-    /// Select between [`super::basic_block::BasicBlock`] and [`super::bottleneck::BottleneckBlock`].
+    /// If set, override the first dilation rate.
+    #[config(default = "None")]
+    pub first_dilation: Option<usize>,
+
+    /// Downsample the input by 2x?
     #[config(default = "false")]
-    pub bottleneck: bool,
+    pub downsample_input: bool,
+
+    /// Select between [`super::basic_block::BasicBlock`] and [`super::bottleneck_block::BottleneckBlock`].
+    #[config(default = "None")]
+    pub bottleneck_policy: Option<BottleneckPolicyConfig>,
 
     /// [`crate::compat::normalization_wrapper::Normalization`] config.
     ///
@@ -57,27 +66,45 @@ pub struct LayerBlockContractConfig {
 }
 
 impl LayerBlockContractConfig {
+    /// Build the [`ResidualBlockContractConfig`]s for this layer block.
+    pub fn to_block_contracts(self) -> Vec<ResidualBlockContractConfig> {
+        let mut first_dilation = self.first_dilation;
+
+        let mut blocks = Vec::with_capacity(self.num_blocks);
+
+        for b in 0..self.num_blocks {
+            let downsample_input = b == 0 && self.downsample_input;
+            let in_planes = if b == 0 {
+                self.in_planes
+            } else {
+                self.out_planes
+            };
+
+            blocks.push(
+                ResidualBlockContractConfig::new(in_planes, self.out_planes)
+                    .with_downsample_input(downsample_input)
+                    .with_first_dilation(first_dilation)
+                    .with_dilation(self.dilation)
+                    .with_bottleneck_policy(self.bottleneck_policy.clone())
+                    .with_normalization(self.normalization.clone())
+                    .with_activation(self.activation.clone()),
+            );
+
+            first_dilation = Some(self.dilation);
+        }
+
+        blocks
+    }
+
     /// Convert to [`LayerBlockStructureConfig`].
     pub fn to_structure(self) -> LayerBlockStructureConfig {
-        let blocks = (0..self.num_blocks)
-            .map(|b| {
-                let in_planes = if b == 0 {
-                    self.in_planes
-                } else {
-                    self.out_planes
-                };
-                let downsample = b == 0 && self.downsample;
-
-                ResidualBlockContractConfig::new(in_planes, self.out_planes)
-                    .with_downsample(downsample)
-                    .with_bottleneck(self.bottleneck)
-                    .with_normalization(self.normalization.clone())
-                    .with_activation(self.activation.clone())
-                    .to_structure()
-            })
-            .collect();
-
-        LayerBlockStructureConfig { blocks }
+        LayerBlockStructureConfig {
+            blocks: self
+                .to_block_contracts()
+                .into_iter()
+                .map(|cfg| cfg.into())
+                .collect(),
+        }
     }
 }
 
@@ -283,6 +310,16 @@ impl<B: Backend> LayerBlockMeta for LayerBlock<B> {
 }
 
 impl<B: Backend> LayerBlock<B> {
+    /// Debug print.
+    pub fn debug_print(&self) {
+        println!("## LayerBlock: len={}", self.len());
+        for (idx, block) in self.blocks.iter().enumerate() {
+            println!("### block[{}]:", idx);
+            block.debug_print();
+            println!();
+        }
+    }
+
     /// Apply the layer block.
     pub fn forward(
         &self,
@@ -300,7 +337,10 @@ impl<B: Backend> LayerBlock<B> {
             &[("in_planes", self.in_planes()), ("stride", self.stride())],
         );
 
-        let x = self.blocks.iter().fold(input, |x, block| block.forward(x));
+        let mut x = input;
+        for block in self.blocks.iter() {
+            x = block.forward(x);
+        }
 
         assert_shape_contract_periodically!(
             ["batch", "out_planes", "out_height", "out_width"],
@@ -365,25 +405,29 @@ mod tests {
 
     #[test]
     fn test_layer_block_config_build() {
-        let config: LayerBlockStructureConfig = LayerBlockContractConfig::new(2, 16, 32)
-            .with_downsample(true)
-            .into();
+        let num_blocks = 2;
+        let in_planes = 16;
+        let planes = 32;
+        let config: LayerBlockStructureConfig =
+            LayerBlockContractConfig::new(num_blocks, in_planes, planes)
+                .with_downsample_input(true)
+                .into();
         config.expect_valid();
         assert_eq!(config.len(), 2);
-        assert_eq!(config.in_planes(), 16);
-        assert_eq!(config.out_planes(), 32);
+        assert_eq!(config.in_planes(), in_planes);
+        assert_eq!(config.out_planes(), planes);
         assert_eq!(config.stride(), 2);
         assert_eq!(config.output_resolution([12, 24]), [6, 12]);
 
         let block1 = &config.blocks[0];
-        assert_eq!(block1.in_planes(), 16);
-        assert_eq!(block1.out_planes(), 32);
+        assert_eq!(block1.in_planes(), in_planes);
+        assert_eq!(block1.out_planes(), planes);
         assert_eq!(block1.stride(), 2);
         assert_eq!(block1.output_resolution([12, 24]), [6, 12]);
 
         let block2 = &config.blocks[1];
-        assert_eq!(block2.in_planes(), 32);
-        assert_eq!(block2.out_planes(), 32);
+        assert_eq!(block2.in_planes(), planes);
+        assert_eq!(block2.out_planes(), planes);
         assert_eq!(block2.stride(), 1);
         assert_eq!(block2.output_resolution([12, 24]), [12, 24]);
     }

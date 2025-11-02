@@ -57,11 +57,11 @@ pub trait CNA2dMeta {
     /// Number of input channels.
     fn in_channels(&self) -> usize;
 
-    /// Number of groups.
-    fn groups(&self) -> usize;
-
     /// Number of output channels.
     fn out_channels(&self) -> usize;
+
+    /// Number of groups.
+    fn groups(&self) -> usize;
 
     /// Get the stride.
     fn stride(&self) -> [usize; 2];
@@ -88,12 +88,12 @@ impl CNA2dMeta for CNA2dConfig {
         self.conv.channels[0]
     }
 
-    fn groups(&self) -> usize {
-        self.conv.groups
-    }
-
     fn out_channels(&self) -> usize {
         self.conv.channels[1]
+    }
+
+    fn groups(&self) -> usize {
+        self.conv.groups
     }
 
     fn stride(&self) -> [usize; 2] {
@@ -153,15 +153,15 @@ pub struct CNA2d<B: Backend> {
 
 impl<B: Backend> CNA2dMeta for CNA2d<B> {
     fn in_channels(&self) -> usize {
-        self.conv.weight.shape().dims[1] * self.groups()
+        self.conv.weight.dims()[1] * self.groups()
+    }
+
+    fn out_channels(&self) -> usize {
+        self.conv.weight.dims()[0]
     }
 
     fn groups(&self) -> usize {
         self.conv.groups
-    }
-
-    fn out_channels(&self) -> usize {
-        self.conv.weight.shape().dims[0]
     }
 
     fn stride(&self) -> [usize; 2] {
@@ -193,17 +193,17 @@ impl<B: Backend> CNA2d<B> {
         &self,
         input: Tensor<B, 4>,
     ) -> Tensor<B, 4> {
-        self.hook_forward(input, |x| x)
+        self.map_forward(input, |x| x)
     }
 
-    /// Hooked Forward Pass.
+    /// Mapping Forward Pass.
     ///
-    /// Applies the hook after normalization but before activation.
+    /// Applies the callback fn after normalization but before activation.
     ///
     /// ```rust,ignore
     /// let x = self.conv.forward(input);
     /// let x = self.norm.forward(x);
-    /// let x = hook(x);
+    /// let x = f(x);
     /// let x = self.act.forward(x);
     /// return x
     /// ```
@@ -212,14 +212,15 @@ impl<B: Backend> CNA2d<B> {
     ///
     /// - `input`: \
     ///   ``[batch, in_channels, in_height=out_height*stride, in_width=out_width*stride]``.
+    /// - `f`: a callback endofunction, from/to ``[batch, in_channels, out_height, out_width]``.
     ///
     /// # Returns
     ///
     /// ``[batch, out_channels, out_height, out_width]``
-    pub fn hook_forward<F>(
+    pub fn map_forward<F>(
         &self,
         input: Tensor<B, 4>,
-        hook: F,
+        f: F,
     ) -> Tensor<B, 4>
     where
         F: FnOnce(Tensor<B, 4>) -> Tensor<B, 4>,
@@ -254,7 +255,7 @@ impl<B: Backend> CNA2d<B> {
 
         let x = self.norm.forward(x);
 
-        let x = hook(x);
+        let x = f(x);
 
         let x = self.act.forward(x);
 
@@ -345,7 +346,7 @@ mod tests {
         {
             let hook = |x| x * 2.0;
 
-            let output = layer.hook_forward(input.clone(), hook);
+            let output = layer.map_forward(input.clone(), hook);
             let expected = {
                 let x = layer.conv.forward(input.clone());
                 let x = layer.norm.forward(x);

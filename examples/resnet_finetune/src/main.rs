@@ -15,6 +15,7 @@ use burn::data::dataloader::DataLoaderBuilder;
 use burn::data::dataset::transform::ShuffledDataset;
 use burn::data::dataset::vision::ImageFolderDataset;
 use burn::module::Module;
+use burn::nn::PReluConfig;
 use burn::nn::activation::ActivationConfig;
 use burn::nn::loss::BinaryCrossEntropyLossConfig;
 use burn::optim::AdamConfig;
@@ -24,6 +25,10 @@ use burn::record::CompactRecorder;
 use burn::tensor::backend::{AutodiffBackend, Backend};
 use burn::train::metric::store::{Aggregate, Direction, Split};
 use burn::train::metric::{HammingScore, LossMetric};
+use burn::train::renderer::{
+    EvaluationName, EvaluationProgress, MetricState, MetricsRenderer, MetricsRendererEvaluation,
+    MetricsRendererTraining, TrainingProgress,
+};
 use burn::train::{
     LearnerBuilder, LearningStrategy, MetricEarlyStoppingStrategy, MultiLabelClassificationOutput,
     StoppingCondition, TrainOutput, TrainStep, ValidStep,
@@ -39,24 +44,6 @@ tracel-ai/models reference:
 | Train | Loss                           | 0.122    | 5        | 0.250    | 1        |
 | Valid | Hamming Score @ Threshold(0.5) | 88.490   | 1        | 93.843   | 3        |
 | Valid | Loss                           | 0.168    | 3        | 0.512    | 1        |
-
-resnet18
-$ --drop-path-prob=0.1 --drop-block-prob=0.2 --learning-rate=1e-4
-| Split | Metric                         | Min.     | Epoch    | Max.     | Epoch    |
-|-------|--------------------------------|----------|----------|----------|----------|
-| Train | Hamming Score @ Threshold(0.5) | 82.958   | 1        | 97.916   | 28       |
-| Train | Loss                           | 0.072    | 28       | 0.515    | 1        |
-| Valid | Hamming Score @ Threshold(0.5) | 91.765   | 1        | 95.706   | 12       |
-| Valid | Loss                           | 0.123    | 17       | 0.411    | 1        |
-
-resnet34
-$ --drop-path-prob=0.15 --drop-block-prob=0.25 --learning-rate=1e-5
-| Split | Metric                         | Min.     | Epoch    | Max.     | Epoch    |
-|-------|--------------------------------|----------|----------|----------|----------|
-| Train | Hamming Score @ Threshold(0.5) | 72.588   | 1        | 96.050   | 58       |
-| Train | Loss                           | 0.132    | 58       | 0.737    | 1        |
-| Valid | Hamming Score @ Threshold(0.5) | 78.137   | 1        | 95.255   | 43       |
-| Valid | Loss                           | 0.130    | 60       | 0.691    | 1        |
  */
 
 #[derive(Parser, Debug)]
@@ -82,6 +69,10 @@ pub struct Args {
     #[arg(short, long, default_value_t = 8)]
     grads_accumulation: usize,
 
+    /// Category smoothing factor for training.
+    #[arg(long, default_value = "0.1")]
+    smoothing: Option<f32>,
+
     /// Number of workers for data loading.
     #[arg(long, default_value = "4")]
     num_workers: usize,
@@ -94,6 +85,10 @@ pub struct Args {
     /// Use "list" to list all available pretrained models.
     #[arg(long, default_value = "resnet34.tv_in1k")]
     pretrained: String,
+
+    /// Freeze the body layers during training.
+    #[arg(long, default_value = "false")]
+    freeze_layers: bool,
 
     /// Drop Block Prob
     #[arg(long, default_value = "0.2")]
@@ -210,7 +205,7 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
 
     let resnet_config = prefab.to_config().with_activation(ActivationConfig::Gelu);
 
-    let model: ResNet<B> = resnet_config
+    let mut model: ResNet<B> = resnet_config
         .clone()
         .to_structure()
         .init(&device)
@@ -219,6 +214,15 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .with_classes(CLASSES.len())
         .with_stochastic_drop_block(args.drop_block_prob)
         .with_stochastic_path_depth(args.drop_path_prob);
+
+    if args.freeze_layers {
+        model = model.freeze_layers();
+    }
+
+    let host: Host<B> = Host {
+        smoothing: args.smoothing,
+        resnet: model,
+    };
 
     let optimizer = AdamConfig::new()
         .with_weight_decay(Some(WeightDecayConfig::new(args.weight_decay)))
@@ -279,7 +283,11 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .grads_accumulation(args.grads_accumulation)
         .num_epochs(args.num_epochs)
         .summary()
-        .build(model, optimizer, args.learning_rate);
+        /*
+        .renderer(CustomRenderer {})
+        .with_application_logger(None)
+         */
+        .build(host, optimizer, args.learning_rate);
 
     // Training
     let now = Instant::now();
@@ -289,10 +297,70 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
 
     model_trained
         .model
+        .resnet
         .save_file(format!("{artifact_dir}/model"), &CompactRecorder::new())
         .expect("Trained model should be saved successfully");
 
     Ok(())
+}
+
+struct CustomRenderer {}
+
+impl MetricsRendererTraining for CustomRenderer {
+    fn update_train(
+        &mut self,
+        _state: MetricState,
+    ) {
+    }
+
+    fn update_valid(
+        &mut self,
+        _state: MetricState,
+    ) {
+    }
+
+    fn render_train(
+        &mut self,
+        item: TrainingProgress,
+    ) {
+        dbg!(item);
+    }
+
+    fn render_valid(
+        &mut self,
+        item: TrainingProgress,
+    ) {
+        dbg!(item);
+    }
+}
+
+impl MetricsRenderer for CustomRenderer {
+    fn manual_close(&mut self) {
+        // Nothing to do.
+    }
+}
+
+impl MetricsRendererEvaluation for CustomRenderer {
+    fn update_test(
+        &mut self,
+        _name: EvaluationName,
+        _state: MetricState,
+    ) {
+    }
+
+    fn render_test(
+        &mut self,
+        item: EvaluationProgress,
+    ) {
+        dbg!(item);
+    }
+}
+
+#[derive(Module, Debug)]
+pub struct Host<B: Backend> {
+    pub smoothing: Option<f32>,
+
+    pub resnet: ResNet<B>,
 }
 
 pub trait MultiLabelClassification<B: Backend> {
@@ -303,15 +371,21 @@ pub trait MultiLabelClassification<B: Backend> {
     ) -> MultiLabelClassificationOutput<B>;
 }
 
-impl<B: Backend> MultiLabelClassification<B> for ResNet<B> {
+impl<B: Backend> MultiLabelClassification<B> for Host<B> {
     fn forward_classification(
         &self,
         images: Tensor<B, 4>,
         targets: Tensor<B, 2, Int>,
     ) -> MultiLabelClassificationOutput<B> {
-        let output = self.forward(images);
-        let loss = BinaryCrossEntropyLossConfig::new()
-            .with_logits(true)
+        let output = self.resnet.forward(images);
+
+        let mut loss_cfg = BinaryCrossEntropyLossConfig::new().with_logits(true);
+
+        if B::ad_enabled() {
+            loss_cfg = loss_cfg.with_smoothing(self.smoothing);
+        }
+
+        let loss = loss_cfg
             .init(&output.device())
             .forward(output.clone(), targets.clone());
 
@@ -320,7 +394,7 @@ impl<B: Backend> MultiLabelClassification<B> for ResNet<B> {
 }
 
 impl<B: AutodiffBackend> TrainStep<ClassificationBatch<B>, MultiLabelClassificationOutput<B>>
-    for ResNet<B>
+    for Host<B>
 {
     fn step(
         &self,
@@ -332,9 +406,7 @@ impl<B: AutodiffBackend> TrainStep<ClassificationBatch<B>, MultiLabelClassificat
     }
 }
 
-impl<B: Backend> ValidStep<ClassificationBatch<B>, MultiLabelClassificationOutput<B>>
-    for ResNet<B>
-{
+impl<B: Backend> ValidStep<ClassificationBatch<B>, MultiLabelClassificationOutput<B>> for Host<B> {
     fn step(
         &self,
         batch: ClassificationBatch<B>,

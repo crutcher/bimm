@@ -7,7 +7,7 @@
 use crate::layers::blocks::cna::CNA2d;
 use crate::layers::blocks::conv_norm::ConvNorm2d;
 use crate::models::resnet::basic_block::BasicBlock;
-use crate::models::resnet::bottleneck::BottleneckBlock;
+use crate::models::resnet::bottleneck_block::BottleneckBlock;
 use crate::models::resnet::downsample::ResNetDownsample;
 use crate::models::resnet::layer_block::LayerBlock;
 use crate::models::resnet::residual_block::ResidualBlock;
@@ -45,7 +45,7 @@ pub struct ResNetStub<B: Backend> {
 }
 
 impl<B: Backend> ResNetStubRecord<B> {
-    pub fn cna_copy_weights(
+    pub fn copy_stub_weights(
         self,
         target: ResNet<B>,
     ) -> ResNet<B> {
@@ -55,7 +55,7 @@ impl<B: Backend> ResNetStubRecord<B> {
                 .layers
                 .into_iter()
                 .zip(target.layers)
-                .map(|(s, t)| s.cna_copy_weights(t))
+                .map(|(s, t)| s.copy_stub_weights(t))
                 .collect(),
             output_fc: target.output_fc.load_record(self.fc),
             ..target
@@ -69,7 +69,7 @@ pub struct LayerBlockStub<B: Backend> {
 }
 
 impl<B: Backend> LayerBlockStubRecord<B> {
-    pub fn cna_copy_weights(
+    pub fn copy_stub_weights(
         self,
         target: LayerBlock<B>,
     ) -> LayerBlock<B> {
@@ -78,7 +78,7 @@ impl<B: Backend> LayerBlockStubRecord<B> {
                 .blocks
                 .into_iter()
                 .zip(target.blocks)
-                .map(|(s, t)| s.cna_copy_weights(t))
+                .map(|(s, t)| s.copy_stub_weights(t))
                 .collect(),
         }
     }
@@ -92,15 +92,15 @@ pub enum ResidualBlockStub<B: Backend> {
 }
 
 impl<B: Backend> ResidualBlockStubRecord<B> {
-    pub fn cna_copy_weights(
+    pub fn copy_stub_weights(
         self,
         target: ResidualBlock<B>,
     ) -> ResidualBlock<B> {
         use ResidualBlock as T;
         use ResidualBlockStubRecord as S;
         match (self, target) {
-            (S::Basic(stub), T::Basic(block)) => stub.cna_copy_weights(block).into(),
-            (S::Bottleneck(stub), T::Bottleneck(block)) => stub.cna_copy_weights(block).into(),
+            (S::Basic(stub), T::Basic(block)) => stub.copy_stub_weights(block).into(),
+            (S::Bottleneck(stub), T::Bottleneck(block)) => stub.copy_stub_weights(block).into(),
             (S::Basic(_), T::Bottleneck(_)) => {
                 panic!("Cannot apply basic block stub to bottleneck block")
             }
@@ -116,7 +116,7 @@ pub fn copy_downsample_weights<B: Backend>(
     target: Option<ResNetDownsample<B>>,
 ) -> Option<ResNetDownsample<B>> {
     match (downsample, target) {
-        (Some(stub), Some(target)) => Some(stub.copy_weights(target)),
+        (Some(stub), Some(target)) => Some(stub.copy_stub_weights(target)),
         (None, None) => None,
         (None, Some(_)) => panic!("None stub cannot be applied to Some<Downsample>"),
         (Some(_), None) => panic!("Some<Downsample> stub cannot be applied to None"),
@@ -130,7 +130,7 @@ pub struct DownsampleStub<B: Backend> {
 }
 
 impl<B: Backend> DownsampleStubRecord<B> {
-    pub fn copy_weights(
+    pub fn copy_stub_weights(
         self,
         target: ResNetDownsample<B>,
     ) -> ResNetDownsample<B> {
@@ -180,7 +180,7 @@ pub struct BasicBlockStub<B: Backend> {
 }
 
 impl<B: Backend> BasicBlockStubRecord<B> {
-    pub fn cna_copy_weights(
+    pub fn copy_stub_weights(
         self,
         target: BasicBlock<B>,
     ) -> BasicBlock<B> {
@@ -205,7 +205,7 @@ pub struct BottleneckStub<B: Backend> {
 }
 
 impl<B: Backend> BottleneckStubRecord<B> {
-    pub fn cna_copy_weights(
+    pub fn copy_stub_weights(
         self,
         target: BottleneckBlock<B>,
     ) -> BottleneckBlock<B> {

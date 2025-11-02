@@ -2,13 +2,13 @@
 //!
 //! [`BottleneckBlock`] is the bottleneck form of the core `ResNet` convolution unit.
 //!
-//! [`BottleneckBlockMeta`] defines a common meta API for [`BottleneckBlock`]
+//! [`BottleneckBlockMeta`] defines a common meta-API for [`BottleneckBlock`]
 //! and [`BottleneckBlockConfig`].
 //!
-//! [`BottleneckBlockConfig`] implements [`Config`], and provides
+//! [`BottleneckBlockConfig`] implements [`Config`] and provides
 //! [`BottleneckBlockConfig::init`] to initialize a [`BottleneckBlock`].
 //!
-//! [`BottleneckBlock`] implements [`Module`], and provides
+//! [`BottleneckBlock`] implements [`Module`] and provides
 //! [`BottleneckBlock::forward`].
 
 use crate::layers::blocks::cna::{AbstractCNA2dConfig, CNA2d, CNA2dConfig, CNA2dMeta};
@@ -23,16 +23,45 @@ use burn::nn::norm::NormalizationConfig;
 use burn::nn::{BatchNormConfig, PaddingConfig2d};
 use burn::prelude::{Backend, Config, Module, Tensor};
 
+/// Bottleneck Policy.
+#[derive(Config, Debug)]
+pub struct BottleneckPolicyConfig {
+    /// Input pinch factor.
+    #[config(default = "BOTTLENECK_BLOCK_DEFAULT_PINCH_FACTOR")]
+    pub pinch_factor: usize,
+}
+
+impl Default for BottleneckPolicyConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// [`BottleneckBlock`] Meta trait.
 pub trait BottleneckBlockMeta {
     /// The number of input feature planes.
     fn in_planes(&self) -> usize;
 
+    /// The number of output feature planes.
+    fn out_planes(&self) -> usize;
+
+    /// The bottleneck pinch factor.
+    /// Controls the relative size of ``pinch_planes``.
+    fn pinch_factor(&self) -> usize;
+
+    /// The internal pinch planes.
+    /// This is ``out_planes / pinch_factor``.
+    fn planes(&self) -> usize {
+        self.out_planes() / self.pinch_factor()
+    }
+
+    /// The first conv width.
+    fn first_planes(&self) -> usize {
+        self.width() / self.reduce_first()
+    }
+
     /// Dilation rate for conv layers.
     fn dilation(&self) -> usize;
-
-    /// Configures the size of `first_planes` and `out_planes`.
-    fn planes(&self) -> usize;
 
     /// Groups of the conv filters.
     fn cardinality(&self) -> usize;
@@ -41,30 +70,13 @@ pub trait BottleneckBlockMeta {
     fn base_width(&self) -> usize;
 
     /// Control factor for `first_planes()`
-    fn reduction_factor(&self) -> usize;
-
-    /// Control factor for `out_planes()`
-    fn expansion_factor(&self) -> usize;
-
-    /// First conv/norm layer output channels.
-    ///
-    /// ``first_planes = planes // reduction_factor``
-    fn first_planes(&self) -> usize {
-        self.width() / self.reduction_factor()
-    }
+    fn reduce_first(&self) -> usize;
 
     /// Get Width Plane.
     ///
-    /// ``planes * (base_width / 64) * cardinality``
+    /// ``pinch_planes * (base_width / 64) * cardinality``
     fn width(&self) -> usize {
-        self.planes() * (self.base_width() / 64) * self.cardinality()
-    }
-
-    /// The number of output feature planes.
-    ///
-    /// ``out_planes = planes * expansion_factor``
-    fn out_planes(&self) -> usize {
-        self.planes() * self.expansion_factor()
+        ((self.planes() as f64 * self.base_width() as f64 / 64.0) as usize) * self.cardinality()
     }
 
     /// The stride of convolution.
@@ -95,6 +107,9 @@ pub trait BottleneckBlockMeta {
     }
 }
 
+/// Default pinch factor for [`BottleneckBlock`].
+pub const BOTTLENECK_BLOCK_DEFAULT_PINCH_FACTOR: usize = 4;
+
 /// [`BottleneckBlock`] Config.
 ///
 /// Implements [`BottleneckBlockMeta`].
@@ -103,24 +118,24 @@ pub struct BottleneckBlockConfig {
     /// The size of the in channels dimension.
     pub in_planes: usize,
 
-    /// Configures the size of `first_planes` and `out_planes`.
-    pub planes: usize,
+    /// The size of the out channels dimension.
+    pub out_planes: usize,
 
     /// Groups of the conv filters.
-    #[config(default = "4")]
+    #[config(default = "1")]
     pub cardinality: usize,
 
     /// Base width used to determine the number of output channels.
     #[config(default = "64")]
     pub base_width: usize,
 
-    /// Control factor for `out_planes()`
-    #[config(default = 1)]
-    pub expansion_factor: usize,
+    /// Bottleneck policy.
+    #[config(default = "BottleneckPolicyConfig::default()")]
+    pub policy: BottleneckPolicyConfig,
 
-    /// Control factor for `first_planes()`
+    /// Control factor for `pinch_planes()`
     #[config(default = 1)]
-    pub reduction_factor: usize,
+    pub reduce_first: usize,
 
     /// The stride of the downsample layer.
     #[config(default = 1)]
@@ -129,6 +144,10 @@ pub struct BottleneckBlockConfig {
     /// Dilation rate for conv layers.
     #[config(default = 1)]
     pub dilation: usize,
+
+    /// If set, override the first dilation rate.
+    #[config(default = "None")]
+    pub first_dilation: Option<usize>,
 
     /// Size of the kernel for the downsample layer.
     #[config(default = "1")]
@@ -159,12 +178,16 @@ impl BottleneckBlockMeta for BottleneckBlockConfig {
         self.in_planes
     }
 
-    fn dilation(&self) -> usize {
-        self.dilation
+    fn out_planes(&self) -> usize {
+        self.out_planes
     }
 
-    fn planes(&self) -> usize {
-        self.planes
+    fn pinch_factor(&self) -> usize {
+        self.policy.pinch_factor
+    }
+
+    fn dilation(&self) -> usize {
+        self.dilation
     }
 
     fn cardinality(&self) -> usize {
@@ -175,12 +198,8 @@ impl BottleneckBlockMeta for BottleneckBlockConfig {
         self.base_width
     }
 
-    fn reduction_factor(&self) -> usize {
-        self.reduction_factor
-    }
-
-    fn expansion_factor(&self) -> usize {
-        self.expansion_factor
+    fn reduce_first(&self) -> usize {
+        self.reduce_first
     }
 
     fn stride(&self) -> usize {
@@ -189,6 +208,18 @@ impl BottleneckBlockMeta for BottleneckBlockConfig {
 }
 
 impl BottleneckBlockConfig {
+    /// Optional dilation rate for the first conv.
+    fn first_dilation(&self) -> Option<usize> {
+        self.first_dilation
+    }
+
+    /// Effective first dilation.
+    ///
+    /// Resolves `first_dilation()` vrs `dilation()`.
+    fn effective_first_dilation(&self) -> usize {
+        self.first_dilation().unwrap_or(self.dilation())
+    }
+
     /// Initialize a [`BottleneckBlock`].
     pub fn init<B: Backend>(
         self,
@@ -197,20 +228,23 @@ impl BottleneckBlockConfig {
         let drop_path_prob = expect_probability(self.drop_path_prob);
 
         let in_planes = self.in_planes();
+        let first_planes = self.first_planes();
         let width = self.width();
-        let first_planes = width / self.reduction_factor;
         let out_planes = self.out_planes();
 
         let dilation = self.dilation();
+        let first_dilation = self.effective_first_dilation();
 
         let stride = self.stride();
 
         // TODO: conditional stride logic for anti-aliasing.
         // use_aa = aa_layer is not None and stride == 2
         // stride = 1 if use_aa else stride
+        let enable_aa = false;
+        let _use_aa = enable_aa && (stride != 1 || first_dilation != dilation);
 
         let downsample = if stride != 1 || in_planes != out_planes {
-            ResNetDownsampleConfig::new(self.in_planes(), self.out_planes(), self.down_kernel_size)
+            ResNetDownsampleConfig::new(in_planes, out_planes, self.down_kernel_size)
                 .with_stride(self.stride())
                 .with_dilation(self.dilation())
                 .with_norm(self.normalization.clone())
@@ -230,21 +264,26 @@ impl BottleneckBlockConfig {
 
         let cna2: CNA2dConfig = cna_builder.build_config(
             Conv2dConfig::new([first_planes, width], scalar_to_array(3))
+                .with_bias(false)
                 .with_stride(scalar_to_array(stride))
-                .with_dilation(scalar_to_array(dilation))
-                .with_padding(PaddingConfig2d::Explicit(dilation, dilation))
-                .with_groups(self.cardinality())
-                .with_bias(false),
+                .with_dilation(scalar_to_array(first_dilation))
+                .with_padding(PaddingConfig2d::Explicit(first_dilation, first_dilation))
+                .with_groups(self.cardinality()),
         );
 
         let cna3: CNA2dConfig = cna_builder.build_config(
             Conv2dConfig::new([width, out_planes], scalar_to_array(1)).with_bias(false),
         );
 
+        assert_eq!(self.in_planes(), cna1.in_channels());
+        assert_eq!(cna1.out_channels(), cna2.in_channels());
+        assert_eq!(cna2.out_channels(), cna3.in_channels());
+        assert_eq!(cna3.out_channels(), self.out_planes());
+
         BottleneckBlock {
             base_width: self.base_width,
-            expansion_factor: self.expansion_factor,
-            reduction_factor: self.reduction_factor,
+            pinch_factor: self.pinch_factor(),
+            reduce_first: self.reduce_first,
 
             downsample: downsample.as_ref().map(|c| c.clone().init(device)),
 
@@ -277,11 +316,11 @@ pub struct BottleneckBlock<B: Backend> {
     /// Base width.
     pub base_width: usize,
 
-    /// Expansion factor.
-    pub expansion_factor: usize,
+    /// Pinch factor.
+    pub pinch_factor: usize,
 
     /// Reduction factor.
-    pub reduction_factor: usize,
+    pub reduce_first: usize,
 
     /// Optional `DownSample` layer; for the residual connection.
     pub downsample: Option<ResNetDownsample<B>>,
@@ -305,12 +344,16 @@ impl<B: Backend> BottleneckBlockMeta for BottleneckBlock<B> {
         self.cna1.in_channels()
     }
 
-    fn dilation(&self) -> usize {
-        self.cna3.conv.dilation[0]
+    fn out_planes(&self) -> usize {
+        self.cna3.out_channels()
     }
 
-    fn planes(&self) -> usize {
-        self.out_planes() / self.expansion_factor()
+    fn pinch_factor(&self) -> usize {
+        self.pinch_factor
+    }
+
+    fn dilation(&self) -> usize {
+        self.cna3.conv.dilation[0]
     }
 
     fn cardinality(&self) -> usize {
@@ -321,24 +364,12 @@ impl<B: Backend> BottleneckBlockMeta for BottleneckBlock<B> {
         self.base_width
     }
 
-    fn reduction_factor(&self) -> usize {
-        self.reduction_factor
-    }
-
-    fn expansion_factor(&self) -> usize {
-        self.expansion_factor
-    }
-
-    fn first_planes(&self) -> usize {
-        self.cna1.out_channels()
+    fn reduce_first(&self) -> usize {
+        self.reduce_first
     }
 
     fn width(&self) -> usize {
         self.cna3.in_channels()
-    }
-
-    fn out_planes(&self) -> usize {
-        self.cna3.out_channels()
     }
 
     fn stride(&self) -> usize {
@@ -347,6 +378,29 @@ impl<B: Backend> BottleneckBlockMeta for BottleneckBlock<B> {
 }
 
 impl<B: Backend> BottleneckBlock<B> {
+    /// Debug Print.
+    pub fn debug_print(&self) {
+        eprintln!("#### BottleneckBlock");
+        if self.downsample.is_some() {
+            eprintln!("  downsample");
+        }
+        eprintln!("  in_planes: {}", self.in_planes());
+        eprintln!("  pinch_planes: {}", self.planes());
+        eprintln!("  width: {}", self.width());
+        eprintln!("  out_planes: {}", self.out_planes());
+        eprintln!("  stride: {}", self.stride());
+        eprintln!("  reduce_first: {}", self.reduce_first());
+        eprintln!("  cardinality: {}", self.cardinality());
+
+        eprintln!();
+        eprintln!("  cna1.in_channels: {}", self.cna1.in_channels());
+        eprintln!("  cna1.out_channels: {}", self.cna1.out_channels());
+        eprintln!("  cna2.in_channels: {}", self.cna2.in_channels());
+        eprintln!("  cna2.out_channels: {}", self.cna2.out_channels());
+        eprintln!("  cna3.in_channels: {}", self.cna3.in_channels());
+        eprintln!("  cna3.out_channels: {}", self.cna3.out_channels());
+    }
+
     /// Forward Pass.
     ///
     /// # Arguments
@@ -360,7 +414,6 @@ impl<B: Backend> BottleneckBlock<B> {
         &self,
         input: Tensor<B, 4>,
     ) -> Tensor<B, 4> {
-        #[cfg(debug_assertions)]
         let [batch, in_height, out_height, in_width, out_width] = bimm_contracts::unpack_shape_contract!(
             [
                 "batch",
@@ -378,44 +431,50 @@ impl<B: Backend> BottleneckBlock<B> {
             None => input.clone(),
         };
 
-        #[cfg(debug_assertions)]
         bimm_contracts::define_shape_contract!(
             OUT_CONTRACT,
             ["batch", "out_planes", "out_height", "out_width"],
         );
-        #[cfg(debug_assertions)]
         let out_bindings = [
             ("batch", batch),
             ("out_planes", self.out_planes()),
             ("out_height", out_height),
             ("out_width", out_width),
         ];
-        #[cfg(debug_assertions)]
         bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &identity, &out_bindings);
 
         let x = self.cna1.forward(input);
 
-        #[cfg(debug_assertions)]
         bimm_contracts::assert_shape_contract_periodically!(
-            ["batch", "first_planes", "in_height", "in_width"],
+            ["batch", "pinch_planes", "in_height", "in_width"],
             &x,
             &[
                 ("batch", batch),
-                ("first_planes", self.first_planes()),
+                ("pinch_planes", self.planes()),
                 ("in_height", in_height),
                 ("in_width", in_width),
             ],
         );
 
-        let x = self.cna2.hook_forward(x, |x| match &self.drop_block {
+        let x = self.cna2.map_forward(x, |x| match &self.drop_block {
             Some(drop_block) => drop_block.forward(x),
             None => x,
         });
 
+        bimm_contracts::assert_shape_contract_periodically!(
+            ["batch", "width", "out_height", "out_width"],
+            &x,
+            &[
+                ("batch", batch),
+                ("width", self.width()),
+                ("out_height", out_height),
+                ("out_width", out_width),
+            ],
+        );
+
         // TODO: anti-aliasing
 
-        self.cna3.hook_forward(x, |x| {
-            #[cfg(debug_assertions)]
+        self.cna3.map_forward(x, |x| {
             bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
 
             // TODO: attention
@@ -468,11 +527,11 @@ mod tests {
 
     #[test]
     fn test_basic_block_config() {
-        let in_channels = 16;
-        let out_channels = 32;
-        let config = BottleneckBlockConfig::new(in_channels, out_channels);
-        assert_eq!(config.in_planes(), in_channels);
-        assert_eq!(config.out_planes(), out_channels);
+        let in_planes = 16;
+        let out_planes = 32;
+        let config = BottleneckBlockConfig::new(in_planes, out_planes);
+        assert_eq!(config.in_planes(), in_planes);
+        assert_eq!(config.out_planes(), out_planes);
         assert_eq!(config.stride(), 1);
         assert_eq!(config.output_resolution([16, 16]), [16, 16]);
         assert!(matches!(config.activation, ActivationConfig::Relu));
@@ -498,14 +557,14 @@ mod tests {
         type B = NdArray<f32>;
         let device = Default::default();
 
-        let in_channels = 2;
-        let out_channels = in_channels;
+        let in_planes = 2;
+        let out_planes = 2;
 
         let block: BottleneckBlock<B> =
-            BottleneckBlockConfig::new(in_channels, out_channels).init(&device);
+            BottleneckBlockConfig::new(in_planes, out_planes).init(&device);
 
-        assert_eq!(block.in_planes(), in_channels);
-        assert_eq!(block.out_planes(), out_channels);
+        assert_eq!(block.in_planes(), in_planes);
+        assert_eq!(block.out_planes(), out_planes);
         assert_eq!(block.stride(), 1);
         assert_eq!(block.output_resolution([16, 16]), [16, 16]);
     }

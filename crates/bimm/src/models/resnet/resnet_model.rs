@@ -13,14 +13,15 @@
 //! [`ResNet`] implements [`Module`], and provides
 //! [`ResNet::forward`].
 
-use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig};
-use crate::layers::drop::drop_block::DropBlockOptions;
-use crate::models::resnet::layer_block::{
+use super::bottleneck_block::BottleneckPolicyConfig;
+use super::layer_block::{
     LayerBlock, LayerBlockContractConfig, LayerBlockMeta, LayerBlockStructureConfig,
 };
-use crate::models::resnet::residual_block::{ResidualBlock, ResidualBlockStructureConfig};
-use crate::models::resnet::resnet_io::pytorch_stubs::load_resnet_stub_record;
-use crate::models::resnet::util::CONV_INTO_RELU_INITIALIZER;
+use super::residual_block::{ResidualBlock, ResidualBlockStructureConfig};
+use super::resnet_io::pytorch_stubs::load_resnet_stub_record;
+use super::util::CONV_INTO_RELU_INITIALIZER;
+use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig};
+use crate::layers::drop::drop_block::DropBlockOptions;
 use crate::utility::probability::expect_probability;
 use burn::module::Module;
 use burn::nn::BatchNormConfig;
@@ -47,7 +48,8 @@ pub const RESNET152_BLOCKS: [usize; 4] = [3, 8, 36, 3];
 #[derive(Config, Debug)]
 pub struct ResNetContractConfig {
     /// Layer block depths.
-    pub layers: [usize; 4],
+    /// Must have the same length as `channels`.
+    pub layers: Vec<usize>,
 
     /// Number of classification classes.
     pub num_classes: usize,
@@ -57,13 +59,13 @@ pub struct ResNetContractConfig {
     #[config(default = "64")]
     pub stem_width: usize,
 
-    /// Model feature expansion rate.
-    #[config(default = "1")]
-    pub expansion: usize,
+    /// Output stride.
+    #[config(default = "32")]
+    pub output_stride: usize,
 
-    /// Use bottleneck blocks.
-    #[config(default = "false")]
-    pub bottleneck: bool,
+    /// Select between [`BasicBlock`] and [`BottleneckBlock`].
+    #[config(default = "None")]
+    pub bottleneck_policy: Option<BottleneckPolicyConfig>,
 
     /// [`crate::compat::normalization_wrapper::Normalization`] config.
     ///
@@ -77,51 +79,96 @@ pub struct ResNetContractConfig {
     pub activation: ActivationConfig,
 }
 
-impl From<ResNetContractConfig> for ResNetStructureConfig {
-    fn from(config: ResNetContractConfig) -> Self {
-        assert!(
-            config.expansion == 1 || config.expansion == 4,
-            "ResNet module only supports expansion values [1, 4] for residual blocks"
-        );
-        let expansion = config.expansion;
-
-        let make_block = |idx: usize, in_factor: usize, out_factor: usize, down: bool| {
-            LayerBlockContractConfig::new(config.layers[idx], 64 * in_factor, 64 * out_factor)
-                .with_downsample(down)
-                .with_bottleneck(config.bottleneck)
-                .with_normalization(config.normalization.clone())
-                .with_activation(config.activation.clone())
-                .into()
+impl ResNetContractConfig {
+    /// Enable default bottleneck policy.
+    pub fn with_bottleneck(
+        self,
+        enable: bool,
+    ) -> Self {
+        let policy = if enable {
+            Some(Default::default())
+        } else {
+            None
         };
+        self.with_bottleneck_policy(policy)
+    }
 
+    /// Build the [`LayerBlockContractConfig`] stack.
+    #[allow(unused)]
+    pub fn to_layer_contracts(&self) -> Vec<LayerBlockContractConfig> {
+        let mut net_stride = 4;
+        let mut dilation = 1;
+        let mut prev_dilation = 1;
+        let mut layers: Vec<LayerBlockContractConfig> = Default::default();
+        let mut in_planes = self.stem_width;
+        for (stage_idx, &num_blocks) in self.layers.iter().enumerate() {
+            let downsample_input = {
+                let mut stride = if stage_idx == 0 { 1 } else { 2 };
+                if net_stride >= self.output_stride {
+                    dilation *= stride;
+                    stride = 1;
+                } else {
+                    net_stride *= stride;
+                }
+                stride != 1
+            };
+
+            let first_dilation = prev_dilation;
+
+            let out_planes = if stage_idx == 0 {
+                match &self.bottleneck_policy {
+                    Some(policy) => in_planes * policy.pinch_factor,
+                    None => in_planes,
+                }
+            } else {
+                2 * in_planes
+            };
+
+            layers.push(
+                LayerBlockContractConfig::new(num_blocks, in_planes, out_planes)
+                    .with_downsample_input(downsample_input)
+                    .with_first_dilation(Some(first_dilation))
+                    .with_dilation(dilation)
+                    .with_bottleneck_policy(self.bottleneck_policy.clone())
+                    .with_normalization(self.normalization.clone())
+                    .with_activation(self.activation.clone()),
+            );
+
+            in_planes = out_planes;
+            prev_dilation = dilation;
+        }
+
+        layers
+    }
+
+    /// Convert to a [`ResNetStructureConfig`].
+    pub fn to_structure(self) -> ResNetStructureConfig {
         ResNetStructureConfig::new(
             ConvNorm2dConfig::from(
-                Conv2dConfig::new([3, config.stem_width], [7, 7])
+                Conv2dConfig::new([3, self.stem_width], [7, 7])
                     .with_stride([2, 2])
                     .with_padding(PaddingConfig2d::Explicit(3, 3))
                     .with_bias(false),
             )
             .with_initializer(CONV_INTO_RELU_INITIALIZER.clone()),
-            vec![
-                make_block(0, 1, expansion, false),
-                make_block(1, expansion, 2 * expansion, true),
-                make_block(2, 2 * expansion, 4 * expansion, true),
-                make_block(3, 4 * expansion, 8 * expansion, true),
-            ],
-            config.num_classes,
+            self.to_layer_contracts()
+                .into_iter()
+                .map(|c| c.into())
+                .collect::<Vec<_>>(),
+            self.num_classes,
         )
-    }
-}
-
-impl ResNetContractConfig {
-    /// Convert to a [`ResNetStructureConfig`].
-    pub fn to_structure(self) -> ResNetStructureConfig {
-        self.into()
     }
 
     /// Create a ResNet-18 model.
     pub fn resnet18(num_classes: usize) -> Self {
-        Self::new(RESNET18_BLOCKS, num_classes) // .with_bottleneck(true)
+        Self::new(RESNET18_BLOCKS.to_vec(), num_classes) // .with_bottleneck(true)
+    }
+}
+
+impl From<ResNetContractConfig> for ResNetStructureConfig {
+    #[allow(unused)]
+    fn from(config: ResNetContractConfig) -> Self {
+        config.to_structure()
     }
 }
 
@@ -279,6 +326,20 @@ pub struct ResNet<B: Backend> {
 }
 
 impl<B: Backend> ResNet<B> {
+    /// Debug Printout.
+    pub fn debug_print(&self) {
+        for (idx, layer) in self.layers.iter().enumerate() {
+            println!(
+                "# Stage[{idx}]/{}:: {} :> {}",
+                layer.len(),
+                layer.in_planes(),
+                layer.out_planes()
+            );
+            layer.debug_print();
+            println!();
+        }
+    }
+
     /// Forward pass.
     pub fn forward(
         &self,
@@ -290,7 +351,10 @@ impl<B: Backend> ResNet<B> {
         let x = self.input_pool.forward(x);
 
         // Residual blocks
-        let x = self.layers.iter().fold(x, |x, layer| layer.forward(x));
+        let mut x = x;
+        for layer in self.layers.iter() {
+            x = layer.forward(x);
+        }
 
         // Head
         let x = self.output_pool.forward(x);
@@ -305,9 +369,11 @@ impl<B: Backend> ResNet<B> {
         path: PathBuf,
     ) -> anyhow::Result<Self> {
         let device = &self.devices()[0];
-        let record = load_resnet_stub_record::<B>(path, device)?;
-        let resnet = self.with_classes(record.fc.weight.dims()[0]);
-        Ok(record.cna_copy_weights(resnet))
+
+        let stub_record = load_resnet_stub_record::<B>(path, device)?;
+        let adapted_target = self.with_classes(stub_record.fc.weight.dims()[0]);
+
+        Ok(stub_record.copy_stub_weights(adapted_target))
     }
 
     /// Re-initialize the last layer with the specified number of output classes.
@@ -407,5 +473,55 @@ impl<B: Backend> ResNet<B> {
             layers: f(self.layers),
             ..self
         }
+    }
+
+    /// Freeze the layers.
+    pub fn freeze_layers(self) -> Self {
+        self.map_layers(|layers| layers.into_iter().map(|layer| layer.no_grad()).collect())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use burn::backend::Wgpu;
+
+    #[test]
+    fn test_to_layers_34_basic() {
+        let cfg = ResNetContractConfig::new(RESNET34_BLOCKS.to_vec(), 1000);
+
+        let layers = cfg.to_layer_contracts();
+
+        println!("{:#?}", layers);
+
+        // assert!(false);
+    }
+
+    #[test]
+    fn test_to_layers_50_bottleneck() {
+        type B = Wgpu;
+        let device = Default::default();
+
+        let cfg = ResNetContractConfig::new(RESNET50_BLOCKS.to_vec(), 1000).with_bottleneck(true);
+        let layers = cfg.to_layer_contracts();
+
+        let first_stage = layers[0].clone();
+        println!("block[0] cfg:\n{:#?}", first_stage);
+        println!();
+
+        let blocks = first_stage
+            .to_block_contracts()
+            .into_iter()
+            .map(|b| b.to_structure())
+            .collect::<Vec<_>>();
+        println!("blocks ...");
+        println!("{:#?}", blocks);
+        println!();
+
+        let model: ResNet<B> = cfg.to_structure().init(&device);
+
+        model.debug_print();
+
+        // assert!(false);
     }
 }

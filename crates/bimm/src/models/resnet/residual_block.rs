@@ -20,8 +20,8 @@
 
 use crate::layers::drop::drop_block::DropBlockOptions;
 use crate::models::resnet::basic_block::{BasicBlock, BasicBlockConfig, BasicBlockMeta};
-use crate::models::resnet::bottleneck::{
-    BottleneckBlock, BottleneckBlockConfig, BottleneckBlockMeta,
+use crate::models::resnet::bottleneck_block::{
+    BottleneckBlock, BottleneckBlockConfig, BottleneckBlockMeta, BottleneckPolicyConfig,
 };
 use crate::models::resnet::util::stride_div_output_resolution;
 use crate::utility::probability::expect_probability;
@@ -39,13 +39,21 @@ pub struct ResidualBlockContractConfig {
     /// The number of output feature planes.
     pub out_planes: usize,
 
-    /// Should the first block downsample?
+    /// Dilation rate for conv layers.
+    #[config(default = 1)]
+    pub dilation: usize,
+
+    /// If set, override the first dilation rate.
+    #[config(default = "None")]
+    pub first_dilation: Option<usize>,
+
+    /// Downsample the input by 2x?
     #[config(default = "false")]
-    pub downsample: bool,
+    pub downsample_input: bool,
 
     /// Select between [`BasicBlock`] and [`BottleneckBlock`].
-    #[config(default = "false")]
-    pub bottleneck: bool,
+    #[config(default = "None")]
+    pub bottleneck_policy: Option<BottleneckPolicyConfig>,
 
     /// [`crate::compat::normalization_wrapper::Normalization`] config.
     ///
@@ -62,19 +70,24 @@ pub struct ResidualBlockContractConfig {
 impl ResidualBlockContractConfig {
     /// Convert to [`ResidualBlockStructureConfig`].
     pub fn to_structure(self) -> ResidualBlockStructureConfig {
-        let stride = if self.downsample { 2 } else { 1 };
-        if self.bottleneck {
-            BottleneckBlockConfig::new(self.in_planes, self.out_planes)
+        let stride = if self.downsample_input { 2 } else { 1 };
+
+        match self.bottleneck_policy {
+            None => BasicBlockConfig::new(self.in_planes, self.out_planes)
                 .with_stride(stride)
+                .with_dilation(self.dilation)
+                .with_first_dilation(self.first_dilation)
                 .with_normalization(self.normalization)
                 .with_activation(self.activation)
-                .into()
-        } else {
-            BasicBlockConfig::new(self.in_planes, self.out_planes)
+                .into(),
+            Some(policy) => BottleneckBlockConfig::new(self.in_planes, self.out_planes)
                 .with_stride(stride)
+                .with_dilation(self.dilation)
+                .with_first_dilation(self.first_dilation)
                 .with_normalization(self.normalization)
                 .with_activation(self.activation)
-                .into()
+                .with_policy(policy)
+                .into(),
         }
     }
 }
@@ -266,6 +279,14 @@ impl<B: Backend> ResidualBlockMeta for ResidualBlock<B> {
 }
 
 impl<B: Backend> ResidualBlock<B> {
+    /// Debug print.
+    pub fn debug_print(&self) {
+        match self {
+            Self::Basic(block) => block.debug_print(),
+            Self::Bottleneck(block) => block.debug_print(),
+        }
+    }
+
     /// Apply the wrapped block to the input.
     ///
     /// # Arguments
@@ -274,7 +295,7 @@ impl<B: Backend> ResidualBlock<B> {
     ///
     /// # Returns
     ///
-    /// A ``[batch, out_planes=planes*expansion_factor, out_height, out_width]`` tensor;
+    /// A ``[batch, out_planes, out_height, out_width]`` tensor;
     pub fn forward(
         &self,
         input: Tensor<B, 4>,
@@ -318,24 +339,26 @@ mod tests {
     #[test]
     fn test_residual_block_config() {
         let in_planes = 16;
-        let planes = 32;
+        let out_planes = 32;
 
         {
-            let inner_cfg = BasicBlockConfig::new(in_planes, planes).with_stride(2);
+            let inner_cfg = BasicBlockConfig::new(in_planes, out_planes).with_stride(2);
+
             let cfg: ResidualBlockStructureConfig = inner_cfg.clone().into();
             assert!(matches!(cfg, ResidualBlockStructureConfig::Basic(_)));
             assert_eq!(cfg.in_planes(), in_planes);
-            assert_eq!(cfg.out_planes(), planes);
+            assert_eq!(cfg.out_planes(), out_planes);
             assert_eq!(cfg.stride(), 2);
             assert_eq!(cfg.output_resolution([20, 20]), [10, 10]);
         }
 
         {
-            let inner_cfg = BottleneckBlockConfig::new(in_planes, planes).with_stride(2);
+            let inner_cfg = BottleneckBlockConfig::new(in_planes, out_planes).with_stride(2);
+
             let cfg: ResidualBlockStructureConfig = inner_cfg.clone().into();
             assert!(matches!(cfg, ResidualBlockStructureConfig::Bottleneck(_)));
             assert_eq!(cfg.in_planes(), in_planes);
-            assert_eq!(cfg.out_planes(), planes);
+            assert_eq!(cfg.out_planes(), out_planes);
             assert_eq!(cfg.stride(), 2);
             assert_eq!(cfg.output_resolution([20, 20]), [10, 10]);
         }

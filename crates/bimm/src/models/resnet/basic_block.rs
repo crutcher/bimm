@@ -2,13 +2,13 @@
 //!
 //! [`BasicBlock`] is the core `ResNet` convolution unit.
 //!
-//! [`BasicBlockMeta`] defines a common meta API for [`BasicBlock`]
+//! [`BasicBlockMeta`] defines a common meta-API for [`BasicBlock`]
 //! and [`BasicBlockConfig`].
 //!
-//! [`BasicBlockConfig`] implements [`Config`], and provides
+//! [`BasicBlockConfig`] implements [`Config`] and provides
 //! [`BasicBlockConfig::init`] to initialize a [`BasicBlock`].
 //!
-//! [`BasicBlock`] implements [`Module`], and provides
+//! [`BasicBlock`] implements [`Module`] and provides
 //! [`BasicBlock::forward`].
 
 use crate::layers::blocks::cna::{AbstractCNA2dConfig, CNA2d, CNA2dConfig, CNA2dMeta};
@@ -29,33 +29,28 @@ pub trait BasicBlockMeta {
     /// The size of the in channels dimension.
     fn in_planes(&self) -> usize;
 
+    /// The size of the out channels dimension.
+    fn out_planes(&self) -> usize;
+
     /// Dilation rate for conv layers.
     fn dilation(&self) -> usize;
 
-    /// Optional dilation rate for the first conv.
+    /// Optional first-dilation override.
     fn first_dilation(&self) -> Option<usize>;
 
-    /// Configures the size of `first_planes` and `out_planes`.
-    fn planes(&self) -> usize;
-
-    /// Control factor for `out_planes()`
-    fn expansion_factor(&self) -> usize;
+    /// Resolved first dilation.
+    fn effective_first_dilation(&self) -> usize {
+        self.first_dilation().unwrap_or(self.dilation())
+    }
 
     /// Control factor for `first_planes()`
-    fn reduction_factor(&self) -> usize;
+    fn reduce_first(&self) -> usize;
 
     /// First conv/norm layer output channels.
     ///
-    /// ``first_planes = planes // reduction_factor``
+    /// ``first_planes = planes // reduce_first``
     fn first_planes(&self) -> usize {
-        self.planes() / self.reduction_factor()
-    }
-
-    /// The size of the out channels dimension.
-    ///
-    /// ``out_planes = planes * expansion_factor``
-    fn out_planes(&self) -> usize {
-        self.planes() * self.expansion_factor()
+        self.out_planes() / self.reduce_first()
     }
 
     /// The stride of convolution.
@@ -85,13 +80,6 @@ pub trait BasicBlockMeta {
     ) -> [usize; 2] {
         stride_div_output_resolution(input_resolution, self.stride())
     }
-
-    /// Effective first dilation.
-    ///
-    /// Resolves `first_dilation()` vrs `dilation()`.
-    fn effective_first_dilation(&self) -> usize {
-        self.first_dilation().unwrap_or(self.dilation())
-    }
 }
 
 /// [`BasicBlock`] Config.
@@ -103,15 +91,11 @@ pub struct BasicBlockConfig {
     pub in_planes: usize,
 
     /// Configures the `out_planes` as a function of `expansion_factor`.
-    pub planes: usize,
-
-    /// Control factor for `out_planes()`
-    #[config(default = 1)]
-    pub expansion_factor: usize,
+    pub out_planes: usize,
 
     /// Control factor for `first_planes()`
     #[config(default = 1)]
-    pub reduction_factor: usize,
+    pub reduce_first: usize,
 
     /// The stride of the downsample layer.
     #[config(default = 1)]
@@ -154,6 +138,10 @@ impl BasicBlockMeta for BasicBlockConfig {
         self.in_planes
     }
 
+    fn out_planes(&self) -> usize {
+        self.out_planes
+    }
+
     fn dilation(&self) -> usize {
         self.dilation
     }
@@ -162,16 +150,8 @@ impl BasicBlockMeta for BasicBlockConfig {
         self.first_dilation
     }
 
-    fn planes(&self) -> usize {
-        self.planes
-    }
-
-    fn expansion_factor(&self) -> usize {
-        self.expansion_factor
-    }
-
-    fn reduction_factor(&self) -> usize {
-        self.reduction_factor
+    fn reduce_first(&self) -> usize {
+        self.reduce_first
     }
 
     fn stride(&self) -> usize {
@@ -192,7 +172,6 @@ impl BasicBlockConfig {
         let out_planes = self.out_planes();
 
         let first_dilation = self.effective_first_dilation();
-        let dilation = self.dilation();
 
         let stride = self.stride();
 
@@ -225,14 +204,13 @@ impl BasicBlockConfig {
 
         let cna2: CNA2dConfig = cna_builder.build_config(
             Conv2dConfig::new([first_planes, out_planes], scalar_to_array(3))
-                .with_dilation(scalar_to_array(dilation))
-                .with_padding(PaddingConfig2d::Explicit(dilation, dilation))
+                .with_dilation(scalar_to_array(self.dilation))
+                .with_padding(PaddingConfig2d::Explicit(self.dilation, self.dilation))
                 .with_bias(false),
         );
 
         BasicBlock {
-            expansion_factor: self.expansion_factor,
-            reduction_factor: self.reduction_factor,
+            reduce_first: self.reduce_first,
 
             downsample: downsample.as_ref().map(|cfg| cfg.clone().init(device)),
 
@@ -261,11 +239,8 @@ impl BasicBlockConfig {
 /// Implements [`BasicBlockMeta`].
 #[derive(Module, Debug)]
 pub struct BasicBlock<B: Backend> {
-    /// Expansion factor.
-    pub expansion_factor: usize,
-
     /// Reduction factor.
-    pub reduction_factor: usize,
+    pub reduce_first: usize,
 
     /// Optional `DownSample` layer; for the residual connection.
     pub downsample: Option<ResNetDownsample<B>>,
@@ -287,6 +262,10 @@ impl<B: Backend> BasicBlockMeta for BasicBlock<B> {
         self.cna1.in_channels()
     }
 
+    fn out_planes(&self) -> usize {
+        self.cna2.out_channels()
+    }
+
     fn dilation(&self) -> usize {
         self.cna1.conv.dilation[0]
     }
@@ -297,24 +276,12 @@ impl<B: Backend> BasicBlockMeta for BasicBlock<B> {
         if d1 == d2 { None } else { Some(d1) }
     }
 
-    fn planes(&self) -> usize {
-        self.cna1.out_channels() / self.expansion_factor()
-    }
-
-    fn expansion_factor(&self) -> usize {
-        self.expansion_factor
-    }
-
-    fn reduction_factor(&self) -> usize {
-        self.reduction_factor
+    fn reduce_first(&self) -> usize {
+        self.reduce_first
     }
 
     fn first_planes(&self) -> usize {
         self.cna1.out_channels()
-    }
-
-    fn out_planes(&self) -> usize {
-        self.cna2.out_channels()
     }
 
     fn stride(&self) -> usize {
@@ -323,6 +290,16 @@ impl<B: Backend> BasicBlockMeta for BasicBlock<B> {
 }
 
 impl<B: Backend> BasicBlock<B> {
+    /// Debug Print.
+    pub fn debug_print(&self) {
+        println!("#### BasicBlock");
+        if self.downsample.is_some() {
+            println!("  downsample");
+        }
+        println!("  in_planes: {}", self.in_planes());
+        println!("  out_planes: {}", self.out_planes());
+    }
+
     /// Forward Pass.
     ///
     /// # Arguments
@@ -369,7 +346,7 @@ impl<B: Backend> BasicBlock<B> {
         // #[cfg(debug_assertions)]
         //  bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &identity, &out_bindings);
 
-        let x = self.cna1.hook_forward(input, |x| match &self.drop_block {
+        let x = self.cna1.map_forward(input, |x| match &self.drop_block {
             Some(drop_block) => drop_block.forward(x),
             None => x,
         });
@@ -388,7 +365,7 @@ impl<B: Backend> BasicBlock<B> {
 
         // TODO: anti-aliasing
 
-        let x = self.cna2.hook_forward(x, |x| {
+        let x = self.cna2.map_forward(x, |x| {
             // TODO: attention
 
             let x = match &self.drop_path {
@@ -445,11 +422,11 @@ mod tests {
 
     #[test]
     fn test_basic_block_config() {
-        let in_channels = 16;
-        let out_channels = 32;
-        let config = BasicBlockConfig::new(in_channels, out_channels);
-        assert_eq!(config.in_planes(), in_channels);
-        assert_eq!(config.out_planes(), out_channels);
+        let in_planes = 16;
+        let out_planes = 32;
+        let config = BasicBlockConfig::new(in_planes, out_planes);
+        assert_eq!(config.in_planes(), in_planes);
+        assert_eq!(config.out_planes(), out_planes);
         assert_eq!(config.stride(), 1);
         assert_eq!(config.output_resolution([16, 16]), [16, 16]);
         assert!(matches!(config.activation, ActivationConfig::Relu));
@@ -475,13 +452,13 @@ mod tests {
         type B = NdArray<f32>;
         let device = Default::default();
 
-        let in_channels = 2;
-        let out_channels = in_channels;
+        let in_planes = 2;
+        let out_planes = in_planes;
 
-        let block: BasicBlock<B> = BasicBlockConfig::new(in_channels, out_channels).init(&device);
+        let block: BasicBlock<B> = BasicBlockConfig::new(in_planes, out_planes).init(&device);
 
-        assert_eq!(block.in_planes(), in_channels);
-        assert_eq!(block.out_planes(), out_channels);
+        assert_eq!(block.in_planes(), in_planes);
+        assert_eq!(block.out_planes(), out_planes);
         assert_eq!(block.stride(), 1);
         assert_eq!(block.output_resolution([16, 16]), [16, 16]);
     }
@@ -493,11 +470,11 @@ mod tests {
 
         let batch_size = 2;
         let in_planes = 2;
-        let planes = 8;
+        let out_planes = 8;
         let in_height = 8;
         let in_width = 8;
 
-        let block: BasicBlock<B> = BasicBlockConfig::new(in_planes, planes).init(&device);
+        let block: BasicBlock<B> = BasicBlockConfig::new(in_planes, out_planes).init(&device);
         let out_planes = block.out_planes();
 
         let input = Tensor::ones([batch_size, in_planes, in_height, in_width], &device);
