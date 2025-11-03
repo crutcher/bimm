@@ -80,6 +80,23 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
             }),
         },
         &StaticPreFabConfig {
+            name: "resnet26",
+            description: "ResNet-26 [2, 2, 2, 2] Bottleneck",
+            builder: || ResNetContractConfig::new(vec![2, 2, 2, 2], 1000).with_bottleneck(true),
+
+            weights: Some(&StaticPretrainedWeightsMap {
+                items: &[&StaticPretrainedWeightsDescriptor {
+                    name: "bt_in1k",
+                    description: "ResNet-26 pretrained on ImageNet",
+                    license: None,
+                    origin: None,
+                    urls: &[
+                        "https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-weights/resnet26-9aa10e23.pth",
+                    ],
+                }],
+            }),
+        },
+        &StaticPreFabConfig {
             name: "resnet34",
             description: "ResNet-34 [3, 4, 6, 3] BasicBlocks",
             builder: || ResNetContractConfig::new(vec![3, 4, 6, 3], 1000),
@@ -146,38 +163,38 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
             builder: || ResNetContractConfig::new(vec![3, 4, 6, 3], 1000).with_bottleneck(true),
 
             weights: Some(&StaticPretrainedWeightsMap {
-                items: &[
-                    &StaticPretrainedWeightsDescriptor {
-                        name: "tv_in1k",
-                        description: "TorchVision ResNet-50",
-                        license: Some("bsd-3-clause"),
-                        origin: Some("https://github.com/pytorch/vision"),
-                        urls: &["https://download.pytorch.org/models/resnet50-0676ba61.pth"],
-                    },
-                    /*
-                    // ERROR: Some<Downsample> stub cannot be applied to None
-                    &StaticPretrainedWeightsDescriptor {
-                        name: "tv_in2k",
-                        description: "ResNet-50 pretrained on ImageNet",
-                        license: Some("bsd-3-clause"),
-                        origin: Some("https://github.com/pytorch/vision"),
-                        urls: &["https://download.pytorch.org/models/resnet50-11ad3fa6.pth"],
-                    },
-                    &StaticPretrainedWeightsDescriptor {
-                        name: "a1_in1k",
-                        description: "ResNet-50 pretrained on ImageNet",
-                        license: Some("bsd-3-clause"),
-                        origin: Some(
-                            "https://github.com/huggingface/pytorch-image-models/releases",
-                        ),
-                        urls: &[
-                            "https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-rsb-weights/resnet50_a1_0-14fe96d1.pth",
-                        ],
-                    },
-                     */
-                ],
+                items: &[&StaticPretrainedWeightsDescriptor {
+                    name: "tv_in1k",
+                    description: "TorchVision ResNet-50",
+                    license: Some("bsd-3-clause"),
+                    origin: Some("https://github.com/pytorch/vision"),
+                    urls: &["https://download.pytorch.org/models/resnet50-0676ba61.pth"],
+                }],
             }),
         },
+        /*
+        &StaticPreFabConfig {
+            name: "resnet50_gn",
+            description: "ResNet-50 [3, 4, 6, 3] Bottleneck with GroupNorm",
+            builder: || {
+                ResNetContractConfig::new(vec![3, 4, 6, 3], 1000)
+                    .with_normalization(NormalizationConfig::Group(GroupNormConfig::new(32, 0)))
+                    .with_bottleneck(true)
+            },
+
+            weights: Some(&StaticPretrainedWeightsMap {
+                items: &[&StaticPretrainedWeightsDescriptor {
+                    name: "a1h_in1k",
+                    description: "ResNet-50 with GroupNorm pretrained on ImageNet",
+                    license: None,
+                    origin: None,
+                    urls: &[
+                        "https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-rsb-weights/resnet50_gn_a1h2-8fe6c4d0.pth",
+                    ],
+                }],
+            }),
+        },
+         */
         &StaticPreFabConfig {
             name: "resnet101",
             description: "ResNet-101 [3, 4, 23, 3] Bottleneck",
@@ -203,6 +220,20 @@ pub static PREFAB_RESNET_MAP: StaticPreFabMap<ResNetContractConfig> = StaticPreF
                         ],
                     },
                 ],
+            }),
+        },
+        &StaticPreFabConfig {
+            name: "resnet152",
+            description: "ResNet-152 [3, 8, 36, 3] Bottleneck",
+            builder: || ResNetContractConfig::new(vec![3, 8, 36, 3], 1000).with_bottleneck(true),
+            weights: Some(&StaticPretrainedWeightsMap {
+                items: &[&StaticPretrainedWeightsDescriptor {
+                    name: "tv_in1k",
+                    description: "TorchVision ResNet-152",
+                    license: Some("bsd-3-clause"),
+                    origin: Some("https://github.com/pytorch/vision"),
+                    urls: &["https://download.pytorch.org/models/resnet152-394f9c45.pth"],
+                }],
             }),
         },
     ],
