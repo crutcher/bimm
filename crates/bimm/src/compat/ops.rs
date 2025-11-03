@@ -1,4 +1,7 @@
 //! [`Tensor`] ops.
+
+use alloc::vec;
+use alloc::vec::Vec;
 use burn::prelude::{Backend, Tensor};
 use std::f64;
 

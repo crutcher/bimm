@@ -569,29 +569,8 @@ mod tests {
         assert_eq!(block.output_resolution([16, 16]), [16, 16]);
     }
 
-    #[cfg(feature = "wgpu")]
-    #[test]
-    fn test_conv2d_example_metal() {
-        // FIXME: Conv2d with groups is broken in 0.18.0; but fixed in 0.19.0
-        type B = burn::backend::Wgpu;
-        let device = Default::default();
-
-        let input: Tensor<B, 4> = Tensor::ones([2, 32, 64, 64], &device);
-
-        let layer = Conv2dConfig::new([32, 32], [3, 3])
-            .with_padding(PaddingConfig2d::Explicit(1, 1))
-            .with_groups(4)
-            .with_bias(false)
-            .init(&device);
-
-        let result = layer.forward(input);
-        assert_eq!(&result.shape().dims, &[2, 32, 64, 64]);
-    }
-
-    #[cfg(feature = "wgpu")]
     #[test]
     fn test_basic_block_forward_same_channels_no_downsample_autodiff() {
-        // FIXME: Conv2d with groups is broken in 0.18.0; but fixed in 0.19.0
         use bimm_contracts::assert_shape_contract;
         use burn::backend::{Autodiff, Wgpu};
         type B = Autodiff<Wgpu>;
@@ -622,10 +601,8 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "wgpu")]
     #[test]
     fn test_basic_block_forward_downsample_drop_block_drop_path_autodiff() {
-        // FIXME: Conv2d with groups is broken in 0.18.0; but fixed in 0.19.0
         use bimm_contracts::assert_shape_contract;
         use burn::backend::{Autodiff, Wgpu};
         type B = Autodiff<Wgpu>;

@@ -1,8 +1,11 @@
 //! # Swin Transformer Block Sequence
+
 use crate::models::swin::v2::swin_block::{
     ShiftedWindowTransformerBlock, ShiftedWindowTransformerBlockConfig,
     ShiftedWindowTransformerBlockMeta,
 };
+use alloc::vec;
+use alloc::vec::Vec;
 use bimm_contracts::{assert_shape_contract_periodically, define_shape_contract};
 use burn::config::Config;
 use burn::module::Module;
@@ -303,6 +306,7 @@ impl<B: Backend> StochasticDepthTransformerBlockSequence<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
     use burn::backend::NdArray;
 
     #[test]

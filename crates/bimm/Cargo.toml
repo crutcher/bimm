@@ -34,9 +34,8 @@ criterion = { workspace = true }
 
 
 [features]
-default = ["std"]
+default = []
 std = []
-wgpu = ["burn/wgpu"]
 
 [[bench]]
 name = "drop_block"

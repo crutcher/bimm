@@ -2,6 +2,8 @@
 //!
 //! Utilities for computing the output shape of convolution operations.
 
+use alloc::vec::Vec;
+
 /// Predict the output size of a 1D convolution operation.
 ///
 /// ```text

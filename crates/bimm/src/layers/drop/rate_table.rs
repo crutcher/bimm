@@ -1,5 +1,7 @@
 //! Common rate table for `DropPath` regularization.
+
 use crate::compat::ops::float_vec_linspace;
+use alloc::vec::Vec;
 
 /// Computes a progressive incremental path drop rate for stochastic depth.
 ///
@@ -139,6 +141,7 @@ mod tests {
     use super::*;
     use crate::layers::drop::rate_table::progressive_dpr;
     use crate::testing::assert_close_to_vec;
+    use alloc::vec;
     use hamcrest::prelude::*;
 
     #[test]

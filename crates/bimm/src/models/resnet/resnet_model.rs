@@ -23,6 +23,8 @@ use super::util::CONV_INTO_RELU_INITIALIZER;
 use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig};
 use crate::layers::drop::drop_block::DropBlockOptions;
 use crate::utility::probability::expect_probability;
+use alloc::vec;
+use alloc::vec::Vec;
 use burn::module::Module;
 use burn::nn::BatchNormConfig;
 use burn::nn::activation::{Activation, ActivationConfig};

@@ -1,9 +1,12 @@
 //! # Module / Weight Caches
 
 use crate::cache::disk::DiskCacheConfig;
+use alloc::collections::BTreeMap;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use alloc::{format, vec};
 use anyhow::bail;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 const X25: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_IBM_SDLC);
@@ -197,6 +200,7 @@ impl PretrainedWeightsMap {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::string::{String, ToString};
 
     #[test]
     fn test_static_descriptor_to_descriptor() {

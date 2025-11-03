@@ -7,14 +7,15 @@ use crate::layers::drop::size_config::SizeConfig;
 use crate::utility::burn::kernels;
 use crate::utility::burn::noise::NoiseConfig;
 use crate::utility::probability::expect_probability;
+use alloc::format;
 use bimm_contracts::unpack_shape_contract;
 use burn::config::Config;
 use burn::module::{Content, Module, ModuleDisplay, ModuleDisplayDefault};
 use burn::prelude::{Backend, Float, Tensor};
 use burn::tensor::module::max_pool2d;
 use burn::tensor::{DType, Distribution};
+use core::ops::Range;
 use serde::{Deserialize, Serialize};
-use std::ops::Range;
 
 /// Configuration for `DropBlock`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -224,7 +225,7 @@ impl DropBlockOptions {
         let [kh, kw] = self.kernel;
         let kh = kh.resolve(h);
         let kw = kw.resolve(w);
-        [std::cmp::min(h, kh), std::cmp::min(w, kw)]
+        [core::cmp::min(h, kh), core::cmp::min(w, kw)]
     }
 
     /// Compute the adjusted gamma rate.

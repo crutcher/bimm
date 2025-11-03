@@ -11,8 +11,8 @@
 //! the description and containment testing of these regions.
 use crate::utility::results::expect_unwrap;
 use anyhow::bail;
-use std::cmp::Ordering;
-use std::fmt::Debug;
+use core::cmp::Ordering;
+use core::fmt::Debug;
 
 /// Z-space `PartialOrd`
 ///

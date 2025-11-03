@@ -18,6 +18,9 @@ use super::residual_block::{
 use crate::layers::drop::drop_block::DropBlockOptions;
 use crate::models::resnet::util::stride_div_output_resolution;
 use crate::utility::probability::expect_probability;
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::config::Config;
 use burn::nn::BatchNormConfig;
@@ -400,6 +403,7 @@ impl<B: Backend> LayerBlock<B> {
 mod tests {
     use super::*;
     use crate::models::resnet::basic_block::BasicBlockConfig;
+    use alloc::vec;
     use bimm_contracts::assert_shape_contract;
     use burn::backend::NdArray;
 

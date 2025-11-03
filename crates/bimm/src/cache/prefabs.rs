@@ -3,11 +3,13 @@
 use crate::cache::weights::{
     PretrainedWeightsDescriptor, PretrainedWeightsMap, StaticPretrainedWeightsMap,
 };
+use alloc::collections::BTreeMap;
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::sync::Arc;
 use anyhow::bail;
 use burn::config::Config;
-use std::collections::BTreeMap;
-use std::fmt::Debug;
-use std::sync::Arc;
+use core::fmt::Debug;
 
 /// Static builder for a [`PreFabConfig`]
 pub struct StaticPreFabConfig<C>
@@ -63,8 +65,8 @@ where
 {
     fn fmt(
         &self,
-        f: &mut std::fmt::Formatter<'_>,
-    ) -> std::fmt::Result {
+        f: &mut core::fmt::Formatter<'_>,
+    ) -> core::fmt::Result {
         self.to_prefab().fmt(f)
     }
 }
@@ -94,11 +96,11 @@ where
 {
     fn fmt(
         &self,
-        f: &mut std::fmt::Formatter<'_>,
-    ) -> std::fmt::Result {
+        f: &mut core::fmt::Formatter<'_>,
+    ) -> core::fmt::Result {
         let pretty = f.alternate();
 
-        let type_name = std::any::type_name::<C>();
+        let type_name = core::any::type_name::<C>();
         let mut handle = f.debug_struct(&format!("PreFabConfig<{}>", type_name));
 
         handle

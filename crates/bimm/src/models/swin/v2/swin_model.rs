@@ -1,4 +1,5 @@
 //! # Top-Level Swin Transformer v2 model components.
+
 use crate::layers::drop::rate_table::DropPathRateDepthTable;
 use crate::layers::patching::patch_embed::{PatchEmbed, PatchEmbedConfig, PatchEmbedMeta};
 use crate::models::swin::v2::block_sequence::{
@@ -6,6 +7,8 @@ use crate::models::swin::v2::block_sequence::{
     StochasticDepthTransformerBlockSequenceMeta,
 };
 use crate::models::swin::v2::patch_merge::{PatchMerging, PatchMergingConfig};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::config::Config;
 use burn::module::{Module, Param};
@@ -592,6 +595,7 @@ impl<B: Backend> SwinTransformerV2<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
     use burn::backend::NdArray;
     use burn::tensor::Distribution;
 

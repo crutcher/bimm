@@ -2,7 +2,7 @@ use burn::config::Config;
 use burn::module::Module;
 use burn::nn::pool::{AvgPool2d, AvgPool2dConfig};
 use burn::prelude::{Backend, Tensor};
-use std::cmp::max;
+use core::cmp::max;
 
 // `AvgPool2dSame`
 //

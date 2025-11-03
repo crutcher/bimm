@@ -4,6 +4,7 @@
 //! These are stub modules to smooth over loading issues with the current version
 //! of `burn-import`. There is insufficient information in loaded weights to
 //! derive information about stateless modules (such as ``Activation::Relu``).
+
 use crate::layers::blocks::cna::CNA2d;
 use crate::layers::blocks::conv_norm::ConvNorm2d;
 use crate::models::resnet::basic_block::BasicBlock;
@@ -12,6 +13,7 @@ use crate::models::resnet::downsample::ResNetDownsample;
 use crate::models::resnet::layer_block::LayerBlock;
 use crate::models::resnet::residual_block::ResidualBlock;
 use crate::models::resnet::resnet_model::ResNet;
+use alloc::vec::Vec;
 use burn::module::Module;
 use burn::nn::conv::{Conv2d, Conv2dRecord};
 use burn::nn::norm::Normalization;

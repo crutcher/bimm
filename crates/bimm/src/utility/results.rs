@@ -2,7 +2,7 @@
 //!
 //! Methods for [`std::result::Result`] manipulation.
 
-use std::fmt::Debug;
+use core::fmt::Debug;
 
 /// Unwraps Result, or Panics.
 ///

@@ -1,7 +1,11 @@
 //! # Burn Record Utilities
 
+use alloc::string::{String, ToString};
+use alloc::vec;
+use alloc::vec::Vec;
 use burn::prelude::Backend;
 use burn::record::{HalfPrecisionSettings, Record};
+use core::iter;
 use serde_json::{Map, Value};
 
 /// Hacky function to display a record.
@@ -18,7 +22,7 @@ pub fn display_record<B: Backend, R: Record<B>>(record: R) {
             // Recursively get shape of nested array
             let arr = arr[0].as_array().unwrap();
             let inner_shape = shape_of_numeric_array(arr)?;
-            Some(std::iter::once(arr.len()).chain(inner_shape).collect())
+            Some(iter::once(arr.len()).chain(inner_shape).collect())
         } else {
             None // Mixed or non-numeric
         }

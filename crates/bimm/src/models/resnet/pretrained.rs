@@ -3,7 +3,8 @@
 use crate::cache::prefabs::{PreFabConfig, StaticPreFabConfig, StaticPreFabMap};
 use crate::cache::weights::{StaticPretrainedWeightsDescriptor, StaticPretrainedWeightsMap};
 use crate::models::resnet::{ResNetContractConfig, ResNetStructureConfig};
-use std::sync::Arc;
+use alloc::sync::Arc;
+use alloc::vec;
 
 impl PreFabConfig<ResNetContractConfig> {
     /// Convert to a prefab for [`ResNetStructureConfig`].

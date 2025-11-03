@@ -1,6 +1,7 @@
 //! # Cache Policy
 
 use crate::cache::disk;
+use alloc::string::String;
 use anyhow::bail;
 use burn::config::Config;
 use burn::data::network::downloader;

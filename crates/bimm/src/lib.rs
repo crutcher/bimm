@@ -1,4 +1,3 @@
-#![warn(missing_docs)]
 //!# bimm - Burn Image Models
 //!
 //! ## Notable Components
@@ -18,6 +17,9 @@
 //!   * [`models::resnet`] - `ResNet`
 //!   * [`models::swin`] - The SWIN Family.
 //!     * [`models::swin::v2`] - The SWIN-V2 Model.
+#![warn(missing_docs)]
+
+extern crate alloc;
 
 extern crate core;
 /// Test-only macro import.

@@ -43,7 +43,7 @@ pub fn stride_div_output_resolution(
 
 /// Recommended initializer for conv layers feeding into a relu.
 pub static CONV_INTO_RELU_INITIALIZER: Initializer = Initializer::KaimingNormal {
-    gain: std::f64::consts::SQRT_2,
+    gain: core::f64::consts::SQRT_2,
     fan_out_only: true,
 };
 
