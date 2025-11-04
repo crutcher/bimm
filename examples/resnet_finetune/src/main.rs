@@ -276,7 +276,7 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .num_workers(args.num_workers)
         .build(valid);
 
-    let iters_per_epoch = train_set_size / (args.batch_size * args.grads_accumulation);
+    let iters_per_epoch = train_set_size / args.batch_size;
     let lr_scheduler = CosineAnnealingLrSchedulerConfig::new(
         args.learning_rate,
         iters_per_epoch * args.num_epochs,
