@@ -16,7 +16,6 @@ use burn::data::dataset::transform::ShuffledDataset;
 use burn::data::dataset::vision::ImageFolderDataset;
 use burn::lr_scheduler::cosine::CosineAnnealingLrSchedulerConfig;
 use burn::module::Module;
-use burn::nn::activation::ActivationConfig;
 use burn::nn::loss::BinaryCrossEntropyLossConfig;
 use burn::optim::AdamWConfig;
 use burn::prelude::{Int, Tensor};
@@ -92,7 +91,7 @@ pub struct Args {
     pub freeze_layers: bool,
 
     /// Drop Block Prob
-    #[arg(long, default_value = "0.2")]
+    #[arg(long, default_value = "0.15")]
     pub drop_block_prob: f64,
 
     /// Drop Path Prob
@@ -112,7 +111,7 @@ pub struct Args {
     pub cautious_weight_decay: bool,
 
     /// Optimizer Weight decay.
-    #[arg(long, default_value_t = 0.02)]
+    #[arg(long, default_value_t = 5e-3)]
     pub weight_decay: f32,
 }
 
@@ -213,7 +212,7 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .fetch_weights(&disk_cache)
         .expect("Failed to fetch pretrained weights");
 
-    let resnet_config = prefab.to_config().with_activation(ActivationConfig::Gelu);
+    let resnet_config = prefab.to_config();
 
     let mut model: ResNet<B> = resnet_config
         .clone()
