@@ -52,7 +52,7 @@ tracel-ai/models reference:
 pub struct Args {
     /// Random seed for reproducibility.
     #[arg(short, long, default_value = "0")]
-    seed: u64,
+    pub seed: u64,
 
     /// Train percentage.
     #[arg(long, default_value = "70")]
@@ -60,52 +60,52 @@ pub struct Args {
 
     /// Directory to save the artifacts.
     #[arg(long, default_value = "/tmp/resnet_finetune")]
-    artifact_dir: String,
+    pub artifact_dir: String,
 
     /// Batch size for processing
     #[arg(short, long, default_value_t = 24)]
-    batch_size: usize,
+    pub batch_size: usize,
 
     /// Grads accumulation size for processing
-    #[arg(short, long, default_value_t = 24)]
-    grads_accumulation: usize,
+    #[arg(short, long, default_value_t = 8)]
+    pub grads_accumulation: usize,
 
     /// Category smoothing factor for training.
     #[arg(long, default_value = "0.1")]
-    smoothing: Option<f32>,
+    pub smoothing: Option<f32>,
 
     /// Number of workers for data loading.
     #[arg(long, default_value = "4")]
-    num_workers: usize,
+    pub num_workers: usize,
 
     /// Number of epochs to train the model.
     #[arg(long, default_value = "200")]
-    num_epochs: usize,
+    pub num_epochs: usize,
 
     /// Pretrained Resnet Model.
     /// Use "list" to list all available pretrained models.
     #[arg(long, default_value = "resnet50.tv_in1k")]
-    pretrained: String,
+    pub pretrained: String,
 
     /// Freeze the body layers during training.
     #[arg(long, default_value = "false")]
-    freeze_layers: bool,
+    pub freeze_layers: bool,
 
     /// Drop Block Prob
     #[arg(long, default_value = "0.2")]
-    drop_block_prob: f64,
+    pub drop_block_prob: f64,
 
     /// Drop Path Prob
     #[arg(long, default_value = "0.05")]
-    stochastic_depth_prob: f64,
+    pub stochastic_depth_prob: f64,
 
     /// Learning rate
-    #[arg(long, default_value_t = 5e-3)]
+    #[arg(long, default_value_t = 5e-4)]
     pub learning_rate: f64,
 
     /// Early stopping patience
     #[arg(long, default_value_t = 20)]
-    patience: usize,
+    pub patience: usize,
 
     /// Enable cautious weight decay.
     #[arg(long, default_value = "false")]
