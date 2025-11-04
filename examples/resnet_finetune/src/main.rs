@@ -16,7 +16,9 @@ use burn::data::dataset::transform::ShuffledDataset;
 use burn::data::dataset::vision::ImageFolderDataset;
 use burn::lr_scheduler::cosine::CosineAnnealingLrSchedulerConfig;
 use burn::module::Module;
+use burn::nn::activation::ActivationConfig;
 use burn::nn::loss::BinaryCrossEntropyLossConfig;
+use burn::nn::{LeakyReluConfig, PReluConfig};
 use burn::optim::AdamWConfig;
 use burn::prelude::{Int, Tensor};
 use burn::record::CompactRecorder;
@@ -33,8 +35,9 @@ use burn::train::{
     LearnerBuilder, LearningStrategy, MetricEarlyStoppingStrategy, MultiLabelClassificationOutput,
     StoppingCondition, TrainOutput, TrainStep, ValidStep,
 };
-use clap::{Parser, arg};
+use clap::{Parser, ValueEnum, arg};
 use core::clone::Clone;
+use serde::{Deserialize, Serialize};
 use std::time::Instant;
 /*
 tracel-ai/models reference:
@@ -45,6 +48,13 @@ tracel-ai/models reference:
 | Valid | Hamming Score @ Threshold(0.5) | 88.490   | 1        | 93.843   | 3        |
 | Valid | Loss                           | 0.168    | 3        | 0.512    | 1        |
  */
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
+pub enum ReplaceActivationOption {
+    Gelu,
+    PRelu,
+    LeakyRelu,
+}
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -78,20 +88,28 @@ pub struct Args {
     pub num_workers: usize,
 
     /// Number of epochs to train the model.
-    #[arg(long, default_value = "200")]
+    #[arg(long, default_value = "60")]
     pub num_epochs: usize,
+
+    /// Early stopping patience
+    #[arg(long, default_value_t = 20)]
+    pub patience: usize,
 
     /// Pretrained Resnet Model.
     /// Use "list" to list all available pretrained models.
     #[arg(long, default_value = "resnet50.tv_in1k")]
     pub pretrained: String,
 
+    /// Replace activation function?
+    #[arg(long, default_value = "None")]
+    pub replace_activation: Option<ReplaceActivationOption>,
+
     /// Freeze the body layers during training.
     #[arg(long, default_value = "false")]
     pub freeze_layers: bool,
 
     /// Drop Block Prob
-    #[arg(long, default_value = "0.15")]
+    #[arg(long, default_value = "0.2")]
     pub drop_block_prob: f64,
 
     /// Drop Path Prob
@@ -99,19 +117,15 @@ pub struct Args {
     pub stochastic_depth_prob: f64,
 
     /// Learning rate
-    #[arg(long, default_value_t = 5e-4)]
+    #[arg(long, default_value_t = 5e-5)]
     pub learning_rate: f64,
-
-    /// Early stopping patience
-    #[arg(long, default_value_t = 20)]
-    pub patience: usize,
 
     /// Enable cautious weight decay.
     #[arg(long, default_value = "false")]
     pub cautious_weight_decay: bool,
 
     /// Optimizer Weight decay.
-    #[arg(long, default_value_t = 5e-3)]
+    #[arg(long, default_value_t = 2e-2)]
     pub weight_decay: f32,
 }
 
@@ -212,7 +226,23 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .fetch_weights(&disk_cache)
         .expect("Failed to fetch pretrained weights");
 
-    let resnet_config = prefab.to_config();
+    let mut resnet_config = prefab.to_config();
+
+    if let Some(option) = &args.replace_activation {
+        match option {
+            ReplaceActivationOption::Gelu => {
+                resnet_config = resnet_config.with_activation(ActivationConfig::Gelu);
+            }
+            ReplaceActivationOption::PRelu => {
+                resnet_config =
+                    resnet_config.with_activation(ActivationConfig::PRelu(PReluConfig::new()));
+            }
+            ReplaceActivationOption::LeakyRelu => {
+                resnet_config = resnet_config
+                    .with_activation(ActivationConfig::LeakyRelu(LeakyReluConfig::new()));
+            }
+        }
+    }
 
     let mut model: ResNet<B> = resnet_config
         .clone()
@@ -283,50 +313,55 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     .init()
     .expect("Failed to initialize learning rate scheduler");
 
-    // Learner config
-    let learner = LearnerBuilder::new(artifact_dir)
-        .metric_train_numeric(HammingScore::new())
-        .metric_valid_numeric(HammingScore::new())
-        .metric_train_numeric(LossMetric::new())
-        .metric_valid_numeric(LossMetric::new())
-        .metric_train(CudaMetric::new())
-        .metric_valid(CudaMetric::new())
-        .metric_train_numeric(CpuUse::new())
-        .metric_valid_numeric(CpuUse::new())
-        .metric_train_numeric(CpuMemory::new())
-        .metric_valid_numeric(CpuMemory::new())
-        .metric_train_numeric(LearningRateMetric::new())
-        .with_file_checkpointer(CompactRecorder::new())
-        .early_stopping(MetricEarlyStoppingStrategy::new(
-            &LossMetric::<B>::new(),
-            Aggregate::Mean,
-            Direction::Lowest,
-            Split::Valid,
-            StoppingCondition::NoImprovementSince {
-                n_epochs: args.patience,
-            },
-        ))
-        .learning_strategy(LearningStrategy::SingleDevice(device.clone()))
-        .grads_accumulation(args.grads_accumulation)
-        .num_epochs(args.num_epochs)
-        .summary()
-        /*
-        .renderer(CustomRenderer {})
-        .with_application_logger(None)
-         */
-        .build(host, optimizer, lr_scheduler);
+    let now: Instant;
+    {
+        // Learner config
+        let learner = LearnerBuilder::new(artifact_dir)
+            .metric_train_numeric(HammingScore::new())
+            .metric_valid_numeric(HammingScore::new())
+            .metric_train_numeric(LossMetric::new())
+            .metric_valid_numeric(LossMetric::new())
+            .metric_train(CudaMetric::new())
+            .metric_valid(CudaMetric::new())
+            .metric_train_numeric(CpuUse::new())
+            .metric_valid_numeric(CpuUse::new())
+            .metric_train_numeric(CpuMemory::new())
+            .metric_valid_numeric(CpuMemory::new())
+            .metric_train_numeric(LearningRateMetric::new())
+            .with_file_checkpointer(CompactRecorder::new())
+            .early_stopping(MetricEarlyStoppingStrategy::new(
+                &LossMetric::<B>::new(),
+                Aggregate::Mean,
+                Direction::Lowest,
+                Split::Valid,
+                StoppingCondition::NoImprovementSince {
+                    n_epochs: args.patience,
+                },
+            ))
+            .learning_strategy(LearningStrategy::SingleDevice(device.clone()))
+            .grads_accumulation(args.grads_accumulation)
+            .num_epochs(args.num_epochs)
+            .summary()
+            /*
+            .renderer(CustomRenderer {})
+            .with_application_logger(None)
+             */
+            .build(host, optimizer, lr_scheduler);
 
-    // Training
-    let now = Instant::now();
-    let model_trained = learner.fit(dataloader_train, dataloader_test);
+        // Training
+        now = Instant::now();
+        let model_trained = learner.fit(dataloader_train, dataloader_test);
+
+        model_trained
+            .model
+            .resnet
+            .save_file(format!("{artifact_dir}/model"), &CompactRecorder::new())
+            .expect("Trained model should be saved successfully");
+    }
     let elapsed = now.elapsed().as_secs();
     println!("Training completed in {}m{}s", (elapsed / 60), elapsed % 60);
 
-    model_trained
-        .model
-        .resnet
-        .save_file(format!("{artifact_dir}/model"), &CompactRecorder::new())
-        .expect("Trained model should be saved successfully");
+    println!("{:#?}", args);
 
     Ok(())
 }
