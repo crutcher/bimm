@@ -104,6 +104,10 @@ pub struct Args {
     #[arg(long, default_value_t = 10)]
     patience: usize,
 
+    /// Enable cautious weight decay.
+    #[arg(long, default_value = "false")]
+    pub cautious_weight_decay: bool,
+
     /// Optimizer Weight decay.
     #[arg(long, default_value_t = 5e-4)]
     pub weight_decay: f32,
@@ -228,7 +232,7 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     };
 
     let optimizer = AdamWConfig::new()
-        .with_cautious_weight_decay(true)
+        .with_cautious_weight_decay(args.cautious_weight_decay)
         .with_weight_decay(args.weight_decay)
         .init();
 
