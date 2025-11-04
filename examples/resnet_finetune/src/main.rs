@@ -23,7 +23,9 @@ use burn::prelude::{Int, Tensor};
 use burn::record::CompactRecorder;
 use burn::tensor::backend::{AutodiffBackend, Backend};
 use burn::train::metric::store::{Aggregate, Direction, Split};
-use burn::train::metric::{HammingScore, LossMetric};
+use burn::train::metric::{
+    CpuMemory, CpuUse, CudaMetric, HammingScore, LearningRateMetric, LossMetric,
+};
 use burn::train::renderer::{
     EvaluationName, EvaluationProgress, MetricState, MetricsRenderer, MetricsRendererEvaluation,
     MetricsRendererTraining, TrainingProgress,
@@ -57,7 +59,7 @@ pub struct Args {
     pub train_percentage: u8,
 
     /// Directory to save the artifacts.
-    #[arg(long, default_value = "/tmp/resnet-finetune")]
+    #[arg(long, default_value = "/tmp/resnet_finetune")]
     artifact_dir: String,
 
     /// Batch size for processing
@@ -288,6 +290,13 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .metric_valid_numeric(HammingScore::new())
         .metric_train_numeric(LossMetric::new())
         .metric_valid_numeric(LossMetric::new())
+        .metric_train(CudaMetric::new())
+        .metric_valid(CudaMetric::new())
+        .metric_train_numeric(CpuUse::new())
+        .metric_valid_numeric(CpuUse::new())
+        .metric_train_numeric(CpuMemory::new())
+        .metric_valid_numeric(CpuMemory::new())
+        .metric_train_numeric(LearningRateMetric::new())
         .with_file_checkpointer(CompactRecorder::new())
         .early_stopping(MetricEarlyStoppingStrategy::new(
             &LossMetric::<B>::new(),
