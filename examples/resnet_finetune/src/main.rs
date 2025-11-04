@@ -1,4 +1,4 @@
-#![allow(dead_code, unused)]
+#![allow(dead_code)]
 #![recursion_limit = "256"]
 
 extern crate core;
@@ -8,18 +8,16 @@ mod dataset;
 use crate::data::{ClassificationBatch, ClassificationBatcher};
 use crate::dataset::{CLASSES, PlanetLoader, download};
 use bimm::cache::disk::DiskCacheConfig;
-use bimm::models::resnet::{PREFAB_RESNET_MAP, ResNet, ResNetContractConfig};
+use bimm::models::resnet::{PREFAB_RESNET_MAP, ResNet};
 use burn::backend::Autodiff;
 use burn::config::Config;
 use burn::data::dataloader::DataLoaderBuilder;
 use burn::data::dataset::transform::ShuffledDataset;
 use burn::data::dataset::vision::ImageFolderDataset;
 use burn::module::Module;
-use burn::nn::PReluConfig;
 use burn::nn::activation::ActivationConfig;
 use burn::nn::loss::BinaryCrossEntropyLossConfig;
-use burn::optim::AdamConfig;
-use burn::optim::decay::WeightDecayConfig;
+use burn::optim::AdamWConfig;
 use burn::prelude::{Int, Tensor};
 use burn::record::CompactRecorder;
 use burn::tensor::backend::{AutodiffBackend, Backend};
@@ -152,6 +150,11 @@ fn main() -> anyhow::Result<()> {
     return train::<Autodiff<burn::backend::Metal>>(&args);
 }
 
+pub fn reset_artifact_dir(artifact_dir: &str) -> anyhow::Result<()> {
+    std::fs::remove_dir_all(artifact_dir)?;
+    std::fs::create_dir_all(artifact_dir).map_err(|e| anyhow::anyhow!(e))
+}
+
 #[must_use]
 pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     let device: B::Device = Default::default();
@@ -189,8 +192,7 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
 
     // Remove existing artifacts before to get an accurate learner summary
     let artifact_dir: &str = args.artifact_dir.as_ref();
-    std::fs::remove_dir_all(artifact_dir);
-    std::fs::create_dir_all(artifact_dir).expect("Failed to create artifacts directory");
+    reset_artifact_dir(artifact_dir)?;
 
     B::seed(&device, args.seed);
 
@@ -224,8 +226,9 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         resnet: model,
     };
 
-    let optimizer = AdamConfig::new()
-        .with_weight_decay(Some(WeightDecayConfig::new(args.weight_decay)))
+    let optimizer = AdamWConfig::new()
+        .with_cautious_weight_decay(true)
+        .with_weight_decay(args.weight_decay)
         .init();
 
     LogConfig {

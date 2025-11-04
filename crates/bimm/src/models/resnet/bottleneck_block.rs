@@ -522,6 +522,7 @@ impl<B: Backend> BottleneckBlock<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bimm_contracts::assert_shape_contract;
     use burn::backend::NdArray;
     use burn::nn::activation::ActivationConfig;
 
@@ -571,7 +572,6 @@ mod tests {
 
     #[test]
     fn test_basic_block_forward_same_channels_no_downsample_autodiff() {
-        use bimm_contracts::assert_shape_contract;
         use burn::backend::{Autodiff, Wgpu};
         type B = Autodiff<Wgpu>;
 
@@ -603,7 +603,6 @@ mod tests {
 
     #[test]
     fn test_basic_block_forward_downsample_drop_block_drop_path_autodiff() {
-        use bimm_contracts::assert_shape_contract;
         use burn::backend::{Autodiff, Wgpu};
         type B = Autodiff<Wgpu>;
 
