@@ -150,9 +150,10 @@ fn main() -> anyhow::Result<()> {
     return train::<Autodiff<burn::backend::Metal>>(&args);
 }
 
-pub fn reset_artifact_dir(artifact_dir: &str) -> anyhow::Result<()> {
-    std::fs::remove_dir_all(artifact_dir)?;
-    std::fs::create_dir_all(artifact_dir).map_err(|e| anyhow::anyhow!(e))
+fn ensure_artifact_dir(artifact_dir: &str) -> anyhow::Result<()> {
+    let _ignored = std::fs::remove_dir_all(artifact_dir);
+    std::fs::create_dir_all(artifact_dir)?;
+    Ok(())
 }
 
 #[must_use]
@@ -192,7 +193,7 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
 
     // Remove existing artifacts before to get an accurate learner summary
     let artifact_dir: &str = args.artifact_dir.as_ref();
-    reset_artifact_dir(artifact_dir)?;
+    ensure_artifact_dir(artifact_dir)?;
 
     B::seed(&device, args.seed);
 
