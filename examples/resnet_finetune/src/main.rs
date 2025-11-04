@@ -11,9 +11,10 @@ use bimm::cache::disk::DiskCacheConfig;
 use bimm::models::resnet::{PREFAB_RESNET_MAP, ResNet};
 use burn::backend::Autodiff;
 use burn::config::Config;
-use burn::data::dataloader::DataLoaderBuilder;
+use burn::data::dataloader::{DataLoaderBuilder, Dataset};
 use burn::data::dataset::transform::ShuffledDataset;
 use burn::data::dataset::vision::ImageFolderDataset;
+use burn::lr_scheduler::cosine::CosineAnnealingLrSchedulerConfig;
 use burn::module::Module;
 use burn::nn::activation::ActivationConfig;
 use burn::nn::loss::BinaryCrossEntropyLossConfig;
@@ -64,7 +65,7 @@ pub struct Args {
     batch_size: usize,
 
     /// Grads accumulation size for processing
-    #[arg(short, long, default_value_t = 8)]
+    #[arg(short, long, default_value_t = 24)]
     grads_accumulation: usize,
 
     /// Category smoothing factor for training.
@@ -76,12 +77,12 @@ pub struct Args {
     num_workers: usize,
 
     /// Number of epochs to train the model.
-    #[arg(long, default_value = "60")]
+    #[arg(long, default_value = "200")]
     num_epochs: usize,
 
     /// Pretrained Resnet Model.
     /// Use "list" to list all available pretrained models.
-    #[arg(long, default_value = "resnet34.tv_in1k")]
+    #[arg(long, default_value = "resnet50.tv_in1k")]
     pretrained: String,
 
     /// Freeze the body layers during training.
@@ -93,15 +94,15 @@ pub struct Args {
     drop_block_prob: f64,
 
     /// Drop Path Prob
-    #[arg(long, default_value = "0.1")]
-    drop_path_prob: f64,
+    #[arg(long, default_value = "0.05")]
+    stochastic_depth_prob: f64,
 
     /// Learning rate
-    #[arg(long, default_value_t = 5e-5)]
+    #[arg(long, default_value_t = 5e-3)]
     pub learning_rate: f64,
 
     /// Early stopping patience
-    #[arg(long, default_value_t = 10)]
+    #[arg(long, default_value_t = 20)]
     patience: usize,
 
     /// Enable cautious weight decay.
@@ -109,7 +110,7 @@ pub struct Args {
     pub cautious_weight_decay: bool,
 
     /// Optimizer Weight decay.
-    #[arg(long, default_value_t = 5e-4)]
+    #[arg(long, default_value_t = 0.02)]
     pub weight_decay: f32,
 }
 
@@ -220,7 +221,7 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .expect("Failed to load pretrained weights")
         .with_classes(CLASSES.len())
         .with_stochastic_drop_block(args.drop_block_prob)
-        .with_stochastic_path_depth(args.drop_path_prob);
+        .with_stochastic_path_depth(args.stochastic_depth_prob);
 
     if args.freeze_layers {
         model = model.freeze_layers();
@@ -244,7 +245,7 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         resnet_prefab: resnet_prefab.clone(),
         resnet_pretrained: resnet_pretrained.clone(),
         drop_block_prob: args.drop_block_prob,
-        drop_path_prob: args.drop_path_prob,
+        drop_path_prob: args.stochastic_depth_prob,
         learning_rate: args.learning_rate,
         patience: args.patience,
         weight_decay: args.weight_decay,
@@ -260,6 +261,8 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     let (train, valid) =
         ImageFolderDataset::planet_train_val_split(args.train_percentage, args.seed).unwrap();
 
+    let train_set_size = train.len();
+
     let dataloader_train = DataLoaderBuilder::new(batcher_train)
         .batch_size(args.batch_size)
         .shuffle(args.seed)
@@ -270,6 +273,14 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .batch_size(args.batch_size)
         .num_workers(args.num_workers)
         .build(valid);
+
+    let iters_per_epoch = train_set_size / (args.batch_size * args.grads_accumulation);
+    let lr_scheduler = CosineAnnealingLrSchedulerConfig::new(
+        args.learning_rate,
+        iters_per_epoch * args.num_epochs,
+    )
+    .init()
+    .expect("Failed to initialize learning rate scheduler");
 
     // Learner config
     let learner = LearnerBuilder::new(artifact_dir)
@@ -295,7 +306,7 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .renderer(CustomRenderer {})
         .with_application_logger(None)
          */
-        .build(host, optimizer, args.learning_rate);
+        .build(host, optimizer, lr_scheduler);
 
     // Training
     let now = Instant::now();
