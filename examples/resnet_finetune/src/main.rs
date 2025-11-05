@@ -90,7 +90,7 @@ pub struct Args {
     #[arg(long, default_value = "60")]
     pub num_epochs: usize,
 
-    /// Early stopping patience
+    /// Early stopping patience; 0 to disable.
     #[arg(long, default_value_t = 20)]
     pub patience: usize,
 
@@ -116,7 +116,7 @@ pub struct Args {
     pub stochastic_depth_prob: f64,
 
     /// Learning rate
-    #[arg(long, default_value_t = 5e-5)]
+    #[arg(long, default_value_t = 5e-3)]
     pub learning_rate: f64,
 
     /// Enable cautious weight decay.
@@ -315,7 +315,7 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     let now: Instant;
     {
         // Learner config
-        let learner = LearnerBuilder::new(artifact_dir)
+        let mut learner_config = LearnerBuilder::new(artifact_dir)
             .metric_train_numeric(HammingScore::new())
             .metric_valid_numeric(HammingScore::new())
             .metric_train_numeric(LossMetric::new())
@@ -328,7 +328,17 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
             .metric_valid_numeric(CpuMemory::new())
             .metric_train_numeric(LearningRateMetric::new())
             .with_file_checkpointer(CompactRecorder::new())
-            .early_stopping(MetricEarlyStoppingStrategy::new(
+            .learning_strategy(LearningStrategy::SingleDevice(device.clone()))
+            .grads_accumulation(args.grads_accumulation)
+            .num_epochs(args.num_epochs)
+            .summary();
+        /*
+        .renderer(CustomRenderer {})
+        .with_application_logger(None)
+         */
+
+        if args.patience > 0 {
+            learner_config = learner_config.early_stopping(MetricEarlyStoppingStrategy::new(
                 &LossMetric::<B>::new(),
                 Aggregate::Mean,
                 Direction::Lowest,
@@ -336,16 +346,10 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
                 StoppingCondition::NoImprovementSince {
                     n_epochs: args.patience,
                 },
-            ))
-            .learning_strategy(LearningStrategy::SingleDevice(device.clone()))
-            .grads_accumulation(args.grads_accumulation)
-            .num_epochs(args.num_epochs)
-            .summary()
-            /*
-            .renderer(CustomRenderer {})
-            .with_application_logger(None)
-             */
-            .build(host, optimizer, lr_scheduler);
+            ));
+        }
+
+        let learner = learner_config.build(host, optimizer, lr_scheduler);
 
         // Training
         now = Instant::now();
