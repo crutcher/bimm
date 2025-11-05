@@ -37,7 +37,6 @@ use burn::train::{
 };
 use clap::{Parser, ValueEnum, arg};
 use core::clone::Clone;
-use serde::{Deserialize, Serialize};
 use std::time::Instant;
 /*
 tracel-ai/models reference:
@@ -49,7 +48,7 @@ tracel-ai/models reference:
 | Valid | Loss                           | 0.168    | 3        | 0.512    | 1        |
  */
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum ReplaceActivationOption {
     Gelu,
     PRelu,
