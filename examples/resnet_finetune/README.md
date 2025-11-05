@@ -117,6 +117,7 @@ Args {
     weight_decay: 0.02,
 }
 
+$ cargo run --release -p resnet_finetune --features cuda -- --replace-activation leaky-relu --cautious-weight-decay
 | Split | Metric                         | Min.     | Epoch    | Max.     | Epoch    |
 |-------|--------------------------------|----------|----------|----------|----------|
 | Train | CPU Memory                     | 16.486   | 1        | 18.592   | 60       |
