@@ -1,6 +1,5 @@
 //! # Cache Policy
 
-use crate::cache::disk;
 use alloc::string::String;
 use anyhow::bail;
 use burn::config::Config;
@@ -75,7 +74,7 @@ impl DiskCacheConfig {
         resource: &[String],
     ) -> anyhow::Result<PathBuf> {
         let cache_file_path = self.ensure_resource_parent_dir(resource)?;
-        disk::try_cache_download_to_path(url, cache_file_path)
+        try_cache_download_to_path(url, cache_file_path)
     }
 }
 

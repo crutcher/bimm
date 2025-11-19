@@ -14,7 +14,9 @@ use burn::config::Config;
 use burn::data::dataloader::{DataLoaderBuilder, Dataset};
 use burn::data::dataset::transform::ShuffledDataset;
 use burn::data::dataset::vision::ImageFolderDataset;
+use burn::lr_scheduler::composed::{ComposedLrSchedulerConfig, SchedulerReduction};
 use burn::lr_scheduler::cosine::CosineAnnealingLrSchedulerConfig;
+use burn::lr_scheduler::linear::LinearLrSchedulerConfig;
 use burn::module::Module;
 use burn::nn::activation::ActivationConfig;
 use burn::nn::loss::BinaryCrossEntropyLossConfig;
@@ -75,11 +77,11 @@ pub struct Args {
     pub batch_size: usize,
 
     /// Grads accumulation size for processing
-    #[arg(short, long, default_value_t = 8)]
+    #[arg(short, long, default_value_t = 4)]
     pub grads_accumulation: usize,
 
     /// Category smoothing factor for training.
-    #[arg(long, default_value = "0.1")]
+    #[arg(long, default_value = "0.05")]
     pub smoothing: Option<f32>,
 
     /// Number of workers for data loading.
@@ -87,11 +89,11 @@ pub struct Args {
     pub num_workers: usize,
 
     /// Number of epochs to train the model.
-    #[arg(long, default_value = "60")]
+    #[arg(long, default_value = "100")]
     pub num_epochs: usize,
 
     /// Early stopping patience; 0 to disable.
-    #[arg(long, default_value_t = 20)]
+    #[arg(long, default_value_t = 10)]
     pub patience: usize,
 
     /// Pretrained Resnet Model.
@@ -100,7 +102,7 @@ pub struct Args {
     pub pretrained: String,
 
     /// Replace activation function?
-    #[arg(long, default_value = "None")]
+    #[arg(long, default_value = "gelu")]
     pub replace_activation: Option<ReplaceActivationOption>,
 
     /// Freeze the body layers during training.
@@ -112,19 +114,23 @@ pub struct Args {
     pub drop_block_prob: f64,
 
     /// Drop Path Prob
-    #[arg(long, default_value = "0.05")]
+    #[arg(long, default_value = "0.1")]
     pub stochastic_depth_prob: f64,
 
     /// Learning rate
     #[arg(long, default_value_t = 5e-3)]
     pub learning_rate: f64,
 
+    /// Warm-up epochs.
+    #[arg(long, default_value_t = 20)]
+    pub warmup_epochs: usize,
+
     /// Enable cautious weight decay.
     #[arg(long, default_value = "false")]
     pub cautious_weight_decay: bool,
 
     /// Optimizer Weight decay.
-    #[arg(long, default_value_t = 2e-2)]
+    #[arg(long, default_value_t = 5e-3)]
     pub weight_decay: f32,
 }
 
@@ -305,12 +311,19 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .build(valid);
 
     let iters_per_epoch = train_set_size / args.batch_size;
-    let lr_scheduler = CosineAnnealingLrSchedulerConfig::new(
-        args.learning_rate,
-        iters_per_epoch * args.num_epochs,
-    )
-    .init()
-    .expect("Failed to initialize learning rate scheduler");
+    let lr_scheduler = ComposedLrSchedulerConfig::new()
+        .linear(LinearLrSchedulerConfig::new(
+            1e-7,
+            1.0,
+            iters_per_epoch * args.warmup_epochs,
+        ))
+        .cosine(CosineAnnealingLrSchedulerConfig::new(
+            args.learning_rate,
+            iters_per_epoch * args.num_epochs,
+        ))
+        .with_reduction(SchedulerReduction::Prod)
+        .init()
+        .expect("Failed to initialize learning rate scheduler");
 
     let now: Instant;
     {
