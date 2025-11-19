@@ -122,7 +122,7 @@ pub struct Args {
     pub learning_rate: f64,
 
     /// Warm-up epochs.
-    #[arg(long, default_value_t = 20)]
+    #[arg(long, default_value_t = 5)]
     pub warmup_epochs: usize,
 
     /// Enable cautious weight decay.
