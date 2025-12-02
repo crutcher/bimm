@@ -154,7 +154,7 @@ impl<B: Backend> PatchMerging<B> {
     ) -> Tensor<B, 3> {
         let [b, h, w] = unpack_shape_contract!(
             ["batch", "flat" = "height" * "width", "d_in"],
-            &x,
+            &x.dims(),
             &["batch", "height", "width"],
             &[
                 ("height", self.input_height()),
@@ -170,7 +170,7 @@ impl<B: Backend> PatchMerging<B> {
         let x = self.norm.forward(x);
         assert_shape_contract_periodically!(
             ["batch", "flat" = "half_height" * "half_width", "d_out"],
-            &x,
+            &x.dims(),
             &[
                 ("batch", b),
                 ("half_height", self.output_height()),
@@ -211,7 +211,7 @@ where
 {
     let [b, h, w, c] = unpack_shape_contract!(
         ["batch", "flat" = "height" * "width", "channels"],
-        &x,
+        &x.dims(),
         &["batch", "height", "width", "channels"],
         &[("height", h), ("width", w)]
     );
@@ -262,7 +262,7 @@ where
 
     let [b, c] = unpack_shape_contract!(
         ["batch", "half_height" * "half_width", "channels"],
-        &x,
+        &x.dims(),
         &["batch", "channels"],
         &[("half_height", h2), ("half_width", w2)]
     );

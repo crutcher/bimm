@@ -393,7 +393,7 @@ mod tests {
 
         assert_shape_contract!(
             ["batch", "out_channels", "out_height", "out_width"],
-            &output,
+            &output.dims(),
             &[
                 ("batch", batch_size),
                 ("out_channels", planes),
@@ -433,7 +433,7 @@ mod tests {
 
         assert_shape_contract!(
             ["batch", "out_planes", "out_height", "out_width"],
-            &output,
+            &output.dims(),
             &[
                 ("batch", batch_size),
                 ("out_planes", planes),

@@ -19,7 +19,6 @@ use bimm_firehose_image::augmentation::orientation::flip::HorizontalFlipStage;
 use bimm_firehose_image::burn_support::{ImageToTensorData, stack_tensor_data_column};
 use bimm_firehose_image::loader::{ImageLoader, ResizeSpec};
 use bimm_firehose_image::{ColorType, ImageShape};
-use burn::backend::Autodiff;
 use burn::config::Config;
 use burn::data::dataloader::{DataLoaderBuilder, Dataset};
 use burn::data::dataset::transform::SamplerDataset;
@@ -113,13 +112,13 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     #[cfg(feature = "wgpu")]
-    return backend_main::<Autodiff<burn::backend::Wgpu>>(&args);
+    return backend_main::<burn::backend::Autodiff<burn::backend::Wgpu>>(&args);
 
     #[cfg(feature = "cuda")]
-    return backend_main::<Autodiff<burn::backend::Cuda>>(&args);
+    return backend_main::<burn::backend::Autodiff<burn::backend::Cuda>>(&args);
 
     #[cfg(feature = "metal")]
-    return backend_main::<Autodiff<burn::backend::Metal>>(&args);
+    return backend_main::<burn::backend::Autodiff<burn::backend::Metal>>(&args);
 }
 
 /// Create the artifact directory for saving training artifacts.
@@ -310,13 +309,13 @@ pub fn backend_main<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
             StoppingCondition::NoImprovementSince { n_epochs: 6 },
         ))
          */
-        .learning_strategy(LearningStrategy::SingleDevice(device.clone()))
         .num_epochs(args.num_epochs)
         .summary()
         .build(
             training_config.model.init::<B>(&device),
             training_config.optimizer.init(),
             lr_scheduler,
+            LearningStrategy::SingleDevice(device.clone()),
         );
 
     let model_trained = learner.fit(train_dataloader, validation_dataloader);

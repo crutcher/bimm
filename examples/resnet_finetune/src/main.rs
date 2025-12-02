@@ -9,7 +9,6 @@ use crate::data::{ClassificationBatch, ClassificationBatcher};
 use crate::dataset::{CLASSES, PlanetLoader, download};
 use bimm::cache::disk::DiskCacheConfig;
 use bimm::models::resnet::{PREFAB_RESNET_MAP, ResNet};
-use burn::backend::Autodiff;
 use burn::config::Config;
 use burn::data::dataloader::{DataLoaderBuilder, Dataset};
 use burn::data::dataset::transform::ShuffledDataset;
@@ -27,7 +26,7 @@ use burn::record::CompactRecorder;
 use burn::tensor::backend::{AutodiffBackend, Backend};
 use burn::train::metric::store::{Aggregate, Direction, Split};
 use burn::train::metric::{
-    CpuMemory, CpuUse, CudaMetric, HammingScore, LearningRateMetric, LossMetric,
+    CpuMemory, CpuUse, CudaMetric, HammingScore, LearningRateMetric, LossMetric, MetricDefinition,
 };
 use burn::train::renderer::{
     EvaluationName, EvaluationProgress, MetricState, MetricsRenderer, MetricsRendererEvaluation,
@@ -166,13 +165,13 @@ fn main() -> anyhow::Result<()> {
     let _source_tree = download();
 
     #[cfg(feature = "wgpu")]
-    return train::<Autodiff<burn::backend::Wgpu>>(&args);
+    return train::<burn::backend::Autodiff<burn::backend::Wgpu>>(&args);
 
     #[cfg(feature = "cuda")]
-    return train::<Autodiff<burn::backend::Cuda>>(&args);
+    return train::<burn::backend::Autodiff<burn::backend::Cuda>>(&args);
 
     #[cfg(feature = "metal")]
-    return train::<Autodiff<burn::backend::Metal>>(&args);
+    return train::<burn::backend::Autodiff<burn::backend::Metal>>(&args);
 }
 
 fn ensure_artifact_dir(artifact_dir: &str) -> anyhow::Result<()> {
@@ -341,7 +340,6 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
             .metric_valid_numeric(CpuMemory::new())
             .metric_train_numeric(LearningRateMetric::new())
             .with_file_checkpointer(CompactRecorder::new())
-            .learning_strategy(LearningStrategy::SingleDevice(device.clone()))
             .grads_accumulation(args.grads_accumulation)
             .num_epochs(args.num_epochs)
             .summary();
@@ -362,7 +360,12 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
             ));
         }
 
-        let learner = learner_config.build(host, optimizer, lr_scheduler);
+        let learner = learner_config.build(
+            host,
+            optimizer,
+            lr_scheduler,
+            LearningStrategy::SingleDevice(device.clone()),
+        );
 
         // Training
         now = Instant::now();
@@ -415,6 +418,12 @@ impl MetricsRendererTraining for CustomRenderer {
 impl MetricsRenderer for CustomRenderer {
     fn manual_close(&mut self) {
         // Nothing to do.
+    }
+
+    fn register_metric(
+        &mut self,
+        _definition: MetricDefinition,
+    ) {
     }
 }
 

@@ -335,7 +335,7 @@ impl<B: Backend> LayerBlock<B> {
                 "in_height" = "out_height" * "stride",
                 "in_width" = "out_width" * "stride"
             ],
-            &input,
+            &input.dims(),
             &["batch", "out_height", "out_width"],
             &[("in_planes", self.in_planes()), ("stride", self.stride())],
         );
@@ -347,7 +347,7 @@ impl<B: Backend> LayerBlock<B> {
 
         assert_shape_contract_periodically!(
             ["batch", "out_planes", "out_height", "out_width"],
-            &x,
+            &x.dims(),
             &[
                 ("batch", batch),
                 ("out_planes", self.out_planes()),
@@ -477,7 +477,7 @@ mod tests {
         let output = block.forward(input.clone());
         assert_shape_contract!(
             ["batch", "out_planes", "out_height", "out_width"],
-            &output,
+            &output.dims(),
             &[
                 ("batch", batch_size),
                 ("out_planes", c_planes),

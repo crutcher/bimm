@@ -173,7 +173,7 @@ mod tests {
                 "window_size" ^ 2,
                 "channels"
             ],
-            &res,
+            &res.dims(),
             &[
                 ("batch", b),
                 ("num_windows", num_windows),
@@ -276,7 +276,7 @@ impl<B: Backend> WindowAttention<B> {
 
         let [b_nw, n, c] = unpack_shape_contract!(
             ["b_nw", "n" = "wh" * "ww", "c"],
-            &x,
+            &x.dims(),
             &["b_nw", "n", "c"],
             &[("wh", wh), ("ww", ww)],
         );
@@ -355,7 +355,7 @@ impl<B: Backend> WindowAttention<B> {
         let attn = softmax(attn, 3);
         assert_shape_contract_periodically!(
             ["b_nw", "num_heads", "Wh" * "Ww", "Wh" * "Ww"],
-            &attn,
+            &attn.dims(),
             &[
                 ("b_nw", b_nw),
                 ("num_heads", self.num_heads()),

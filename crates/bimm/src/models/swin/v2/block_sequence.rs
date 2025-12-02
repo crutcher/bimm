@@ -290,14 +290,14 @@ impl<B: Backend> StochasticDepthTransformerBlockSequence<B> {
         let env = [("height", h), ("width", w)];
 
         define_shape_contract!(CONTRACT, ["batch", "height" * "width", "channels"]);
-        assert_shape_contract_periodically!(CONTRACT, &x, &env);
+        assert_shape_contract_periodically!(CONTRACT, &x.dims(), &env);
 
         let mut x = x;
         for block in &self.blocks {
             x = block.forward(x);
         }
 
-        assert_shape_contract_periodically!(CONTRACT, &x, &env);
+        assert_shape_contract_periodically!(CONTRACT, &x.dims(), &env);
 
         x
     }

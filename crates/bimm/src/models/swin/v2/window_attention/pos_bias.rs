@@ -352,7 +352,7 @@ mod tests {
 
         assert_shape_contract!(
             ["heads", "flat" = "h" * "w", "flat" = "h" * "w"],
-            &table,
+            &table.dims(),
             &[
                 ("heads", num_heads),
                 ("h", window_shape[0]),

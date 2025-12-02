@@ -128,13 +128,13 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     #[cfg(feature = "wgpu")]
-    return backend_main::<Autodiff<burn::backend::Wgpu>>(&args);
-
+    type B = burn::backend::Wgpu;
     #[cfg(feature = "cuda")]
-    return backend_main::<Autodiff<burn::backend::Cuda>>(&args);
-
+    type B = burn::backend::Cuda;
     #[cfg(feature = "metal")]
-    return backend_main::<Autodiff<burn::backend::Metal>>(&args);
+    type B = burn::backend::Metal;
+
+    backend_main::<Autodiff<B>>(&args)
 }
 
 /// Create the artifact directory for saving training artifacts.
@@ -321,11 +321,15 @@ pub fn backend_main<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
                 n_epochs: args.patience,
             },
         ))
-        .learning_strategy(LearningStrategy::SingleDevice(device.clone()))
         .grads_accumulation(args.grads_accumulation)
         .num_epochs(args.num_epochs)
         .summary()
-        .build(model, optim_config.init(), lr_scheduler);
+        .build(
+            model,
+            optim_config.init(),
+            lr_scheduler,
+            LearningStrategy::SingleDevice(device.clone()),
+        );
 
     let model_trained = learner.fit(train_dataloader, validation_dataloader);
 

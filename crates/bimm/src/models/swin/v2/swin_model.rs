@@ -554,7 +554,7 @@ impl<B: Backend> SwinTransformerV2<B> {
     ) -> Tensor<B, 2> {
         let [batch] = unpack_shape_contract!(
             ["batch", "d_input", "height", "width"],
-            &input,
+            &input.dims(),
             &["batch"],
             &[
                 ("d_input", self.d_input()),
@@ -566,7 +566,7 @@ impl<B: Backend> SwinTransformerV2<B> {
         let x = self.apply_patching(input);
         assert_shape_contract_periodically!(
             ["batch", "num_patches", "d_embed"],
-            &x,
+            &x.dims(),
             &[
                 ("num_patches", self.patch_embed.num_patches()),
                 ("d_embed", self.d_embed()),
@@ -577,14 +577,14 @@ impl<B: Backend> SwinTransformerV2<B> {
         let x = self.aggregate_grid(x);
         assert_shape_contract_periodically!(
             ["batch", "grid_output_features"],
-            &x,
+            &x.dims(),
             &[("grid_output_features", self.grid_output_features)]
         );
 
         let x = self.apply_head(x);
         assert_shape_contract_periodically!(
             ["batch", "num_classes"],
-            &x,
+            &x.dims(),
             &[("batch", batch), ("num_classes", self.num_classes())]
         );
 

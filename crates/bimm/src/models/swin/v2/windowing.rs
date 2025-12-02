@@ -34,7 +34,7 @@ where
             "w_wins" * "window_size",
             "channels"
         ],
-        &tensor,
+        &tensor.dims(),
         &["batch", "h_wins", "w_wins", "channels"],
         &[("window_size", window_size)]
     );
@@ -82,7 +82,7 @@ where
             "window_size",
             "channels"
         ],
-        &windows,
+        &windows.dims(),
         &["batch", "channels"],
         &[
             ("h_wins", h_wins),

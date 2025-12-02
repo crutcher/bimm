@@ -421,7 +421,7 @@ impl<B: Backend> BottleneckBlock<B> {
                 "in_height" = "out_height" * "stride",
                 "in_width" = "out_width" * "stride"
             ],
-            &input,
+            &input.dims(),
             &["batch", "in_height", "out_height", "in_width", "out_width"],
             &[("in_planes", self.in_planes()), ("stride", self.stride())],
         );
@@ -441,13 +441,17 @@ impl<B: Backend> BottleneckBlock<B> {
             ("out_height", out_height),
             ("out_width", out_width),
         ];
-        bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &identity, &out_bindings);
+        bimm_contracts::assert_shape_contract_periodically!(
+            OUT_CONTRACT,
+            &identity.dims(),
+            &out_bindings
+        );
 
         let x = self.cna1.forward(input);
 
         bimm_contracts::assert_shape_contract_periodically!(
             ["batch", "pinch_planes", "in_height", "in_width"],
-            &x,
+            &x.dims(),
             &[
                 ("batch", batch),
                 ("pinch_planes", self.planes()),
@@ -463,7 +467,7 @@ impl<B: Backend> BottleneckBlock<B> {
 
         bimm_contracts::assert_shape_contract_periodically!(
             ["batch", "width", "out_height", "out_width"],
-            &x,
+            &x.dims(),
             &[
                 ("batch", batch),
                 ("width", self.width()),
@@ -475,7 +479,11 @@ impl<B: Backend> BottleneckBlock<B> {
         // TODO: anti-aliasing
 
         self.cna3.map_forward(x, |x| {
-            bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
+            bimm_contracts::assert_shape_contract_periodically!(
+                OUT_CONTRACT,
+                &x.dims(),
+                &out_bindings
+            );
 
             // TODO: attention
 
@@ -591,7 +599,7 @@ mod tests {
 
         assert_shape_contract!(
             ["batch", "out_channels", "out_height", "out_width"],
-            &output,
+            &output.dims(),
             &[
                 ("batch", batch_size),
                 ("out_channels", out_planes),
@@ -631,7 +639,7 @@ mod tests {
 
         assert_shape_contract!(
             ["batch", "out_channels", "out_height", "out_width"],
-            &output,
+            &output.dims(),
             &[
                 ("batch", batch_size),
                 ("out_channels", out_planes),

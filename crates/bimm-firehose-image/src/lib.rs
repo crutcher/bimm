@@ -100,7 +100,7 @@ mod tests {
                       "name": "data",
                       "description": "TensorData representation of the image.",
                       "data_type": {
-                        "type_name": "burn_tensor::tensor::data::TensorData"
+                        "type_name": "burn_backend::data::tensor::TensorData"
                       }
                     }
                   ],

@@ -189,7 +189,7 @@ impl<B: Backend> PatchEmbed<B> {
     ) -> Tensor<B, 3> {
         assert_shape_contract_periodically!(
             ["batch", "d_input", "height", "width"],
-            &x,
+            &x.dims(),
             &[
                 ("d_input", self.d_input()),
                 ("height", self.input_height()),
@@ -202,7 +202,7 @@ impl<B: Backend> PatchEmbed<B> {
         let x = self.projection.forward(x);
         assert_shape_contract_periodically!(
             ["batch", "d_output", "patches_height", "patches_width"],
-            &x,
+            &x.dims(),
             &[
                 ("batch", batch),
                 ("d_output", self.d_output()),
@@ -215,7 +215,7 @@ impl<B: Backend> PatchEmbed<B> {
         let x = x.swap_dims(1, 2);
         assert_shape_contract_periodically!(
             ["batch", "num_patches", "d_output"],
-            &x,
+            &x.dims(),
             &[
                 ("batch", batch),
                 ("num_patches", self.num_patches()),
@@ -229,7 +229,7 @@ impl<B: Backend> PatchEmbed<B> {
         };
         assert_shape_contract_periodically!(
             ["batch", "num_patches", "d_output"],
-            &x,
+            &x.dims(),
             &[
                 ("batch", batch),
                 ("num_patches", self.num_patches()),

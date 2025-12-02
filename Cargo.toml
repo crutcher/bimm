@@ -24,8 +24,8 @@ doc_markdown = "warn"
 
 
 [workspace.dependencies]
-burn = "^0.19.1"
-burn-import = "^0.19.1"
+burn = "^0.20.0-pre.4"
+burn-import = "^0.20.0-pre.4"
 dirs = "^6.0.0"
 
 bimm-contracts = "^0.19.2"

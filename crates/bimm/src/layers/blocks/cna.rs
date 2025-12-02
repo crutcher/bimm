@@ -232,7 +232,7 @@ impl<B: Backend> CNA2d<B> {
                 "in_height" = "out_height" * "height_stride",
                 "in_width" = "out_width" * "width_stride"
             ],
-            &input,
+            &input.dims(),
             &["batch", "out_height", "out_width"],
             &[
                 ("in_channels", self.in_channels()),
@@ -244,7 +244,7 @@ impl<B: Backend> CNA2d<B> {
 
         assert_shape_contract_periodically!(
             ["batch", "out_channels", "out_height", "out_width"],
-            &x,
+            &x.dims(),
             &[
                 ("batch", batch),
                 ("out_channels", self.out_channels()),
@@ -261,7 +261,7 @@ impl<B: Backend> CNA2d<B> {
 
         assert_shape_contract_periodically!(
             ["batch", "out_channels", "out_height", "out_width"],
-            &x,
+            &x.dims(),
             &[
                 ("batch", batch),
                 ("out_channels", self.out_channels()),

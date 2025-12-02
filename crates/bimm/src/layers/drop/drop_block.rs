@@ -285,7 +285,7 @@ fn drop_block_2d_drop_filter_<B: Backend>(
     kernel_shape: [usize; 2],
     partial_edge_blocks: bool,
 ) -> Tensor<B, 4> {
-    let [_, _, h, w] = unpack_shape_contract!(["b", "c", "h", "w"], &selected_blocks);
+    let [_, _, h, w] = unpack_shape_contract!(["b", "c", "h", "w"], &selected_blocks.dims());
     let [kh, kw] = kernel_shape;
 
     assert!(

@@ -321,7 +321,7 @@ impl<B: Backend> BasicBlock<B> {
                 "in_height" = "out_height" * "stride",
                 "in_width" = "out_width" * "stride"
             ],
-            &input,
+            &input.dims(),
             &["batch", "out_height", "out_width"],
             &[("in_planes", self.in_planes()), ("stride", self.stride())],
         );
@@ -354,7 +354,7 @@ impl<B: Backend> BasicBlock<B> {
         #[cfg(debug_assertions)]
         bimm_contracts::assert_shape_contract_periodically!(
             ["batch", "first_planes", "out_height", "out_width"],
-            &x,
+            &x.dims(),
             &[
                 ("batch", batch),
                 ("first_planes", self.first_planes()),
@@ -377,7 +377,7 @@ impl<B: Backend> BasicBlock<B> {
         });
 
         #[cfg(debug_assertions)]
-        bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &x, &out_bindings);
+        bimm_contracts::assert_shape_contract_periodically!(OUT_CONTRACT, &x.dims(), &out_bindings);
 
         x
     }
@@ -482,7 +482,7 @@ mod tests {
 
         assert_shape_contract!(
             ["batch", "out_channels", "out_height", "out_width"],
-            &output,
+            &output.dims(),
             &[
                 ("batch", batch_size),
                 ("out_channels", out_planes),
@@ -520,7 +520,7 @@ mod tests {
 
         assert_shape_contract!(
             ["batch", "out_channels", "out_height", "out_width"],
-            &output,
+            &output.dims(),
             &[
                 ("batch", batch_size),
                 ("out_channels", out_planes),

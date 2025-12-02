@@ -142,14 +142,14 @@ impl<B: Backend> BlockMlp<B> {
     ) -> Tensor<B, D> {
         assert_shape_contract_periodically!(
             [..., "in"],
-            &x,
+            &x.dims(),
             &[("in", self.d_input())]
         );
 
         let x = self.fc1.forward(x);
         assert_shape_contract_periodically!(
             [..., "h"],
-            &x,
+            &x.dims(),
             &[("h", self.d_hidden())]
         );
 
@@ -160,7 +160,7 @@ impl<B: Backend> BlockMlp<B> {
         let x = self.fc2.forward(x);
         assert_shape_contract_periodically!(
             [..., "out"],
-            &x,
+            &x.dims(),
             &[("out", self.d_output())]
         );
 
@@ -565,7 +565,7 @@ impl<B: Backend> ShiftedWindowTransformerBlock<B> {
         let env = [("height", h), ("width", w)];
 
         define_shape_contract!(CONTRACT, ["batch", "height" * "width", "channels"]);
-        let [b, c] = CONTRACT.unpack_shape(&x, &["batch", "channels"], &env);
+        let [b, c] = CONTRACT.unpack_shape(&x.dims(), &["batch", "channels"], &env);
 
         let x = self.with_skip(x, |x| {
             let x = x.reshape([b, h, w, c]);
@@ -578,11 +578,11 @@ impl<B: Backend> ShiftedWindowTransformerBlock<B> {
         });
         // b, h * w, c
 
-        assert_shape_contract_periodically!(CONTRACT, &x, &env);
+        assert_shape_contract_periodically!(CONTRACT, &x.dims(), &env);
 
         let x = self.with_skip(x, |x| self.norm2.forward(self.block_mlp.forward(x)));
 
-        assert_shape_contract_periodically!(CONTRACT, &x, &env);
+        assert_shape_contract_periodically!(CONTRACT, &x.dims(), &env);
 
         x
     }

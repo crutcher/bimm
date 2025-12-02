@@ -208,7 +208,7 @@ impl<B: Backend> ResNetDownsample<B> {
     ) -> Tensor<B, 4> {
         let [batch, in_height, in_width] = unpack_shape_contract!(
             ["batch", "in_channels", "in_height", "in_width",],
-            &input,
+            &input.dims(),
             &["batch", "in_height", "in_width"],
             &[("in_channels", self.in_channels()),]
         );
@@ -220,7 +220,7 @@ impl<B: Backend> ResNetDownsample<B> {
 
         assert_shape_contract_periodically!(
             ["batch", "out_channels", "out_height", "out_width"],
-            &out,
+            &out.dims(),
             &[
                 ("batch", batch),
                 ("out_channels", self.out_channels()),
@@ -275,7 +275,7 @@ mod tests {
 
         assert_shape_contract!(
             ["batch", "out_channels", "out_height", "out_width"],
-            &out,
+            &out.dims(),
             &[
                 ("batch", batch_size),
                 ("out_channels", out_channels),
