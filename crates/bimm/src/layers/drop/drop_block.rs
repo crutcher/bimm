@@ -305,7 +305,16 @@ fn drop_block_2d_drop_filter_<B: Backend>(
                 .cast(dtype);
     }
 
-    selection = max_pool2d(selection, kernel_shape, [1, 1], [kh / 2, kw / 2], [1, 1]);
+    let ceil_mode = false;
+
+    selection = max_pool2d(
+        selection,
+        kernel_shape,
+        [1, 1],
+        [kh / 2, kw / 2],
+        [1, 1],
+        ceil_mode,
+    );
 
     // Clip even-kernel padding artifacts.
     if (kh % 2) == 0 || (kw % 2) == 0 {

@@ -8,7 +8,7 @@ https://github.com/tracel-ai/models/blob/main/resnet-burn/examples/finetune/exam
 This will download both model weights and a fine-tune dataset:
 
 ```bash
-cargo run --release -p resnet_finetune
+cargo run --release -p resnet_finetune --features cuda
 ```
 
 ## List Available Models

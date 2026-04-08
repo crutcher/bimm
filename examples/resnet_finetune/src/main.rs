@@ -25,18 +25,16 @@ use burn::prelude::{Int, Tensor};
 use burn::record::CompactRecorder;
 use burn::tensor::backend::{AutodiffBackend, Backend};
 use burn::train::metric::store::{Aggregate, Direction, Split};
-use burn::train::metric::{
-    CpuMemory, CpuUse, CudaMetric, HammingScore, LearningRateMetric, LossMetric, MetricDefinition,
-};
+use burn::train::metric::{HammingScore, LearningRateMetric, LossMetric, MetricDefinition};
 use burn::train::renderer::{
     EvaluationName, EvaluationProgress, MetricState, MetricsRenderer, MetricsRendererEvaluation,
     MetricsRendererTraining, TrainingProgress,
 };
 use burn::train::{
-    LearnerBuilder, LearningStrategy, MetricEarlyStoppingStrategy, MultiLabelClassificationOutput,
-    StoppingCondition, TrainOutput, TrainStep, ValidStep,
+    InferenceStep, Learner, MetricEarlyStoppingStrategy, MultiLabelClassificationOutput,
+    StoppingCondition, SupervisedTraining, TrainOutput, TrainStep,
 };
-use clap::{Parser, ValueEnum, arg};
+use clap::{Parser, ValueEnum};
 use core::clone::Clone;
 use std::time::Instant;
 /*
@@ -326,6 +324,7 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
 
     let now: Instant;
     {
+        /*
         // Learner config
         let mut learner_config = LearnerBuilder::new(artifact_dir)
             .metric_train_numeric(HammingScore::new())
@@ -369,9 +368,34 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
 
         // Training
         now = Instant::now();
-        let model_trained = learner.fit(dataloader_train, dataloader_test);
+        let result = learner.fit(dataloader_train, dataloader_test);
+         */
 
-        model_trained
+        let training = SupervisedTraining::new(artifact_dir, dataloader_train, dataloader_test)
+            .metrics((
+                HammingScore::new(),
+                LossMetric::new(),
+                // CudaMetric::new(), ??
+                LearningRateMetric::new(),
+            ))
+            .with_file_checkpointer(CompactRecorder::new())
+            .early_stopping(MetricEarlyStoppingStrategy::new(
+                &LossMetric::<B>::new(),
+                Aggregate::Mean,
+                Direction::Lowest,
+                Split::Valid,
+                StoppingCondition::NoImprovementSince {
+                    n_epochs: args.patience,
+                },
+            ))
+            .num_epochs(args.num_epochs)
+            .grads_accumulation(args.grads_accumulation)
+            .summary();
+
+        now = Instant::now();
+        let result = training.launch(Learner::new(host, optimizer, lr_scheduler));
+
+        result
             .model
             .resnet
             .save_file(format!("{artifact_dir}/model"), &CompactRecorder::new())
@@ -480,24 +504,28 @@ impl<B: Backend> MultiLabelClassification<B> for Host<B> {
     }
 }
 
-impl<B: AutodiffBackend> TrainStep<ClassificationBatch<B>, MultiLabelClassificationOutput<B>>
-    for Host<B>
-{
+impl<B: AutodiffBackend> TrainStep for Host<B> {
+    type Input = ClassificationBatch<B>;
+    type Output = MultiLabelClassificationOutput<B>;
+
     fn step(
         &self,
-        batch: ClassificationBatch<B>,
-    ) -> TrainOutput<MultiLabelClassificationOutput<B>> {
+        batch: Self::Input,
+    ) -> TrainOutput<Self::Output> {
         let item = self.forward_classification(batch.images, batch.targets);
 
         TrainOutput::new(self, item.loss.backward(), item)
     }
 }
 
-impl<B: Backend> ValidStep<ClassificationBatch<B>, MultiLabelClassificationOutput<B>> for Host<B> {
+impl<B: Backend> InferenceStep for Host<B> {
+    type Input = ClassificationBatch<B>;
+    type Output = MultiLabelClassificationOutput<B>;
+
     fn step(
         &self,
-        batch: ClassificationBatch<B>,
-    ) -> MultiLabelClassificationOutput<B> {
+        batch: Self::Input,
+    ) -> Self::Output {
         self.forward_classification(batch.images, batch.targets)
     }
 }

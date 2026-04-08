@@ -1,3 +1,5 @@
+use super::dataset::CLASSES;
+use burn::tensor::IndexingUpdateOp;
 use burn::{
     data::{
         dataloader::batcher::Batcher,
@@ -5,8 +7,6 @@ use burn::{
     },
     prelude::*,
 };
-
-use super::dataset::CLASSES;
 
 // ImageNet mean and std values
 const MEAN: [f32; 3] = [0.485, 0.456, 0.406];
@@ -41,6 +41,7 @@ pub fn multi_hot<B: Backend>(
             device,
         ),
         Tensor::ones(Shape::new([indices.len()]), device),
+        IndexingUpdateOp::Add,
     )
 }
 

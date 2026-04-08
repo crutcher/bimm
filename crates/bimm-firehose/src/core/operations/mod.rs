@@ -82,7 +82,7 @@ mod tests {
         FirehoseRowBatch, FirehoseRowReader, FirehoseRowTransaction, FirehoseRowWriter,
     };
     use crate::core::schema::{BuildPlan, ColumnSchema, DataTypeDescription, FirehoseTableSchema};
-    use crate::define_firehose_operator_id;
+    // use crate::define_firehose_operator_id;
     use indoc::indoc;
     use serde::{Deserialize, Serialize};
     use std::collections::BTreeMap;

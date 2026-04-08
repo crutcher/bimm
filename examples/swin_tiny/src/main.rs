@@ -29,13 +29,14 @@ use burn::optim::AdamWConfig;
 use burn::prelude::{Backend, Int, Tensor};
 use burn::record::CompactRecorder;
 use burn::tensor::backend::AutodiffBackend;
-use burn::train::metric::{
-    AccuracyMetric, CpuMemory, CpuUse, CudaMetric, LearningRateMetric, LossMetric,
-    TopKAccuracyMetric,
+use burn::train::metric::store::{Aggregate, Direction, Split};
+use burn::train::metric::{AccuracyMetric, LearningRateMetric, LossMetric, TopKAccuracyMetric};
+use burn::train::{
+    ClassificationOutput, Learner, MetricEarlyStoppingStrategy, StoppingCondition,
+    SupervisedTraining,
 };
-use burn::train::{ClassificationOutput, LearnerBuilder, LearningStrategy};
-use burn::train::{TrainOutput, TrainStep, ValidStep};
-use clap::{Parser, arg};
+use burn::train::{InferenceStep, TrainOutput, TrainStep};
+use clap::Parser;
 use rand::{Rng, rng};
 use std::sync::Arc;
 
@@ -64,6 +65,14 @@ pub struct Args {
     /// Number of epochs to train the model.
     #[arg(long, default_value = "60")]
     num_epochs: usize,
+
+    /// Grads accumulation size for processing
+    #[arg(short, long, default_value_t = 8)]
+    grads_accumulation: usize,
+
+    /// Early stopping patience
+    #[arg(long, default_value = "20")]
+    patience: usize,
 
     /// Embedding ratio: ``ratio * channels * patch_size * patch_size``
     #[arg(long, default_value = "1.25")]
@@ -285,42 +294,39 @@ pub fn backend_main<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .init()
         .map_err(|e| anyhow::anyhow!("Failed to initialize learning rate scheduler: {}", e))?;
 
-    let learner = LearnerBuilder::new(artifact_dir)
-        .metric_train_numeric(LossMetric::new())
-        .metric_valid_numeric(LossMetric::new())
-        .metric_train_numeric(AccuracyMetric::new())
-        .metric_valid_numeric(AccuracyMetric::new())
-        .metric_train_numeric(TopKAccuracyMetric::new(2))
-        .metric_valid_numeric(TopKAccuracyMetric::new(2))
-        .metric_train(CudaMetric::new())
-        .metric_valid(CudaMetric::new())
-        .metric_train_numeric(CpuUse::new())
-        .metric_valid_numeric(CpuUse::new())
-        .metric_train_numeric(CpuMemory::new())
-        .metric_valid_numeric(CpuMemory::new())
-        .metric_train_numeric(LearningRateMetric::new())
-        .with_file_checkpointer(CompactRecorder::new())
-        /*
-        .early_stopping(MetricEarlyStoppingStrategy::new(
-            &LossMetric::<B>::new(),
-            Aggregate::Mean,
-            Direction::Lowest,
-            Split::Valid,
-            StoppingCondition::NoImprovementSince { n_epochs: 6 },
-        ))
-         */
-        .num_epochs(args.num_epochs)
-        .summary()
-        .build(
-            training_config.model.init::<B>(&device),
-            training_config.optimizer.init(),
-            lr_scheduler,
-            LearningStrategy::SingleDevice(device.clone()),
-        );
+    let training = SupervisedTraining::new(
+        artifact_dir,
+        train_dataloader.clone(),
+        validation_dataloader.clone(),
+    )
+    .metrics((
+        AccuracyMetric::new(),
+        TopKAccuracyMetric::new(2),
+        LossMetric::new(),
+        // CudaMetric::new(), ??
+        LearningRateMetric::new(),
+    ))
+    .with_file_checkpointer(CompactRecorder::new())
+    .early_stopping(MetricEarlyStoppingStrategy::new(
+        &LossMetric::<B>::new(),
+        Aggregate::Mean,
+        Direction::Lowest,
+        Split::Valid,
+        StoppingCondition::NoImprovementSince {
+            n_epochs: args.patience,
+        },
+    ))
+    .num_epochs(args.num_epochs)
+    .grads_accumulation(args.grads_accumulation)
+    .summary();
 
-    let model_trained = learner.fit(train_dataloader, validation_dataloader);
+    let result = training.launch(Learner::new(
+        training_config.model.init::<B>(&device),
+        training_config.optimizer.init(),
+        lr_scheduler,
+    ));
 
-    model_trained
+    result
         .model
         .save_file(format!("{artifact_dir}/model"), &CompactRecorder::new())
         .expect("Trained model should be saved successfully");
@@ -370,26 +376,28 @@ impl<B: Backend> Model<B> {
     }
 }
 
-impl<B: AutodiffBackend> TrainStep<(Tensor<B, 4>, Tensor<B, 1, Int>), ClassificationOutput<B>>
-    for Model<B>
-{
+impl<B: AutodiffBackend> TrainStep for Model<B> {
+    type Input = (Tensor<B, 4>, Tensor<B, 1, Int>);
+    type Output = ClassificationOutput<B>;
+
     fn step(
         &self,
-        batch: (Tensor<B, 4>, Tensor<B, 1, Int>),
-    ) -> TrainOutput<ClassificationOutput<B>> {
+        batch: Self::Input,
+    ) -> TrainOutput<Self::Output> {
         let (images, targets) = batch;
         let item = self.forward_classification(images, targets);
         TrainOutput::new(self, item.loss.backward(), item)
     }
 }
 
-impl<B: Backend> ValidStep<(Tensor<B, 4>, Tensor<B, 1, Int>), ClassificationOutput<B>>
-    for Model<B>
-{
+impl<B: Backend> InferenceStep for Model<B> {
+    type Input = (Tensor<B, 4>, Tensor<B, 1, Int>);
+    type Output = ClassificationOutput<B>;
+
     fn step(
         &self,
-        batch: (Tensor<B, 4>, Tensor<B, 1, Int>),
-    ) -> ClassificationOutput<B> {
+        batch: Self::Input,
+    ) -> Self::Output {
         let (images, targets) = batch;
         self.forward_classification(images, targets)
     }

@@ -5,6 +5,7 @@ This example shows how to use a Swin Transformer V2 Tiny model for image classif
 ## Installing the Dataset
 
 See:
+
 * https://github.com/BayesWatch/cinic-10
 * https://datashare.ed.ac.uk/handle/10283/3192
 
@@ -16,7 +17,7 @@ See:
 Run the training:
 
 ```bash
-cargo run --release -p swin_tiny -- \
+cargo run --release -p swin_tiny --features cuda -- \
   --training-root $CINIC10_PATH/train \
   --validation-root $CINIC10_PATH/val 
 ```
