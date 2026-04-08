@@ -42,7 +42,7 @@ jobs:
         run: cargo fmt --check
 
       - name: Clippy Lint
-        run: cargo clippy --no-deps
+        run: cargo clippy --no-deps --features=wgpu
 
       - name: Build and Test
         run: |
