@@ -46,4 +46,4 @@ jobs:
 
       - name: Build and Test
         run: |
-          cargo tarpaulin --coveralls=${{ secrets.COVERALLS_REPO_TOKEN }}
+          cargo tarpaulin -features=wgpu --coveralls=${{ secrets.COVERALLS_REPO_TOKEN }}
