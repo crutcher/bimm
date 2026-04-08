@@ -206,10 +206,8 @@ impl ResNetStructureConfig {
         device: &B::Device,
     ) -> ResNet<B> {
         let mut input_conv_norm = self.input_conv_norm.clone();
-        if self.input_conv_norm_initializer.is_some() {
-            input_conv_norm.conv = input_conv_norm
-                .conv
-                .with_initializer(self.input_conv_norm_initializer.unwrap());
+        if let Some(initializer) = &self.input_conv_norm_initializer {
+            input_conv_norm.conv = input_conv_norm.conv.with_initializer(initializer.clone());
         }
 
         let head_planes = self.layers.last().unwrap().out_planes();

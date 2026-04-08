@@ -18,9 +18,9 @@ See:
 Run the training:
 
 ```bash
-cargo run --release -p resnet_tiny -- \
+cargo run --release -p resnet_tiny --features cuda -- \
   --training-root $CINIC10_PATH/train \
-  --validation-root $CINIC10_PATH/val 
+  --validation-root $CINIC10_PATH/valid 
 ```
 
 

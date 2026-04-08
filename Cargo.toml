@@ -13,7 +13,7 @@ edition = "2024"
 version = "0.19.5"
 repository = "https://github.com/crutcher/bimm"
 license = "MIT"
-rust-version = "1.88.0"
+rust-version = "1.90.0"
 
 [workspace.lints.rust]
 warnings = "deny"
@@ -24,8 +24,8 @@ doc_markdown = "warn"
 
 
 [workspace.dependencies]
-burn = "^0.20.0-pre.4"
-burn-import = "^0.20.0-pre.4"
+burn = "^0.20.1"
+burn-import = "^0.20.1"
 dirs = "^6.0.0"
 
 bimm-contracts = "^0.19.2"
