@@ -19,6 +19,16 @@ use alloc::{
 };
 use std::path::PathBuf;
 
+use bunsen::{
+    blocks::images::{
+        conv::conv_norm::{
+            ConvNorm2d,
+            ConvNorm2dConfig,
+        },
+        drop::drop_block::DropBlockOptions,
+    },
+    support::validators::expect_probability,
+};
 use burn::{
     module::Module,
     nn::{
@@ -61,16 +71,6 @@ use super::{
     },
     resnet_io::pytorch_stubs::load_resnet_stub_record,
     util::CONV_INTO_RELU_INITIALIZER,
-};
-use crate::{
-    layers::{
-        blocks::conv_norm::{
-            ConvNorm2d,
-            ConvNorm2dConfig,
-        },
-        drop::drop_block::DropBlockOptions,
-    },
-    utility::probability::expect_probability,
 };
 
 /// ResNet-18 block depths.

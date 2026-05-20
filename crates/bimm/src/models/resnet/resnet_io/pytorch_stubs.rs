@@ -9,6 +9,10 @@
 use alloc::vec::Vec;
 use std::path::PathBuf;
 
+use bunsen::blocks::images::conv::{
+    cna::CNA2d,
+    conv_norm::ConvNorm2d,
+};
 use burn::{
     module::Module,
     nn::{
@@ -24,19 +28,13 @@ use burn::{
     prelude::Backend,
 };
 
-use crate::{
-    layers::blocks::{
-        cna::CNA2d,
-        conv_norm::ConvNorm2d,
-    },
-    models::resnet::{
-        basic_block::BasicBlock,
-        bottleneck_block::BottleneckBlock,
-        downsample::ResNetDownsample,
-        layer_block::LayerBlock,
-        residual_block::ResidualBlock,
-        resnet_model::ResNet,
-    },
+use crate::models::resnet::{
+    basic_block::BasicBlock,
+    bottleneck_block::BottleneckBlock,
+    downsample::ResNetDownsample,
+    layer_block::LayerBlock,
+    residual_block::ResidualBlock,
+    resnet_model::ResNet,
 };
 
 /// Load a [`ResNetStubRecord`] from ``torch`` weights path.

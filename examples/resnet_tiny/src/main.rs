@@ -10,7 +10,7 @@ use core::{
 use std::sync::Arc;
 
 use bimm::{
-    cache::disk::DiskCacheConfig,
+    cache::DiskCacheConfig,
     models::resnet::{
         PREFAB_RESNET_MAP,
         ResNet,

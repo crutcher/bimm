@@ -19,6 +19,10 @@
 //! * [`From<BasicBlock<B>>`](`BasicBlock`),
 //! * [`From<BottleneckBlock<B>>`](`BottleneckBlock`).
 
+use bunsen::{
+    blocks::images::drop::drop_block::DropBlockOptions,
+    support::validators::expect_probability,
+};
 use burn::{
     nn::{
         BatchNormConfig,
@@ -33,23 +37,19 @@ use burn::{
     },
 };
 
-use crate::{
-    layers::drop::drop_block::DropBlockOptions,
-    models::resnet::{
-        basic_block::{
-            BasicBlock,
-            BasicBlockConfig,
-            BasicBlockMeta,
-        },
-        bottleneck_block::{
-            BottleneckBlock,
-            BottleneckBlockConfig,
-            BottleneckBlockMeta,
-            BottleneckPolicyConfig,
-        },
-        util::stride_div_output_resolution,
+use crate::models::resnet::{
+    basic_block::{
+        BasicBlock,
+        BasicBlockConfig,
+        BasicBlockMeta,
     },
-    utility::probability::expect_probability,
+    bottleneck_block::{
+        BottleneckBlock,
+        BottleneckBlockConfig,
+        BottleneckBlockMeta,
+        BottleneckPolicyConfig,
+    },
+    util::stride_div_output_resolution,
 };
 
 /// Abstract [`ResidualBlock`] Config.

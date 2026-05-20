@@ -14,7 +14,7 @@ use core::fmt::Debug;
 use anyhow::bail;
 use burn::config::Config;
 
-use crate::cache::weights::{
+use crate::cache::{
     PretrainedWeightsDescriptor,
     PretrainedWeightsMap,
     StaticPretrainedWeightsMap,

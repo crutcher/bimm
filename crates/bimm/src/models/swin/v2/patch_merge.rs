@@ -295,17 +295,19 @@ where
 
 #[cfg(test)]
 mod tests {
-    use bunsen::support::testing::PerfTestBackend;
+    use bunsen::{
+        blocks::images::patching::patch_embed::{
+            PatchEmbedConfig,
+            PatchEmbedMeta,
+        },
+        support::testing::PerfTestBackend,
+    };
     use burn::{
         prelude::Backend,
         tensor::Distribution,
     };
 
     use super::*;
-    use crate::layers::patching::patch_embed::{
-        PatchEmbedConfig,
-        PatchEmbedMeta,
-    };
 
     type B = PerfTestBackend;
 

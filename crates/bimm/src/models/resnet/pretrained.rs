@@ -7,15 +7,11 @@ use alloc::{
 
 use crate::{
     cache::{
-        prefabs::{
-            PreFabConfig,
-            StaticPreFabConfig,
-            StaticPreFabMap,
-        },
-        weights::{
-            StaticPretrainedWeightsDescriptor,
-            StaticPretrainedWeightsMap,
-        },
+        PreFabConfig,
+        StaticPreFabConfig,
+        StaticPreFabMap,
+        StaticPretrainedWeightsDescriptor,
+        StaticPretrainedWeightsMap,
     },
     models::resnet::{
         ResNetContractConfig,

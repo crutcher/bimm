@@ -1,7 +1,14 @@
 //! # Operational Block for Swin Transformer v2.
-use bunsen::contracts::{
-    assert_shape_contract_periodically,
-    define_shape_contract,
+
+use bunsen::{
+    blocks::images::drop::drop_path::{
+        DropPath,
+        DropPathConfig,
+    },
+    contracts::{
+        assert_shape_contract_periodically,
+        define_shape_contract,
+    },
 };
 use burn::{
     config::Config,
@@ -25,22 +32,16 @@ use burn::{
     tensor::BasicOps,
 };
 
-use crate::{
-    layers::drop::drop_path::{
-        DropPath,
-        DropPathConfig,
+use crate::models::swin::v2::{
+    window_attention::{
+        WindowAttention,
+        WindowAttentionConfig,
+        WindowAttentionMeta,
+        sw_attn_mask,
     },
-    models::swin::v2::{
-        window_attention::{
-            WindowAttention,
-            WindowAttentionConfig,
-            WindowAttentionMeta,
-            sw_attn_mask,
-        },
-        windowing::{
-            window_partition,
-            window_reverse,
-        },
+    windowing::{
+        window_partition,
+        window_reverse,
     },
 };
 

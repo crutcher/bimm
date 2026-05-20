@@ -9,7 +9,7 @@ use core::clone::Clone;
 use std::time::Instant;
 
 use bimm::{
-    cache::disk::DiskCacheConfig,
+    cache::DiskCacheConfig,
     models::resnet::{
         PREFAB_RESNET_MAP,
         ResNet,

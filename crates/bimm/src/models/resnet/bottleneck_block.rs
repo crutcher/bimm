@@ -12,25 +12,9 @@
 //! [`BottleneckBlock`] implements [`Module`] and provides
 //! [`BottleneckBlock::forward`].
 
-use burn::{
-    nn::{
-        BatchNormConfig,
-        PaddingConfig2d,
-        activation::ActivationConfig,
-        conv::Conv2dConfig,
-        norm::NormalizationConfig,
-    },
-    prelude::{
-        Backend,
-        Config,
-        Module,
-        Tensor,
-    },
-};
-
-use crate::{
-    layers::{
-        blocks::cna::{
+use bunsen::{
+    blocks::images::{
+        conv::cna::{
             AbstractCNA2dConfig,
             CNA2d,
             CNA2dConfig,
@@ -48,17 +32,33 @@ use crate::{
             },
         },
     },
-    models::resnet::{
-        downsample::{
-            ResNetDownsample,
-            ResNetDownsampleConfig,
-        },
-        util::{
-            scalar_to_array,
-            stride_div_output_resolution,
-        },
+    support::validators::expect_probability,
+};
+use burn::{
+    nn::{
+        BatchNormConfig,
+        PaddingConfig2d,
+        activation::ActivationConfig,
+        conv::Conv2dConfig,
+        norm::NormalizationConfig,
     },
-    utility::probability::expect_probability,
+    prelude::{
+        Backend,
+        Config,
+        Module,
+        Tensor,
+    },
+};
+
+use crate::models::resnet::{
+    downsample::{
+        ResNetDownsample,
+        ResNetDownsampleConfig,
+    },
+    util::{
+        scalar_to_array,
+        stride_div_output_resolution,
+    },
 };
 
 /// Bottleneck Policy.
@@ -574,6 +574,7 @@ impl<B: Backend> BottleneckBlock<B> {
 #[cfg(test)]
 mod tests {
     use bunsen::{
+        blocks::images::drop::drop_block::DropBlockOptions,
         contracts::assert_shape_contract,
         support::testing::PerfTestBackend,
     };

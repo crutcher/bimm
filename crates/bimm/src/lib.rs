@@ -5,17 +5,6 @@
 //! * [`cache`] - weight loading cache.
 //! * [`compat`] - compat code, ported or planned for an upcoming release of
 //!   ``burn``.
-//! * [`layers`] - reusable neural network modules.
-//!   * [`layers::blocks`] - miscellaneous blocks.
-//!     * [`layers::blocks::cna::CNA2d`] - ``Conv2d + Normalization +
-//!       Activation`` block.
-//!     * [`layers::blocks::conv_norm::ConvNorm2d`] - ``Conv2d + BatchNorm2d``
-//!       block.
-//!   * [`layers::drop`] - dropout layers.
-//!     * [`layers::drop::drop_block`] - 2d drop block / spatial dropout.
-//!     * [`layers::drop::drop_path`] - drop path / stochastic depth.
-//!   * [`layers::patching`] - patching layers.
-//!     * [`layers::patching::patch_embed`] - 2d patch embedding layer.
 //! * [`models`] - complete model families.
 //!   * [`models::resnet`] - `ResNet`
 //!   * [`models::swin`] - The SWIN Family.
@@ -38,8 +27,5 @@ pub mod compat;
 #[allow(dead_code)]
 pub(crate) mod testing;
 
-pub mod layers;
-
 pub mod cache;
 pub mod models;
-pub mod utility;

@@ -12,7 +12,7 @@ description = "burn image models"
 workspace = true
 
 [dependencies]
-bunsen = { workspace = true }
+bunsen = { workspace = true, features = ["cache"] }
 burn = { workspace = true, features = ["network", "store"] }
 burn-store = { workspace = true, features = ["pytorch"] }
 

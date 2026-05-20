@@ -1,13 +1,13 @@
 use std::hint::black_box;
 
-use bimm::{
-    layers::drop::drop_block::{
+use bunsen::{
+    blocks::images::drop::drop_block::{
         DropBlockOptions,
         drop_block_2d,
     },
-    utility::burn::noise::NoiseConfig,
+    ops::noise::NoiseConfig,
+    support::testing::PerfTestBackend,
 };
-use bunsen::support::testing::PerfTestBackend;
 use burn::prelude::Tensor;
 use criterion::{
     Criterion,

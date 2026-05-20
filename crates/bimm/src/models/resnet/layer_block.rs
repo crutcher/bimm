@@ -20,9 +20,13 @@ use alloc::{
     vec::Vec,
 };
 
-use bunsen::contracts::{
-    assert_shape_contract_periodically,
-    unpack_shape_contract,
+use bunsen::{
+    blocks::images::drop::drop_block::DropBlockOptions,
+    contracts::{
+        assert_shape_contract_periodically,
+        unpack_shape_contract,
+    },
+    support::validators::expect_probability,
 };
 use burn::{
     config::Config,
@@ -47,11 +51,7 @@ use super::{
         ResidualBlockStructureConfig,
     },
 };
-use crate::{
-    layers::drop::drop_block::DropBlockOptions,
-    models::resnet::util::stride_div_output_resolution,
-    utility::probability::expect_probability,
-};
+use crate::models::resnet::util::stride_div_output_resolution;
 
 /// Abstract [`LayerBlock`] Config.
 #[derive(Config, Debug)]

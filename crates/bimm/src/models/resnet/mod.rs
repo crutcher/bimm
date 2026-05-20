@@ -9,7 +9,7 @@
 //!
 //! ```rust,no_run
 //! use bimm::{
-//!     cache::disk::DiskCacheConfig,
+//!     cache::DiskCacheConfig,
 //!     models::resnet::{
 //!         PREFAB_RESNET_MAP,
 //!         ResNet,

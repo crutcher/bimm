@@ -3,17 +3,10 @@ extern crate core;
 
 use std::sync::Arc;
 
-use bimm::{
-    layers::drop::drop_block::{
-        DropBlock2d,
-        DropBlock2dConfig,
-        DropBlockOptions,
-    },
-    models::swin::v2::swin_model::{
-        LayerConfig,
-        SwinTransformerV2,
-        SwinTransformerV2Config,
-    },
+use bimm::models::swin::v2::swin_model::{
+    LayerConfig,
+    SwinTransformerV2,
+    SwinTransformerV2Config,
 };
 use bimm_firehose::{
     burn::{
@@ -50,6 +43,11 @@ use bimm_firehose_image::{
         ImageLoader,
         ResizeSpec,
     },
+};
+use bunsen::blocks::images::drop::drop_block::{
+    DropBlock2d,
+    DropBlock2dConfig,
+    DropBlockOptions,
 };
 use burn::{
     backend::Autodiff,

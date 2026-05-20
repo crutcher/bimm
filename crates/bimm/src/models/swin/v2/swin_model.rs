@@ -8,9 +8,19 @@ use alloc::{
     vec::Vec,
 };
 
-use bunsen::contracts::{
-    assert_shape_contract_periodically,
-    unpack_shape_contract,
+use bunsen::{
+    blocks::images::{
+        drop::rate_table::DropPathRateDepthTable,
+        patching::patch_embed::{
+            PatchEmbed,
+            PatchEmbedConfig,
+            PatchEmbedMeta,
+        },
+    },
+    contracts::{
+        assert_shape_contract_periodically,
+        unpack_shape_contract,
+    },
 };
 use burn::{
     config::Config,
@@ -37,25 +47,15 @@ use burn::{
     },
 };
 
-use crate::{
-    layers::{
-        drop::rate_table::DropPathRateDepthTable,
-        patching::patch_embed::{
-            PatchEmbed,
-            PatchEmbedConfig,
-            PatchEmbedMeta,
-        },
+use crate::models::swin::v2::{
+    block_sequence::{
+        StochasticDepthTransformerBlockSequence,
+        StochasticDepthTransformerBlockSequenceConfig,
+        StochasticDepthTransformerBlockSequenceMeta,
     },
-    models::swin::v2::{
-        block_sequence::{
-            StochasticDepthTransformerBlockSequence,
-            StochasticDepthTransformerBlockSequenceConfig,
-            StochasticDepthTransformerBlockSequenceMeta,
-        },
-        patch_merge::{
-            PatchMerging,
-            PatchMergingConfig,
-        },
+    patch_merge::{
+        PatchMerging,
+        PatchMergingConfig,
     },
 };
 

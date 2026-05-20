@@ -15,6 +15,7 @@ bimm-firehose = { version = "0.19.5", path = "../../crates/bimm-firehose" }
 bimm-firehose-image = { version = "0.19.5", path = "../../crates/bimm-firehose-image" }
 
 burn = { workspace = true, features = ["train", "fusion", "autotune", "vision", "dataset", "flex"] }
+bunsen = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
 clap = { workspace = true, features = ["derive"] }
