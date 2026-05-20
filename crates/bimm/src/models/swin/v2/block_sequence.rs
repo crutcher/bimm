@@ -1,15 +1,28 @@
 //! # Swin Transformer Block Sequence
 
+use alloc::{
+    vec,
+    vec::Vec,
+};
+
+use bunsen::contracts::{
+    assert_shape_contract_periodically,
+    define_shape_contract,
+};
+use burn::{
+    config::Config,
+    module::Module,
+    prelude::{
+        Backend,
+        Tensor,
+    },
+};
+
 use crate::models::swin::v2::swin_block::{
-    ShiftedWindowTransformerBlock, ShiftedWindowTransformerBlockConfig,
+    ShiftedWindowTransformerBlock,
+    ShiftedWindowTransformerBlockConfig,
     ShiftedWindowTransformerBlockMeta,
 };
-use alloc::vec;
-use alloc::vec::Vec;
-use bimm_contracts::{assert_shape_contract_periodically, define_shape_contract};
-use burn::config::Config;
-use burn::module::Module;
-use burn::prelude::{Backend, Tensor};
 
 /// Common introspection train for `BasicLayer`.
 pub trait StochasticDepthTransformerBlockSequenceMeta {
@@ -217,7 +230,8 @@ impl StochasticDepthTransformerBlockSequenceConfig {
 ///
 /// Equivalent to ``BasicLayer`` in the original SWIN-Transformer source.
 ///
-/// Applies a sequence of shift-window-alternating ``SwinTransformerBlock`` modules.
+/// Applies a sequence of shift-window-alternating ``SwinTransformerBlock``
+/// modules.
 #[derive(Module, Debug)]
 pub struct StochasticDepthTransformerBlockSequence<B: Backend> {
     blocks: Vec<ShiftedWindowTransformerBlock<B>>,
@@ -305,9 +319,11 @@ impl<B: Backend> StochasticDepthTransformerBlockSequence<B> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use alloc::vec;
-    use burn::backend::NdArray;
+
+    use bunsen::support::testing::PerfTestBackend;
+
+    use super::*;
 
     #[test]
     fn test_config() {
@@ -377,6 +393,8 @@ mod tests {
 
     #[test]
     fn test_module_init() {
+        type B = PerfTestBackend;
+
         let d_input = 96;
         let input_resolution = [56, 56];
         let depth = 12;
@@ -392,7 +410,7 @@ mod tests {
         );
 
         let device = Default::default();
-        let module = config.init::<NdArray>(&device);
+        let module = config.init::<B>(&device);
 
         assert_eq!(module.d_input(), d_input);
         assert_eq!(module.input_resolution(), input_resolution);

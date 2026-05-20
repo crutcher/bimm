@@ -21,7 +21,8 @@ use alloc::vec::Vec;
 /// - `input_size`: The input dimension size, must be > 0.
 /// - `kernel_size`: The kernel size, must be > 0.
 /// - `stride`: The stride of the convolution, must be > 0.
-/// - `padding`: The padding of the convolution, added evenly to all sides of the input.
+/// - `padding`: The padding of the convolution, added evenly to all sides of
+///   the input.
 /// - `dilation`: The dilation of the convolution, must be > 0.
 ///
 /// # Returns
@@ -69,7 +70,8 @@ pub fn maybe_conv1d_output_size(
 /// - `input_size`: The input dimension size, must be > 0.
 /// - `kernel_size`: The kernel size, must be > 0.
 /// - `stride`: The stride of the convolution, must be > 0.
-/// - `padding`: The padding of the convolution, added evenly to all sides of the input.
+/// - `padding`: The padding of the convolution, added evenly to all sides of
+///   the input.
 /// - `dilation`: The dilation of the convolution, must be > 0.
 ///
 /// # Returns
@@ -101,10 +103,14 @@ pub fn expect_conv1d_output_size(
 /// # Arguments
 ///
 /// - `input_shape`: The input dimension shape, each dim must be > 0.
-/// - `kernel_shape`: The kernel shape; length must match `input_shape`, each dim must be > 0.
-/// - `stride`: The stride of the convolution; length must match `input_shape`, each dim must be > 0.
-/// - `padding`: The padding of the convolution, added evenly to all sides of the input.
-/// - `dilation`: The dilation of the convolution; length must match `input_shape`, each dim must be > 0.
+/// - `kernel_shape`: The kernel shape; length must match `input_shape`, each
+///   dim must be > 0.
+/// - `stride`: The stride of the convolution; length must match `input_shape`,
+///   each dim must be > 0.
+/// - `padding`: The padding of the convolution, added evenly to all sides of
+///   the input.
+/// - `dilation`: The dilation of the convolution; length must match
+///   `input_shape`, each dim must be > 0.
 ///
 /// # Returns
 ///
@@ -145,7 +151,8 @@ pub fn maybe_conv_output_shape_dyn(
 /// - `input_shape`: The input dimension shape, each dim must be > 0.
 /// - `kernel_shape`: The kernel shape, each dim must be > 0.
 /// - `stride`: The stride of the convolution, each dim must be > 0.
-/// - `padding`: The padding of the convolution, added evenly to all sides of the input.
+/// - `padding`: The padding of the convolution, added evenly to all sides of
+///   the input.
 /// - `dilation`: The dilation of the convolution, each dim must be > 0.
 ///
 /// # Returns
@@ -175,7 +182,8 @@ pub fn expect_conv_output_shape_dyn(
 /// - `input_shape`: The input dimension shape, each dim must be > 0.
 /// - `kernel_shape`: The kernel shape, each dim must be > 0.
 /// - `stride`: The stride of the convolution, each dim must be > 0.
-/// - `padding`: The padding of the convolution, added evenly to all sides of the input.
+/// - `padding`: The padding of the convolution, added evenly to all sides of
+///   the input.
 /// - `dilation`: The dilation of the convolution, each dim must be > 0.
 ///
 /// # Returns
@@ -211,7 +219,8 @@ pub fn maybe_conv_output_shape<const D: usize>(
 /// - `input_shape`: The input dimension shape, each dim must be > 0.
 /// - `kernel_shape`: The kernel shape, each dim must be > 0.
 /// - `stride`: The stride of the convolution, each dim must be > 0.
-/// - `padding`: The padding of the convolution, added evenly to all sides of the input.
+/// - `padding`: The padding of the convolution, added evenly to all sides of
+///   the input.
 /// - `dilation`: The dilation of the convolution, each dim must be > 0.
 ///
 /// # Returns

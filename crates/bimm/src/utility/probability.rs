@@ -1,7 +1,8 @@
 //! # Probability Utilities.
 
-use anyhow::bail;
 use core::fmt::Debug;
+
+use anyhow::bail;
 use num_traits::Float;
 
 /// Validate a probability in the range ``[0.0, 1.0]``.
@@ -44,7 +45,10 @@ pub fn expect_probability<F: Float + Debug>(prob: F) -> F {
 
 #[cfg(test)]
 mod tests {
-    use crate::utility::probability::{expect_probability, try_probability};
+    use crate::utility::probability::{
+        expect_probability,
+        try_probability,
+    };
 
     #[test]
     fn test_probability() {

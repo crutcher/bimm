@@ -1,13 +1,24 @@
-use crate::models::swin::v2::window_attention::{
-    window_attention_relative_position_index, window_log1p_relative_offset_grid,
+use bunsen::contracts::assert_shape_contract_periodically;
+use burn::{
+    config::Config,
+    module::Module,
+    nn,
+    nn::activation::{
+        Activation,
+        ActivationConfig,
+    },
+    prelude::{
+        Backend,
+        Int,
+        Tensor,
+    },
+    tensor::activation::sigmoid,
 };
-use bimm_contracts::assert_shape_contract_periodically;
-use burn::config::Config;
-use burn::module::Module;
-use burn::nn;
-use burn::nn::activation::{Activation, ActivationConfig};
-use burn::prelude::{Backend, Int, Tensor};
-use burn::tensor::activation::sigmoid;
+
+use crate::models::swin::v2::window_attention::{
+    window_attention_relative_position_index,
+    window_log1p_relative_offset_grid,
+};
 
 /// Common introspection interface for relative position bias modules.
 pub trait RelativePositionBiasMeta {
@@ -61,6 +72,7 @@ impl RelativePositionBiasMeta for RelativePositionBiasConfig {
     fn window_shape(&self) -> [usize; 2] {
         self.window_shape
     }
+
     fn base(&self) -> f64 {
         self.base
     }
@@ -131,6 +143,7 @@ impl<B: Backend> RelativePositionBiasMeta for OffsetGridRelativePositionBias<B> 
     fn base(&self) -> f64 {
         self.base
     }
+
     fn num_heads(&self) -> usize {
         self.num_heads
     }
@@ -143,8 +156,9 @@ impl<B: Backend> RelativePositionBiasMeta for OffsetGridRelativePositionBias<B> 
 impl<B: Backend> OffsetGridRelativePositionBias<B> {
     /// Returns the learned relative position bias.
     ///
-    /// This is hashed such that all pairs of locations in the window with the same
-    /// inter-pair relative offset will have the same bias across all heads.
+    /// This is hashed such that all pairs of locations in the window with the
+    /// same inter-pair relative offset will have the same bias across all
+    /// heads.
     ///
     /// # Returns
     ///
@@ -276,7 +290,8 @@ impl<B: Backend> ContinuousPositionBiasMlp<B> {
     ///
     /// # Arguments
     ///
-    /// * `x`: A tensor of ``[..., 2]`` of the relative log-offset coordinates table.
+    /// * `x`: A tensor of ``[..., 2]`` of the relative log-offset coordinates
+    ///   table.
     ///
     /// # Returns
     ///
@@ -294,15 +309,24 @@ impl<B: Backend> ContinuousPositionBiasMlp<B> {
 
 #[cfg(test)]
 mod tests {
+    use bunsen::{
+        contracts::assert_shape_contract,
+        support::testing::{
+            PerfTestBackend,
+            SetupTestBackend,
+        },
+    };
+
     use super::*;
     use crate::models::swin::v2::window_attention::{
-        window_attention_relative_position_index, window_log1p_relative_offset_grid,
+        window_attention_relative_position_index,
+        window_log1p_relative_offset_grid,
     };
-    use bimm_contracts::assert_shape_contract;
-    use burn::backend::NdArray;
 
     #[test]
     fn test_rpb_meta() {
+        type B = SetupTestBackend;
+
         let config = RelativePositionBiasConfig::new(12, [3, 2]);
 
         assert_eq!(config.base(), 8.0);
@@ -312,7 +336,7 @@ mod tests {
         assert_eq!(config.window_width(), 2);
 
         let device = Default::default();
-        let rpb = config.init_offset_grid_rpb::<NdArray>(&device);
+        let rpb = config.init_offset_grid_rpb::<B>(&device);
 
         assert_eq!(rpb.base(), 8.0);
         assert_eq!(rpb.num_heads(), 12);
@@ -323,13 +347,14 @@ mod tests {
 
     #[test]
     fn test_og_rpb() {
+        type B = PerfTestBackend;
         let device = Default::default();
 
         let window_shape = [3, 2];
         let num_heads = 8;
 
         let config = RelativePositionBiasConfig::new(num_heads, window_shape);
-        let rpb = config.init_offset_grid_rpb::<NdArray>(&device);
+        let rpb = config.init_offset_grid_rpb::<B>(&device);
 
         assert_eq!(rpb.base(), 8.0);
         assert_eq!(rpb.num_heads(), num_heads);
@@ -338,12 +363,12 @@ mod tests {
         assert_eq!(rpb.window_width(), window_shape[1]);
 
         rpb.rel_coords_table.to_data().assert_eq(
-            &window_log1p_relative_offset_grid::<NdArray>(window_shape, 8.0, &device).to_data(),
+            &window_log1p_relative_offset_grid::<B>(window_shape, 8.0, &device).to_data(),
             true,
         );
 
         rpb.rel_index.to_data().assert_eq(
-            &window_attention_relative_position_index::<NdArray>(window_shape, &device).to_data(),
+            &window_attention_relative_position_index::<B>(window_shape, &device).to_data(),
             true,
         );
 
@@ -363,13 +388,14 @@ mod tests {
 
     #[test]
     fn test_cpb_mlp_meta() {
+        type B = SetupTestBackend;
         let config = ContinuousPositionBiasMlpConfig::new(8).with_d_hidden(512);
 
         assert_eq!(config.d_hidden(), 512);
         assert_eq!(config.num_heads(), 8);
 
         let device = Default::default();
-        let mlp = config.init::<NdArray>(&device);
+        let mlp = config.init::<B>(&device);
 
         assert_eq!(mlp.d_hidden(), 512);
         assert_eq!(mlp.num_heads(), 8);

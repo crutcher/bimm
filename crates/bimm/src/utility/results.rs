@@ -23,8 +23,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use anyhow::bail;
+
+    use super::*;
 
     fn try_example(
         value: i32,

@@ -1,13 +1,27 @@
 //! Image speckle noise stages.
-use crate::augmentation::{
-    AugmentationStage, AugmentationStageConfig, ImageAugContext, PluginBuilder,
-    WithAugmentationStageBuilder,
-};
-use crate::define_image_aug_plugin;
-use image::{DynamicImage, GenericImage, GenericImageView};
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::sync::Arc;
+
+use image::{
+    DynamicImage,
+    GenericImage,
+    GenericImageView,
+};
+use serde::{
+    Deserialize,
+    Serialize,
+};
+use serde_json::Value;
+
+use crate::{
+    augmentation::{
+        AugmentationStage,
+        AugmentationStageConfig,
+        ImageAugContext,
+        PluginBuilder,
+        WithAugmentationStageBuilder,
+    },
+    define_image_aug_plugin,
+};
 
 define_image_aug_plugin!(SPECKLE, SpeckleStage::build_stage);
 

@@ -1,5 +1,7 @@
-use crate::core::operations::environment::MapOpEnvironment;
-use crate::core::operations::registration::FirehoseOperatorFactoryRegistration;
+use crate::core::operations::{
+    environment::MapOpEnvironment,
+    registration::FirehoseOperatorFactoryRegistration,
+};
 
 /// Build the default environment.
 ///

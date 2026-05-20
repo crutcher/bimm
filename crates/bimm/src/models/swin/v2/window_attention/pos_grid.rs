@@ -1,5 +1,14 @@
-use burn::prelude::{Backend, Int, Tensor};
-use burn::tensor::grid::{IndexPos, meshgrid_stack};
+use burn::{
+    prelude::{
+        Backend,
+        Int,
+        Tensor,
+    },
+    tensor::grid::{
+        IndexPos,
+        meshgrid_stack,
+    },
+};
 
 /// Creates a grid of 2D offset indices for a given window shape.
 ///
@@ -10,10 +19,12 @@ use burn::tensor::grid::{IndexPos, meshgrid_stack};
 ///
 /// # Returns
 ///
-/// A 3D tensor of shape (2*height-1, 2*width-1, 2) containing the offset indices.
+/// A 3D tensor of shape (2*height-1, 2*width-1, 2) containing the offset
+/// indices.
 ///
-/// The first dimension represents the height offsets, the second dimension represents the width offsets,
-/// and the third dimension contains the respective indices.
+/// The first dimension represents the height offsets, the second dimension
+/// represents the width offsets, and the third dimension contains the
+/// respective indices.
 #[inline(always)]
 #[must_use]
 pub fn window_index_offset_grid<B: Backend>(
@@ -38,7 +49,8 @@ pub fn window_index_offset_grid<B: Backend>(
 
 /// Creates a grid of 2D relative offsets for a given window shape.
 ///
-/// Converts `window_index_offset_grid` to ``.float()`` and scales by the maximum offset value.
+/// Converts `window_index_offset_grid` to ``.float()`` and scales by the
+/// maximum offset value.
 ///
 /// # Arguments
 ///
@@ -47,7 +59,8 @@ pub fn window_index_offset_grid<B: Backend>(
 ///
 /// # Returns
 ///
-/// A 3D tensor of shape (2*height-1, 2*width-1, 2) containing the relative offsets.
+/// A 3D tensor of shape (2*height-1, 2*width-1, 2) containing the relative
+/// offsets.
 #[inline(always)]
 #[must_use]
 pub fn window_relative_offset_grid<B: Backend>(
@@ -63,8 +76,8 @@ pub fn window_relative_offset_grid<B: Backend>(
 
 /// Creates a grid of 2D log-scaled relative offsets for a given window shape.
 ///
-/// This is a variant of `window_relative_offset_grid` that applies a logarithmic transformation
-/// to the relative offsets.
+/// This is a variant of `window_relative_offset_grid` that applies a
+/// logarithmic transformation to the relative offsets.
 ///
 /// # Arguments
 ///
@@ -74,7 +87,8 @@ pub fn window_relative_offset_grid<B: Backend>(
 ///
 /// # Returns
 ///
-/// A 3D tensor of shape (2*height-1, 2*width-1, 2) containing the log-scaled relative offsets.
+/// A 3D tensor of shape (2*height-1, 2*width-1, 2) containing the log-scaled
+/// relative offsets.
 #[inline(always)]
 #[must_use]
 pub fn window_log1p_relative_offset_grid<B: Backend>(
@@ -99,10 +113,12 @@ pub fn window_log1p_relative_offset_grid<B: Backend>(
 ///
 /// # Returns
 ///
-/// A 2D tensor of shape (height * width, height * width) containing the relative position indices.
+/// A 2D tensor of shape (height * width, height * width) containing the
+/// relative position indices.
 ///
-/// This has a translation-invariant property, meaning that the relative position indices are
-/// the same regardless of the position of the window in the input tensor.
+/// This has a translation-invariant property, meaning that the relative
+/// position indices are the same regardless of the position of the window in
+/// the input tensor.
 ///
 /// ```math
 /// \forall i, j \in [0, h * w), \text{rel}[i, j] = \text{rel}[i + \Delta_i, j + \Delta_j]
@@ -172,16 +188,23 @@ pub fn window_attention_relative_position_index<B: Backend>(
 
 #[cfg(test)]
 mod tests {
+    use bunsen::support::testing::{
+        PerfTestBackend,
+        SetupTestBackend,
+    };
+    use burn::{
+        prelude::TensorData,
+        tensor::Tolerance,
+    };
+
     use super::*;
-    use burn::backend::NdArray;
-    use burn::prelude::TensorData;
-    use burn::tensor::Tolerance;
 
     #[test]
     fn test_window_index_offset_grid() {
+        type B = SetupTestBackend;
         let device = Default::default();
 
-        window_index_offset_grid::<NdArray>([3, 2], &device)
+        window_index_offset_grid::<B>([3, 2], &device)
             .to_data()
             .assert_eq(
                 &TensorData::from([
@@ -197,9 +220,10 @@ mod tests {
 
     #[test]
     fn test_window_relative_offset_grid() {
+        type B = SetupTestBackend;
         let device = Default::default();
 
-        window_relative_offset_grid::<NdArray>([3, 2], &device)
+        window_relative_offset_grid::<B>([3, 2], &device)
             .clone()
             .to_data()
             .assert_eq(
@@ -216,10 +240,11 @@ mod tests {
 
     #[test]
     fn test_window_log_offset_grid() {
+        type B = PerfTestBackend;
         let device = Default::default();
         let base = 8.0;
 
-        let actual = window_log1p_relative_offset_grid::<NdArray>([3, 2], base, &device);
+        let actual = window_log1p_relative_offset_grid::<B>([3, 2], base, &device);
 
         actual.to_data().assert_approx_eq(
             &TensorData::from([
@@ -251,10 +276,11 @@ mod tests {
 
     #[test]
     fn test_relative_position_index() {
+        type B = SetupTestBackend;
         let window_shape = [2, 3];
 
         let device = Default::default();
-        let rel = window_attention_relative_position_index::<NdArray>(window_shape, &device);
+        let rel = window_attention_relative_position_index::<B>(window_shape, &device);
         rel.clone().to_data().assert_eq(
             &TensorData::from([
                 [7, 6, 5, 2, 1, 0],

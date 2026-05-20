@@ -4,8 +4,11 @@
 //! ## Example
 //!
 //! ```rust,no_run
-//! use bimm::models::swin::v2::swin_model::{SwinTransformerV2, SwinTransformerV2Config};
-//! use bimm::models::swin::v2::swin_model::LayerConfig;
+//! use bimm::models::swin::v2::swin_model::{
+//!     LayerConfig,
+//!     SwinTransformerV2,
+//!     SwinTransformerV2Config,
+//! };
 //! use burn::backend::NdArray;
 //!
 //! let image_dimensions = [224, 224];

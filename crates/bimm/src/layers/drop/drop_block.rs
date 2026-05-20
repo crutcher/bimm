@@ -3,19 +3,44 @@
 //! Based upon [DropBlock (Ghiasi et al., 2018)](https://arxiv.org/pdf/1810.12890.pdf);
 //! inspired also by the `python-image-models` implementation.
 
-use crate::layers::drop::size_config::SizeConfig;
-use crate::utility::burn::kernels;
-use crate::utility::burn::noise::NoiseConfig;
-use crate::utility::probability::expect_probability;
 use alloc::format;
-use bimm_contracts::unpack_shape_contract;
-use burn::config::Config;
-use burn::module::{Content, Module, ModuleDisplay, ModuleDisplayDefault};
-use burn::prelude::{Backend, Float, Tensor};
-use burn::tensor::module::max_pool2d;
-use burn::tensor::{DType, Distribution};
 use core::ops::Range;
-use serde::{Deserialize, Serialize};
+
+use bunsen::contracts::unpack_shape_contract;
+use burn::{
+    config::Config,
+    module::{
+        Content,
+        Module,
+        ModuleDisplay,
+        ModuleDisplayDefault,
+    },
+    prelude::{
+        Backend,
+        Float,
+        Tensor,
+    },
+    tensor::{
+        DType,
+        Distribution,
+        module::max_pool2d,
+    },
+};
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
+use crate::{
+    layers::drop::size_config::SizeConfig,
+    utility::{
+        burn::{
+            kernels,
+            noise::NoiseConfig,
+        },
+        probability::expect_probability,
+    },
+};
 
 /// Configuration for `DropBlock`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -231,7 +256,8 @@ impl DropBlockOptions {
     /// Compute the adjusted gamma rate.
     ///
     /// Gamma is the adjusted probability that any given point is the midpoint
-    /// of a dropped block; given the desired `drop_rate`, the block size, and the input size.
+    /// of a dropped block; given the desired `drop_rate`, the block size, and
+    /// the input size.
     ///
     /// # Arguments
     ///
@@ -275,9 +301,9 @@ impl DropBlockOptions {
 ///
 /// # Arguments
 ///
-/// * `selected_blocks` - Input selection noise;
-///   `1.0` at the midpoints of selected blocks to drop,
-///   `0.0` everywhere else. Expected to be gamma noise.
+/// * `selected_blocks` - Input selection noise; `1.0` at the midpoints of
+///   selected blocks to drop, `0.0` everywhere else. Expected to be gamma
+///   noise.
 /// * `kernel_shape` - the shape of the kernel.
 /// * `partial_edge_blocks` - permit partial blocks at the edges, faster.
 fn drop_block_2d_drop_filter_<B: Backend>(
@@ -443,7 +469,7 @@ impl DropBlock2d {
         &self,
         tensor: Tensor<B, 4>,
     ) -> Tensor<B, 4> {
-        if B::ad_enabled() {
+        if B::ad_enabled(&tensor.device()) {
             drop_block_2d(tensor.clone(), &self.options)
         } else {
             tensor
@@ -453,12 +479,15 @@ impl DropBlock2d {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use bunsen::support::testing::PerfTestBackend;
+    use burn::{
+        backend::Autodiff,
+        module::DisplaySettings,
+        prelude::TensorData,
+    };
 
+    use super::*;
     use crate::utility::burn::noise::NoiseConfig;
-    use burn::backend::{Autodiff, NdArray};
-    use burn::module::DisplaySettings;
-    use burn::prelude::TensorData;
 
     #[test]
     fn test_drop_block_options() {
@@ -534,7 +563,7 @@ mod tests {
 
     #[test]
     fn test_drop_block_2d_drop_filter() {
-        type B = NdArray;
+        type B = PerfTestBackend;
         let device = Default::default();
 
         let selected_blocks: Tensor<B, 4> = Tensor::<B, 2>::from_data(
@@ -584,7 +613,7 @@ mod tests {
 
     #[test]
     fn test_drop_block_2d_no_op() {
-        type B = NdArray;
+        type B = PerfTestBackend;
         let device = Default::default();
 
         let shape = [2, 3, 7, 9];
@@ -604,7 +633,7 @@ mod tests {
 
     #[test]
     fn test_drop_block_2d_with_norm() {
-        type B = NdArray;
+        type B = PerfTestBackend;
         let device = Default::default();
 
         let shape = [2, 3, 100, 100];
@@ -636,7 +665,7 @@ mod tests {
 
     #[test]
     fn test_drop_block_2d_with_noise() {
-        type B = NdArray;
+        type B = PerfTestBackend;
         let device = Default::default();
 
         let shape = [2, 3, 100, 100];
@@ -669,7 +698,7 @@ mod tests {
 
     #[test]
     fn test_module_inference() {
-        type B = NdArray;
+        type B = PerfTestBackend;
         let device = Default::default();
 
         let config = DropBlock2dConfig::new();
@@ -684,7 +713,7 @@ mod tests {
 
         let tensor: Tensor<B, 4> = Tensor::ones(shape, &device);
 
-        assert_eq!(B::ad_enabled(), false);
+        assert_eq!(B::ad_enabled(&tensor.device()), false);
         let result = module.forward(tensor.clone());
 
         // Not under training; so a no-op.
@@ -693,7 +722,7 @@ mod tests {
 
     #[test]
     fn test_module_training() {
-        type B = Autodiff<NdArray>;
+        type B = Autodiff<PerfTestBackend>;
         let device = Default::default();
 
         let drop_prob = 0.1;
@@ -714,7 +743,7 @@ mod tests {
 
         let tensor: Tensor<B, 4> = Tensor::ones(shape, &device);
 
-        assert_eq!(B::ad_enabled(), true);
+        assert_eq!(B::ad_enabled(&tensor.device()), true);
         let drop = module.forward(tensor.clone());
 
         // Count all 1.0; which are the non-dropped values.

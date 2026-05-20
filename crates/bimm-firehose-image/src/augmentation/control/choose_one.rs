@@ -1,14 +1,24 @@
 //! Stage that randomly selects one of its children.
-use crate::augmentation::{
-    AugmentationStage, AugmentationStageConfig, ImageAugContext, PluginBuilder,
-    WithAugmentationStageBuilder,
-};
-use crate::define_image_aug_plugin;
+use std::sync::Arc;
+
 use anyhow::bail;
 use image::DynamicImage;
 use rand::Rng;
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
+use crate::{
+    augmentation::{
+        AugmentationStage,
+        AugmentationStageConfig,
+        ImageAugContext,
+        PluginBuilder,
+        WithAugmentationStageBuilder,
+    },
+    define_image_aug_plugin,
+};
 
 define_image_aug_plugin!(CHOOSE_ONE, ChooseOneStage::build_stage);
 

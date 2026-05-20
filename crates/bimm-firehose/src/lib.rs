@@ -18,12 +18,13 @@ mod pipeline;
 
 /// Define a self-referential ID.
 ///
-/// The id will be defined as a static string constant that refers to its own namespace path.
+/// The id will be defined as a static string constant that refers to its own
+/// namespace path.
 ///
 /// # Arguments
 ///
-/// * `$name`: The final path name of the ID to define;
-///   the rest of the name will be taken from the module context.
+/// * `$name`: The final path name of the ID to define; the rest of the name
+///   will be taken from the module context.
 ///
 /// # Example
 /// ```
@@ -31,7 +32,6 @@ mod pipeline;
 /// bimm_firehose::define_self_referential_id!(ID);
 /// // pub static ID: &str = "foo::bar::ID";
 /// ```
-///
 #[macro_export]
 macro_rules! define_self_referential_id {
     ($name:ident) => {

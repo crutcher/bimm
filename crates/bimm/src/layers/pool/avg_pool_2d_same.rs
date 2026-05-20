@@ -1,8 +1,17 @@
-use burn::config::Config;
-use burn::module::Module;
-use burn::nn::pool::{AvgPool2d, AvgPool2dConfig};
-use burn::prelude::{Backend, Tensor};
 use core::cmp::max;
+
+use burn::{
+    config::Config,
+    module::Module,
+    nn::pool::{
+        AvgPool2d,
+        AvgPool2dConfig,
+    },
+    prelude::{
+        Backend,
+        Tensor,
+    },
+};
 
 // `AvgPool2dSame`
 //
@@ -100,7 +109,6 @@ use core::cmp::max;
 //             self.ceil_mode,
 //             self.count_include_pad,
 //         )
-//
 // ```
 
 /// [`AvgPool2dSame`] Configuration.
@@ -156,8 +164,8 @@ pub fn pad_same<B: Backend>(
     dilation: [usize; 2],
     value: f32,
 ) -> Tensor<B, 4> {
-    let ih = input.shape().dims[2];
-    let iw = input.shape().dims[3];
+    let ih = input.shape()[2];
+    let iw = input.shape()[3];
     let pad_h = get_same_padding(ih, kernel_size[0], stride[0], dilation[0]);
     let pad_w = get_same_padding(iw, kernel_size[1], stride[1], dilation[1]);
     input.pad(

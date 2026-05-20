@@ -1,14 +1,24 @@
 //! Stage that randomly runs, or skips, a child.
-use crate::augmentation::{
-    AugmentationStage, AugmentationStageConfig, ImageAugContext, PluginBuilder,
-    WithAugmentationStageBuilder,
-};
-use crate::define_image_aug_plugin;
+use std::sync::Arc;
+
 use bimm_firehose::utility::probability::try_probability;
 use image::DynamicImage;
 use rand::Rng;
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
+use crate::{
+    augmentation::{
+        AugmentationStage,
+        AugmentationStageConfig,
+        ImageAugContext,
+        PluginBuilder,
+        WithAugmentationStageBuilder,
+    },
+    define_image_aug_plugin,
+};
 
 define_image_aug_plugin!(WITH_PROB, WithProbStage::build_stage);
 

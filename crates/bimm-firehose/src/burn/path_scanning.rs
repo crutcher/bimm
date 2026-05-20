@@ -1,6 +1,12 @@
-use burn::data::dataset::InMemDataset;
-use burn::data::dataset::vision::ImageLoaderError;
-use std::collections::{HashMap, HashSet};
+use std::collections::{
+    HashMap,
+    HashSet,
+};
+
+use burn::data::dataset::{
+    InMemDataset,
+    vision::ImageLoaderError,
+};
 
 /// Scan a folder of ``$ROOT/$CLASS/$IMG.{jpg,png}`` into an `InMemDataset`.
 pub fn image_dataset_for_folder<P>(root: P) -> anyhow::Result<InMemDataset<(String, usize)>>

@@ -1,7 +1,13 @@
 //! # Image test utilities.
-use crate::ImageShape;
-use image::{DynamicImage, ImageBuffer, Rgb, RgbImage};
+use image::{
+    DynamicImage,
+    ImageBuffer,
+    Rgb,
+    RgbImage,
+};
 use image_compare::BlendInput;
+
+use crate::ImageShape;
 
 /// Generates a simple gradient pattern image.
 pub fn generate_gradient_pattern(shape: ImageShape) -> RgbImage {
@@ -23,13 +29,15 @@ pub fn generate_gradient_pattern(shape: ImageShape) -> RgbImage {
 
 /// Asserts that two images are similar within a given tolerance.
 ///
-/// This function uses the `image_compare` crate to compare two images and checks if their similarity score is above a specified tolerance.
+/// This function uses the `image_compare` crate to compare two images and
+/// checks if their similarity score is above a specified tolerance.
 ///
 /// # Arguments
 ///
 /// * `actual` - The actual image to compare.
 /// * `expected` - The expected image to compare against.
-/// * `tolerance` - An optional tolerance value for the similarity score. If not provided, defaults to 0.01.
+/// * `tolerance` - An optional tolerance value for the similarity score. If not
+///   provided, defaults to 0.01.
 pub fn assert_image_close_rgba<'a, A, B>(
     actual: A,
     expected: B,
@@ -56,7 +64,8 @@ pub fn assert_image_close_rgba<'a, A, B>(
     }
 }
 
-/// Asserts that two `DynamicImage` instances are similar within a given tolerance.
+/// Asserts that two `DynamicImage` instances are similar within a given
+/// tolerance.
 ///
 /// This function converts both images to RGBA format before comparing them.
 ///
@@ -64,11 +73,13 @@ pub fn assert_image_close_rgba<'a, A, B>(
 ///
 /// * `actual` - The actual image to compare.
 /// * `expected` - The expected image to compare against.
-/// * `tolerance` - An optional tolerance value for the similarity score. If not provided, defaults to 0.01.
+/// * `tolerance` - An optional tolerance value for the similarity score. If not
+///   provided, defaults to 0.01.
 ///
 /// # Panics
 ///
-/// This function will panic if the images are not similar enough according to the specified tolerance.
+/// This function will panic if the images are not similar enough according to
+/// the specified tolerance.
 pub fn assert_image_close(
     actual: &DynamicImage,
     expected: &DynamicImage,

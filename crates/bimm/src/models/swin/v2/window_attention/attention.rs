@@ -1,15 +1,40 @@
+use bunsen::contracts::{
+    assert_shape_contract_periodically,
+    unpack_shape_contract,
+};
+use burn::{
+    config::Config,
+    module::{
+        Module,
+        Param,
+        ParamId,
+    },
+    nn::{
+        Dropout,
+        DropoutConfig,
+        Linear,
+        LinearConfig,
+        activation::ActivationConfig,
+    },
+    prelude::{
+        Backend,
+        Tensor,
+    },
+    tensor::{
+        activation::softmax,
+        linalg::{
+            Norm,
+            vector_normalize,
+        },
+    },
+};
+
 use crate::models::swin::v2::window_attention::{
-    OffsetGridRelativePositionBias, RelativePositionBiasConfig, RelativePositionBiasMeta,
+    OffsetGridRelativePositionBias,
+    RelativePositionBiasConfig,
+    RelativePositionBiasMeta,
     apply_attention_mask,
 };
-use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
-use burn::config::Config;
-use burn::module::{Module, Param, ParamId};
-use burn::nn::activation::ActivationConfig;
-use burn::nn::{Dropout, DropoutConfig, Linear, LinearConfig};
-use burn::prelude::{Backend, Tensor};
-use burn::tensor::activation::softmax;
-use burn::tensor::linalg::{Norm, vector_normalize};
 
 /// EPS is a small constant used to avoid numerical instability in calculations.
 pub const EPS: f64 = 1e-12;
@@ -100,87 +125,6 @@ impl<B: Backend> WindowAttentionMeta for WindowAttention<B> {
 
     fn enable_qkv_bias(&self) -> bool {
         self.q_linear.bias.is_some()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::models::swin::v2::window_attention::*;
-    use bimm_contracts::assert_shape_contract;
-    use burn::backend::NdArray;
-    use burn::prelude::Tensor;
-    use burn::tensor::Distribution;
-
-    #[test]
-    fn test_window_attention_meta() {
-        let window_shape = [4, 4];
-        let num_heads = 8;
-        let channels = num_heads * 3; // Assuming cph = 3
-
-        let config = WindowAttentionConfig::new(channels, window_shape, num_heads);
-
-        assert_eq!(config.d_input(), channels);
-        assert_eq!(config.window_shape(), window_shape);
-        assert_eq!(config.num_heads(), num_heads);
-        assert!(config.enable_qkv_bias());
-        assert_eq!(config.attn_drop(), 0.0);
-        assert_eq!(config.proj_drop(), 0.0);
-        assert_eq!(config.window_height(), 4);
-        assert_eq!(config.window_width(), 4);
-
-        let device = Default::default();
-        let attn_mod = config.init::<NdArray>(&device);
-
-        assert_eq!(attn_mod.d_input(), channels);
-        assert_eq!(attn_mod.window_shape(), window_shape);
-        assert_eq!(attn_mod.num_heads(), num_heads);
-        assert!(attn_mod.enable_qkv_bias());
-        assert_eq!(attn_mod.attn_drop(), 0.0);
-        assert_eq!(attn_mod.proj_drop(), 0.0);
-    }
-
-    #[test]
-    fn test_wa() {
-        let b = 3;
-        let num_windows = 2;
-
-        let window_size = 4;
-
-        let num_heads = 5;
-        let cph = 3;
-        let channels = num_heads * cph;
-
-        let config = WindowAttentionConfig::new(channels, [window_size, window_size], num_heads);
-
-        let device = Default::default();
-        let attn_mod = config.init::<NdArray>(&device);
-
-        assert_eq!(attn_mod.d_input(), channels);
-        assert_eq!(attn_mod.window_shape(), [window_size, window_size]);
-        assert_eq!(attn_mod.num_heads(), num_heads);
-
-        let distribution = Distribution::Uniform(0.0, 1.0);
-        let input = Tensor::<NdArray, 3>::random(
-            [b * num_windows, window_size * window_size, channels],
-            distribution,
-            &device,
-        );
-
-        let res = attn_mod.forward(input, None);
-        assert_shape_contract!(
-            [
-                "bn" = "batch" * "num_windows",
-                "window_size" ^ 2,
-                "channels"
-            ],
-            &res.dims(),
-            &[
-                ("batch", b),
-                ("num_windows", num_windows),
-                ("window_size", window_size),
-                ("channels", channels),
-            ],
-        );
     }
 }
 
@@ -391,11 +335,13 @@ impl<B: Backend> WindowAttention<B> {
         self.rpb_module.forward()
     }
 
-    /// Encode the attention logits with the logit scale and relative position bias.
+    /// Encode the attention logits with the logit scale and relative position
+    /// bias.
     ///
     /// # Arguments
     ///
-    /// - `attn`: Attention logits tensor of shape (`b_nw`, `num_heads`, Wh*Ww, Wh*Ww).
+    /// - `attn`: Attention logits tensor of shape (`b_nw`, `num_heads`, Wh*Ww,
+    ///   Wh*Ww).
     ///
     /// # Returns
     ///
@@ -463,5 +409,95 @@ impl WindowAttentionConfig {
             }
             .init(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bunsen::{
+        contracts::assert_shape_contract,
+        support::testing::PerfTestBackend,
+    };
+    use burn::{
+        prelude::Tensor,
+        tensor::Distribution,
+    };
+
+    use crate::models::swin::v2::window_attention::*;
+
+    #[test]
+    fn test_window_attention_meta() {
+        type B = PerfTestBackend;
+
+        let window_shape = [4, 4];
+        let num_heads = 8;
+        let channels = num_heads * 3; // Assuming cph = 3
+
+        let config = WindowAttentionConfig::new(channels, window_shape, num_heads);
+
+        assert_eq!(config.d_input(), channels);
+        assert_eq!(config.window_shape(), window_shape);
+        assert_eq!(config.num_heads(), num_heads);
+        assert!(config.enable_qkv_bias());
+        assert_eq!(config.attn_drop(), 0.0);
+        assert_eq!(config.proj_drop(), 0.0);
+        assert_eq!(config.window_height(), 4);
+        assert_eq!(config.window_width(), 4);
+
+        let device = Default::default();
+        let attn_mod = config.init::<B>(&device);
+
+        assert_eq!(attn_mod.d_input(), channels);
+        assert_eq!(attn_mod.window_shape(), window_shape);
+        assert_eq!(attn_mod.num_heads(), num_heads);
+        assert!(attn_mod.enable_qkv_bias());
+        assert_eq!(attn_mod.attn_drop(), 0.0);
+        assert_eq!(attn_mod.proj_drop(), 0.0);
+    }
+
+    #[test]
+    fn test_wa() {
+        type B = PerfTestBackend;
+
+        let b = 3;
+        let num_windows = 2;
+
+        let window_size = 4;
+
+        let num_heads = 5;
+        let cph = 3;
+        let channels = num_heads * cph;
+
+        let config = WindowAttentionConfig::new(channels, [window_size, window_size], num_heads);
+
+        let device = Default::default();
+        let attn_mod = config.init::<B>(&device);
+
+        assert_eq!(attn_mod.d_input(), channels);
+        assert_eq!(attn_mod.window_shape(), [window_size, window_size]);
+        assert_eq!(attn_mod.num_heads(), num_heads);
+
+        let distribution = Distribution::Uniform(0.0, 1.0);
+        let input = Tensor::<B, 3>::random(
+            [b * num_windows, window_size * window_size, channels],
+            distribution,
+            &device,
+        );
+
+        let res = attn_mod.forward(input, None);
+        assert_shape_contract!(
+            [
+                "bn" = "batch" * "num_windows",
+                "window_size" ^ 2,
+                "channels"
+            ],
+            &res.dims(),
+            &[
+                ("batch", b),
+                ("num_windows", num_windows),
+                ("window_size", window_size),
+                ("channels", channels),
+            ],
+        );
     }
 }

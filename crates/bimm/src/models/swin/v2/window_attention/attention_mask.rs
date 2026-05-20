@@ -1,5 +1,11 @@
+use burn::prelude::{
+    Backend,
+    Bool,
+    Int,
+    Tensor,
+};
+
 use crate::models::swin::v2::windowing::window_partition;
-use burn::prelude::{Backend, Bool, Int, Tensor};
 
 /// Apply an attention mask.
 ///
@@ -8,7 +14,8 @@ use burn::prelude::{Backend, Bool, Int, Tensor};
 /// - `b_nw`: Batch size times number of windows.
 /// - `n`: Number of elements in the input tensor, Wh*Ww.
 /// - `num_heads`: Number of attention heads.
-/// - `attn`: Attention logits tensor of shape (`b_nw`, `num_heads`, Wh*Ww, Wh*Ww).
+/// - `attn`: Attention logits tensor of shape (`b_nw`, `num_heads`, Wh*Ww,
+///   Wh*Ww).
 /// - `mask`: Mask tensor of shape (`num_windows`, Wh*Ww, Wh*Ww).
 ///
 /// # Returns
@@ -45,7 +52,8 @@ pub fn apply_attention_mask<B: Backend>(
 ///
 /// # Arguments
 ///
-/// - `input_shape`: The shape of the input tensor; must be divisible by the window size.
+/// - `input_shape`: The shape of the input tensor; must be divisible by the
+///   window size.
 /// - `window_size`: The size of the window.
 /// - `shift_size`: The size of the shift.
 /// - `device`: The device on which the tensor will be created.
@@ -147,26 +155,34 @@ pub fn sw_attn_mask<B: Backend>(
 
 #[cfg(test)]
 mod tests {
+    use bunsen::support::testing::PerfTestBackend;
+    use burn::prelude::{
+        Tensor,
+        TensorData,
+        s,
+    };
+
     use super::*;
-    use burn::backend::NdArray;
-    use burn::prelude::{Tensor, TensorData, s};
 
     #[should_panic(expected = "Height 5 is not divisible by window size 2")]
     #[test]
     fn test_sw_img_mask_height_not_divisible() {
+        type B = PerfTestBackend;
         let device = Default::default();
-        let _d = sw_img_mask::<NdArray>([5, 4], 2, 1, &device);
+        let _d = sw_img_mask::<B>([5, 4], 2, 1, &device);
     }
 
     #[should_panic(expected = "Width 5 is not divisible by window size 2")]
     #[test]
     fn test_sw_img_mask_width_not_divisible() {
+        type B = PerfTestBackend;
         let device = Default::default();
-        let _d = sw_img_mask::<NdArray>([4, 5], 2, 1, &device);
+        let _d = sw_img_mask::<B>([4, 5], 2, 1, &device);
     }
 
     #[test]
     fn test_apply_attention_mask() {
+        type B = PerfTestBackend;
         let b = 2;
         let nw = 2;
         let b_nw = b * nw;
@@ -175,11 +191,11 @@ mod tests {
         let num_heads = 5;
 
         let device = Default::default();
-        let attn = Tensor::<NdArray, 4>::zeros([b_nw, num_heads, n, n], &device);
+        let attn = Tensor::<B, 4>::zeros([b_nw, num_heads, n, n], &device);
         // (b*nw, num_heads, ws*ws, ws*ws)
 
         // (nw, ws*ws, ws*ws)
-        let mask = Tensor::<NdArray, 3>::from_data(
+        let mask = Tensor::<B, 3>::from_data(
             [
                 [
                     [0.0, 0.25, 0.5, 0.75],
@@ -210,8 +226,7 @@ mod tests {
                     .squeeze_dim::<4>(0)
                     .squeeze_dim::<3>(0);
 
-                let wmask: Tensor<NdArray, 2> =
-                    mask.clone().slice(s![wi, .., ..]).squeeze_dim::<2>(0);
+                let wmask: Tensor<B, 2> = mask.clone().slice(s![wi, .., ..]).squeeze_dim::<2>(0);
 
                 for hi in 0..num_heads {
                     let h_attn = window.clone().slice(s![hi, .., ..]).squeeze_dim::<2>(0);
@@ -224,10 +239,11 @@ mod tests {
 
     #[test]
     fn test_attn_mask() {
+        type B = PerfTestBackend;
         // let b_nw = 1;
         let device = Default::default();
 
-        sw_attn_mask::<NdArray>([4, 4], 2, 1, &device)
+        sw_attn_mask::<B>([4, 4], 2, 1, &device)
             .to_data()
             .assert_eq(
                 &TensorData::from([
@@ -256,10 +272,10 @@ mod tests {
                         [true, true, true, false],
                     ],
                 ]),
-                true,
+                false,
             );
 
-        sw_attn_mask::<NdArray>([6, 6], 3, 1, &device)
+        sw_attn_mask::<B>([6, 6], 3, 1, &device)
             .to_data()
             .assert_eq(
                 &TensorData::from([
@@ -326,10 +342,10 @@ mod tests {
                         [true, true, true, true, true, true, true, true, false],
                     ],
                 ]),
-                true,
+                false,
             );
 
-        sw_attn_mask::<NdArray>([6, 6], 3, 2, &device)
+        sw_attn_mask::<B>([6, 6], 3, 2, &device)
             .to_data()
             .assert_eq(
                 &TensorData::from([
@@ -396,7 +412,7 @@ mod tests {
                         [true, true, true, true, false, false, true, false, false],
                     ],
                 ]),
-                true,
+                false,
             );
     }
 }

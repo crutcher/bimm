@@ -1,7 +1,14 @@
-use crate::pipeline::{DataLoadDataItem, DataLoadMetaDataItem, DataLoadOperator, DataLoadSchedule};
 use std::sync::Arc;
 
-/// Represents a plan for loading data, including a schedule and an optional operator.
+use crate::pipeline::{
+    DataLoadDataItem,
+    DataLoadMetaDataItem,
+    DataLoadOperator,
+    DataLoadSchedule,
+};
+
+/// Represents a plan for loading data, including a schedule and an optional
+/// operator.
 #[derive(Debug, Clone)]
 pub struct DataLoadPlan<M, T>
 where
@@ -28,7 +35,8 @@ where
         }
     }
 
-    /// Initializes a `DataLoadPlan` with a given schedule and an optional operator.
+    /// Initializes a `DataLoadPlan` with a given schedule and an optional
+    /// operator.
     pub fn init(
         schedule: DataLoadSchedule<M>,
         op: Option<Arc<dyn DataLoadOperator<M, T>>>,
@@ -49,9 +57,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::*;
     use crate::pipeline::FnOperator;
-    use std::sync::Arc;
 
     #[test]
     fn test_index_to_str_plan() {

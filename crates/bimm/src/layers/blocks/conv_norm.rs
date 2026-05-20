@@ -1,13 +1,29 @@
 //! # `ConvNorm` Module
 //!
-//! A [`ConvNorm2d`] module is a [`Conv2d`] layer followed by a [`BatchNorm`] layer.
+//! A [`ConvNorm2d`] module is a [`Conv2d`] layer followed by a [`BatchNorm`]
+//! layer.
 
-use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
-use burn::config::Config;
-use burn::module::Module;
-use burn::nn::conv::{Conv2d, Conv2dConfig};
-use burn::nn::{BatchNorm, BatchNormConfig, Initializer};
-use burn::prelude::{Backend, Tensor};
+use bunsen::contracts::{
+    assert_shape_contract_periodically,
+    unpack_shape_contract,
+};
+use burn::{
+    config::Config,
+    module::Module,
+    nn::{
+        BatchNorm,
+        BatchNormConfig,
+        Initializer,
+        conv::{
+            Conv2d,
+            Conv2dConfig,
+        },
+    },
+    prelude::{
+        Backend,
+        Tensor,
+    },
+};
 
 /// [`ConvNorm2d`] Meta.
 pub trait ConvNorm2dMeta {
@@ -91,7 +107,7 @@ pub struct ConvNorm2d<B: Backend> {
 
 impl<B: Backend> ConvNorm2dMeta for ConvNorm2d<B> {
     fn in_channels(&self) -> usize {
-        self.conv.weight.shape().dims[1] * self.groups()
+        self.conv.weight.shape()[1] * self.groups()
     }
 
     fn groups(&self) -> usize {
@@ -99,7 +115,7 @@ impl<B: Backend> ConvNorm2dMeta for ConvNorm2d<B> {
     }
 
     fn out_channels(&self) -> usize {
-        self.conv.weight.shape().dims[0]
+        self.conv.weight.shape()[0]
     }
 
     fn stride(&self) -> &[usize; 2] {
@@ -116,6 +132,7 @@ impl<B: Backend> ConvNorm2d<B> {
     pub fn zero_init_norm(&mut self) {
         self.norm.gamma = self.norm.gamma.clone().map(|p| p.slice_fill([..], 0.0));
     }
+
     /// Forward Pass.
     pub fn forward(
         &self,
@@ -157,14 +174,15 @@ impl<B: Backend> ConvNorm2d<B> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use burn::nn::PaddingConfig2d;
+
+    use super::*;
 
     #[test]
     fn test_conv_norm_config() {
         let inner_config = Conv2dConfig::new([2, 4], [3, 3])
             .with_stride([2, 2])
-            .with_padding(PaddingConfig2d::Explicit(1, 1))
+            .with_padding(PaddingConfig2d::Explicit(1, 1, 1, 1))
             .with_bias(false);
 
         let config: ConvNorm2dConfig = inner_config.clone().into();

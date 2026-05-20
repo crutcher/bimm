@@ -1,7 +1,8 @@
 //! Common rate table for `DropPath` regularization.
 
-use crate::compat::ops::float_vec_linspace;
 use alloc::vec::Vec;
+
+use crate::compat::ops::float_vec_linspace;
 
 /// Computes a progressive incremental path drop rate for stochastic depth.
 ///
@@ -14,7 +15,8 @@ use alloc::vec::Vec;
 ///
 /// # Returns
 ///
-/// A vector of drop path rates, one for each layer, starting from 0.0 and ending at `drop_path_rate`.
+/// A vector of drop path rates, one for each layer, starting from 0.0 and
+/// ending at `drop_path_rate`.
 #[inline(always)]
 #[must_use]
 pub fn progressive_dpr(
@@ -36,16 +38,19 @@ pub struct DropPathRateDepthTable {
 }
 
 impl DropPathRateDepthTable {
-    /// Creates a new `DropPathRateDepthTable` with the specified drop path rate and layer depths.
+    /// Creates a new `DropPathRateDepthTable` with the specified drop path rate
+    /// and layer depths.
     ///
     /// # Arguments
     ///
     /// * `drop_path_rate`: The final drop path rate to be achieved.
-    /// * `layer_depths`: A slice of layer depths, where each element represents the depth of a specific layer.
+    /// * `layer_depths`: A slice of layer depths, where each element represents
+    ///   the depth of a specific layer.
     ///
     /// # Returns
     ///
-    /// A new `DropPathRateDepthTable` instance containing the progressive drop path rates for each layer.
+    /// A new `DropPathRateDepthTable` instance containing the progressive drop
+    /// path rates for each layer.
     #[must_use]
     pub fn new(
         drop_path_rate: f64,
@@ -82,11 +87,13 @@ impl DropPathRateDepthTable {
     ///
     /// # Arguments
     ///
-    /// * `layer_i`: The index of the layer for which to retrieve the drop path rates.
+    /// * `layer_i`: The index of the layer for which to retrieve the drop path
+    ///   rates.
     ///
     /// # Panics
     ///
-    /// If the layer index is out of bounds, it will panic with a message indicating the issue.
+    /// If the layer index is out of bounds, it will panic with a message
+    /// indicating the issue.
     #[must_use]
     pub fn layer_dprs(
         &self,
@@ -116,16 +123,19 @@ impl DropPathRateDepthTable {
 
     /// Returns the progressive drop path rates for layer with the given depths.
     ///
-    /// This is a convenience function that creates a new `DropPathRateDepthTable` and returns the layer rates.
+    /// This is a convenience function that creates a new
+    /// `DropPathRateDepthTable` and returns the layer rates.
     ///
     /// # Arguments
     ///
     /// * `drop_path_rate`: The final drop path rate to be achieved.
-    /// * `layer_depths`: A slice of layer depths, where each element represents the depth of a specific layer.
+    /// * `layer_depths`: A slice of layer depths, where each element represents
+    ///   the depth of a specific layer.
     ///
     /// # Returns
     ///
-    /// A vector of vectors, where each inner vector contains the progressive drop path rates for a specific layer.
+    /// A vector of vectors, where each inner vector contains the progressive
+    /// drop path rates for a specific layer.
     #[must_use]
     pub fn dpr_layer_rates(
         drop_path_rate: f64,
@@ -138,11 +148,15 @@ impl DropPathRateDepthTable {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::layers::drop::rate_table::progressive_dpr;
-    use crate::testing::assert_close_to_vec;
     use alloc::vec;
+
     use hamcrest::prelude::*;
+
+    use super::*;
+    use crate::{
+        layers::drop::rate_table::progressive_dpr,
+        testing::assert_close_to_vec,
+    };
 
     #[test]
     fn test_incremental_drop_rate() {

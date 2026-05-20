@@ -1,16 +1,48 @@
 //! # Operational Block for Swin Transformer v2.
-use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
-use crate::models::swin::v2::window_attention::{
-    WindowAttention, WindowAttentionConfig, WindowAttentionMeta, sw_attn_mask,
+use bunsen::contracts::{
+    assert_shape_contract_periodically,
+    define_shape_contract,
 };
-use crate::models::swin::v2::windowing::{window_partition, window_reverse};
-use bimm_contracts::{assert_shape_contract_periodically, define_shape_contract};
-use burn::config::Config;
-use burn::module::Module;
-use burn::nn::activation::{Activation, ActivationConfig};
-use burn::nn::{Dropout, DropoutConfig, LayerNorm, LayerNormConfig, Linear, LinearConfig};
-use burn::prelude::{Backend, Tensor};
-use burn::tensor::BasicOps;
+use burn::{
+    config::Config,
+    module::Module,
+    nn::{
+        Dropout,
+        DropoutConfig,
+        LayerNorm,
+        LayerNormConfig,
+        Linear,
+        LinearConfig,
+        activation::{
+            Activation,
+            ActivationConfig,
+        },
+    },
+    prelude::{
+        Backend,
+        Tensor,
+    },
+    tensor::BasicOps,
+};
+
+use crate::{
+    layers::drop::drop_path::{
+        DropPath,
+        DropPathConfig,
+    },
+    models::swin::v2::{
+        window_attention::{
+            WindowAttention,
+            WindowAttentionConfig,
+            WindowAttentionMeta,
+            sw_attn_mask,
+        },
+        windowing::{
+            window_partition,
+            window_reverse,
+        },
+    },
+};
 
 /// Common meta-interface for `BlockMlp` config.
 pub trait BlockMlpMeta {
@@ -171,10 +203,11 @@ impl<B: Backend> BlockMlp<B> {
 /// Applies an inner function under conditional cyclic shift.
 ///
 /// This is used for shifted window attention. When `swa_enabled` is true,
-/// it cyclically shifts the input tensor by `shift_size` in the last two dimensions,
-/// applies the function `f`, and then reverses the cyclic shift.
+/// it cyclically shifts the input tensor by `shift_size` in the last two
+/// dimensions, applies the function `f`, and then reverses the cyclic shift.
 ///
-/// When `swa_enabled` is false, it simply applies the function `f` without any shift.
+/// When `swa_enabled` is false, it simply applies the function `f` without any
+/// shift.
 ///
 /// # Arguments
 ///
@@ -183,7 +216,8 @@ impl<B: Backend> BlockMlp<B> {
 ///
 /// # Returns
 ///
-/// A new tensor of the same shape as `x`, with the function `f` applied after cyclic shifting.
+/// A new tensor of the same shape as `x`, with the function `f` applied after
+/// cyclic shifting.
 #[must_use]
 #[inline(always)]
 fn with_shift<B: Backend, F, K>(
@@ -587,7 +621,8 @@ impl<B: Backend> ShiftedWindowTransformerBlock<B> {
         x
     }
 
-    /// Applies an inner function under conditional stochastic residual/depth-skip connection.
+    /// Applies an inner function under conditional stochastic
+    /// residual/depth-skip connection.
     #[must_use]
     #[inline(always)]
     fn with_skip<const D: usize, F>(
@@ -603,8 +638,8 @@ impl<B: Backend> ShiftedWindowTransformerBlock<B> {
 
     /// Applies window attention to the input tensor.
     ///
-    /// This function partitions the input tensor into windows, applies window attention,
-    /// and then merges the windows back to the original shape.
+    /// This function partitions the input tensor into windows, applies window
+    /// attention, and then merges the windows back to the original shape.
     ///
     /// # Arguments
     ///
@@ -613,7 +648,8 @@ impl<B: Backend> ShiftedWindowTransformerBlock<B> {
     ///
     /// # Returns
     ///
-    /// A new tensor of ``[batch, height, width, channels]`` with window attention applied.
+    /// A new tensor of ``[batch, height, width, channels]`` with window
+    /// attention applied.
     #[must_use]
     #[inline(always)]
     fn apply_window(
@@ -642,9 +678,10 @@ impl<B: Backend> ShiftedWindowTransformerBlock<B> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use burn::backend::NdArray;
+    use bunsen::support::testing::PerfTestBackend;
     use burn::tensor::Distribution;
+
+    use super::*;
 
     #[test]
     fn test_block_mlp_meta() {
@@ -678,11 +715,8 @@ mod tests {
 
     #[test]
     fn test_mlp() {
-        impl_test_mlp::<NdArray>();
-    }
-
-    fn impl_test_mlp<B: Backend>() {
-        let device: B::Device = Default::default();
+        type B = PerfTestBackend;
+        let device = Default::default();
 
         let a = 2;
         let b = 3;
@@ -713,6 +747,7 @@ mod tests {
 
     #[test]
     fn test_with_shift() {
+        type B = PerfTestBackend;
         let device = Default::default();
         let b = 1;
         let h = 4;
@@ -720,12 +755,11 @@ mod tests {
         let c = 3;
 
         let distribution = burn::tensor::Distribution::Uniform(0.0, 1.0);
-        let input = Tensor::<NdArray, 4>::random([b, h, w, c], distribution, &device);
+        let input = Tensor::<B, 4>::random([b, h, w, c], distribution, &device);
 
-        let idx: Tensor<NdArray, 4> =
-            Tensor::arange(0..input.shape().num_elements() as i64, &device)
-                .reshape([b, h, w, c])
-                .float();
+        let idx: Tensor<B, 4> = Tensor::arange(0..input.shape().num_elements() as i64, &device)
+            .reshape([b, h, w, c])
+            .float();
 
         // No-op shift:
         with_shift(input.clone(), 0, |x| x + idx.clone())
@@ -748,6 +782,9 @@ mod tests {
 
     #[test]
     fn test_shifted_window_transformer_block_meta() {
+        type B = PerfTestBackend;
+        let device = Default::default();
+
         let d_input = 128;
         let num_heads = 4;
         let input_resolution = [14, 14];
@@ -772,8 +809,7 @@ mod tests {
         assert_eq!(config.mlp_ratio(), 4.0);
         assert_eq!(config.drop_path_rate(), 0.0);
 
-        let device = Default::default();
-        let block = config.init::<NdArray>(&device);
+        let block = config.init::<B>(&device);
 
         assert_eq!(block.d_input(), d_input);
         assert_eq!(block.input_resolution(), input_resolution);
@@ -797,54 +833,64 @@ mod tests {
     #[should_panic(expected = "input_resolution must be greater than zero")]
     #[test]
     fn test_shifted_window_transformer_block_config_zero_resolution() {
+        type B = PerfTestBackend;
+
         let d_input = 128;
         let num_heads = 4;
         let input_resolution = [0, 14];
 
         let config = ShiftedWindowTransformerBlockConfig::new(d_input, input_resolution, num_heads);
 
-        let _d = config.init::<NdArray>(&Default::default());
+        let _d = config.init::<B>(&Default::default());
     }
 
     #[should_panic(expected = "input_resolution must be divisible by window size")]
     #[test]
     fn test_shifted_window_transformer_block_config_invalid_resolution() {
+        type B = PerfTestBackend;
+
         let d_input = 128;
         let num_heads = 4;
         let input_resolution = [15, 14]; // Not divisible by default window size of 7
 
         let config = ShiftedWindowTransformerBlockConfig::new(d_input, input_resolution, num_heads);
 
-        let _d = config.init::<NdArray>(&Default::default());
+        let _d = config.init::<B>(&Default::default());
     }
 
     #[should_panic(expected = "d_input must be greater than zero")]
     #[test]
     fn test_shifted_window_transformer_block_config_zero_d_input() {
+        type B = PerfTestBackend;
+
         let d_input = 0; // Invalid d_input
         let num_heads = 4;
         let input_resolution = [14, 14];
 
         let config = ShiftedWindowTransformerBlockConfig::new(d_input, input_resolution, num_heads);
 
-        let _d = config.init::<NdArray>(&Default::default());
+        let _d = config.init::<B>(&Default::default());
     }
 
     #[should_panic(expected = "num_heads must be greater than zero")]
     #[test]
     fn test_shifted_window_transformer_block_config_zero_num_heads() {
+        type B = PerfTestBackend;
+
         let d_input = 128;
         let num_heads = 0; // Invalid num_heads
         let input_resolution = [14, 14];
 
         let config = ShiftedWindowTransformerBlockConfig::new(d_input, input_resolution, num_heads);
 
-        let _d = config.init::<NdArray>(&Default::default());
+        let _d = config.init::<B>(&Default::default());
     }
 
     #[should_panic(expected = "window_size must be greater than zero")]
     #[test]
     fn test_shifted_window_transformer_block_config_zero_window_size() {
+        type B = PerfTestBackend;
+
         let d_input = 128;
         let num_heads = 4;
         let input_resolution = [14, 14];
@@ -853,11 +899,13 @@ mod tests {
         let config = ShiftedWindowTransformerBlockConfig::new(d_input, input_resolution, num_heads)
             .with_window_size(window_size);
 
-        let _d = config.init::<NdArray>(&Default::default());
+        let _d = config.init::<B>(&Default::default());
     }
 
     #[test]
     fn test_block() {
+        type B = PerfTestBackend;
+
         let b = 1;
         let num_heads = 4;
         let channels_per_head = 3;
@@ -872,13 +920,13 @@ mod tests {
             .with_window_size(window_size);
 
         let device = Default::default();
-        let block = config.init::<NdArray>(&device);
+        let block = config.init::<B>(&device);
 
         let distribution = burn::tensor::Distribution::Uniform(0.0, 1.0);
-        let input = Tensor::<NdArray, 3>::random([b, h * w, d_input], distribution, &device);
+        let input = Tensor::<B, 3>::random([b, h * w, d_input], distribution, &device);
 
-        let _output = block.forward(input.clone());
+        let output = block.forward(input.clone());
 
-        assert_eq!(input.dims(), _output.dims());
+        assert_eq!(input.dims(), output.dims());
     }
 }

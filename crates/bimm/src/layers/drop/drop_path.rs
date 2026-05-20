@@ -1,4 +1,5 @@
-//! Burn implementation of the `DropPath` (Stochastic Depth) regularization layer.
+//! Burn implementation of the `DropPath` (Stochastic Depth) regularization
+//! layer.
 //!
 //! Papers:
 //! `DropBlock`: A regularization method for convolutional networks (<https://arxiv.org/abs/1810.12890>)
@@ -8,11 +9,17 @@
 //! Inspired by the python implementation from the timm library:
 //! <https://github.com/huggingface/pytorch-image-models/blob/main/timm/layers/drop.py>
 
+use burn::{
+    config::Config,
+    module::Module,
+    prelude::{
+        Backend,
+        Tensor,
+    },
+    tensor::Distribution,
+};
+
 use crate::utility::probability;
-use burn::config::Config;
-use burn::module::Module;
-use burn::prelude::{Backend, Tensor};
-use burn::tensor::Distribution;
 
 /// `DropPath` (stochastic depth) regularization.
 ///
@@ -140,7 +147,8 @@ impl DropPathConfig {
 
 /// The `DropPath` module.
 ///
-/// Burn Module that implements the `DropPath` (Stochastic Depth) regularization.
+/// Burn Module that implements the `DropPath` (Stochastic Depth)
+/// regularization.
 #[derive(Module, Clone, Debug)]
 pub struct DropPath {
     /// Probability of dropping a path.
@@ -167,11 +175,12 @@ impl DropPath {
         &self,
         input: Tensor<B, D>,
     ) -> Tensor<B, D> {
-        let training = B::ad_enabled();
+        let training = B::ad_enabled(&input.device());
         drop_path(input, self.drop_prob, training, self.scale_by_keep)
     }
 
-    /// Applies an inner function under conditional stochastic residual/depth-skip connection.
+    /// Applies an inner function under conditional stochastic
+    /// residual/depth-skip connection.
     ///
     /// This is used for stochastic depth in the transformer block.
     ///
@@ -182,7 +191,8 @@ impl DropPath {
     ///
     /// # Returns
     ///
-    /// The result of the function application, with a stochastic skip connection applied.
+    /// The result of the function application, with a stochastic skip
+    /// connection applied.
     #[inline]
     #[must_use]
     pub fn with_skip<B: Backend, const D: usize, F>(
@@ -199,14 +209,17 @@ impl DropPath {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use bunsen::support::testing::PerfTestBackend;
+    use burn::{
+        prelude::Tensor,
+        tensor::Distribution,
+    };
 
-    use burn::backend::NdArray;
-    use burn::prelude::Tensor;
-    use burn::tensor::Distribution;
+    use super::*;
 
     #[test]
     fn test_drop_path() {
+        type B = PerfTestBackend;
         let device = Default::default();
         let drop_prob = 0.5;
         let scale_by_keep = true;
@@ -218,8 +231,7 @@ mod tests {
 
         let module = config.init();
 
-        let input =
-            Tensor::<NdArray, 4>::random([2, 3, 4, 5], Distribution::Uniform(0.0, 1.0), &device);
+        let input = Tensor::<B, 4>::random([2, 3, 4, 5], Distribution::Uniform(0.0, 1.0), &device);
         let output = module.forward(input.clone());
 
         assert_eq!(input.dims(), output.dims());
@@ -227,12 +239,13 @@ mod tests {
 
     #[test]
     fn test_drop_path_wrapper() {
+        type B = PerfTestBackend;
         let device = Default::default();
 
         let n = 3;
         let shape = [n, 2, 4];
 
-        let x = Tensor::<NdArray, 3>::random(shape, Distribution::Uniform(0.0, 1.0), &device);
+        let x = Tensor::<B, 3>::random(shape, Distribution::Uniform(0.0, 1.0), &device);
 
         // No-op case: not training and drop_prob = 0.0
         let training = false;
@@ -244,12 +257,13 @@ mod tests {
 
     #[test]
     fn test_drop_path_sample() {
+        type B = PerfTestBackend;
         let device = Default::default();
 
         let n = 3;
         let shape = [n, 2, 4];
 
-        let x = Tensor::<NdArray, 3>::random(shape, Distribution::Uniform(0.0, 1.0), &device);
+        let x = Tensor::<B, 3>::random(shape, Distribution::Uniform(0.0, 1.0), &device);
 
         // No-op case: not training and drop_prob = 0.0
         let training = false;
@@ -263,7 +277,7 @@ mod tests {
             |shape, keep_prob, device| {
                 assert_eq!(shape, [3, 1, 1]);
                 assert_eq!(keep_prob, 1.0);
-                Tensor::<NdArray, 3>::from_data([[[1.0]], [[0.0]], [[1.0]]], device)
+                Tensor::<B, 3>::from_data([[[1.0]], [[0.0]], [[1.0]]], device)
             },
         );
         res.to_data().assert_eq(&x.clone().to_data(), true);
@@ -280,7 +294,7 @@ mod tests {
             |shape, keep_prob, device| {
                 assert_eq!(shape, [3, 1, 1]);
                 assert_eq!(keep_prob, 1.0);
-                Tensor::<NdArray, 3>::from_data([[[1.0]], [[0.0]], [[1.0]]], device)
+                Tensor::<B, 3>::from_data([[[1.0]], [[0.0]], [[1.0]]], device)
             },
         );
         res.to_data().assert_eq(&x.clone().to_data(), true);
@@ -297,11 +311,11 @@ mod tests {
             |shape, keep_prob, device| {
                 assert_eq!(shape, [3, 1, 1]);
                 assert_eq!(keep_prob, 0.5);
-                Tensor::<NdArray, 3>::from_data([[[1.0]], [[0.0]], [[1.0]]], device)
+                Tensor::<B, 3>::from_data([[[1.0]], [[0.0]], [[1.0]]], device)
             },
         );
         res.to_data().assert_eq(
-            &(x.clone() * Tensor::<NdArray, 3>::from_data([[[1.0]], [[0.0]], [[1.0]]], &device))
+            &(x.clone() * Tensor::<B, 3>::from_data([[[1.0]], [[0.0]], [[1.0]]], &device))
                 .to_data(),
             true,
         );
@@ -319,11 +333,11 @@ mod tests {
             |shape, keep_prob, device| {
                 assert_eq!(shape, [3, 1, 1]);
                 assert_eq!(keep_prob, 0.5);
-                Tensor::<NdArray, 3>::from_data([[[1.0]], [[0.0]], [[1.0]]], device)
+                Tensor::<B, 3>::from_data([[[1.0]], [[0.0]], [[1.0]]], device)
             },
         );
         res.to_data().assert_eq(
-            &(x.clone() * Tensor::<NdArray, 3>::from_data([[[1.0]], [[0.0]], [[1.0]]], &device))
+            &(x.clone() * Tensor::<B, 3>::from_data([[[1.0]], [[0.0]], [[1.0]]], &device))
                 .div_scalar(keep_prob)
                 .to_data(),
             true,
@@ -332,6 +346,8 @@ mod tests {
 
     #[test]
     fn test_droppath_module() {
+        type B = PerfTestBackend;
+
         let drop_prob = 0.2;
         let config = DropPathConfig::new().with_drop_prob(drop_prob);
 
@@ -346,7 +362,7 @@ mod tests {
 
         let device = Default::default();
         let shape = [2, 3, 4];
-        let x = Tensor::<NdArray, 3>::random(shape, Distribution::Uniform(0.0, 1.0), &device);
+        let x = Tensor::<B, 3>::random(shape, Distribution::Uniform(0.0, 1.0), &device);
 
         // TODO(crutcher): work out how to enable/disable training mode in tests.
         let output = module.forward(x.clone());

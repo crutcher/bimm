@@ -1,33 +1,61 @@
 #![allow(missing_docs, dead_code)]
 //! # ResNet-18 Stubs.
 //!
-//! These are stub modules to smooth over loading issues with the current version
-//! of `burn-import`. There is insufficient information in loaded weights to
-//! derive information about stateless modules (such as ``Activation::Relu``).
+//! These are stub modules to smooth over loading issues with the current
+//! version of `burn-import`. There is insufficient information in loaded
+//! weights to derive information about stateless modules (such as
+//! ``Activation::Relu``).
 
-use crate::layers::blocks::cna::CNA2d;
-use crate::layers::blocks::conv_norm::ConvNorm2d;
-use crate::models::resnet::basic_block::BasicBlock;
-use crate::models::resnet::bottleneck_block::BottleneckBlock;
-use crate::models::resnet::downsample::ResNetDownsample;
-use crate::models::resnet::layer_block::LayerBlock;
-use crate::models::resnet::residual_block::ResidualBlock;
-use crate::models::resnet::resnet_model::ResNet;
 use alloc::vec::Vec;
-use burn::module::Module;
-use burn::nn::conv::{Conv2d, Conv2dRecord};
-use burn::nn::norm::Normalization;
-use burn::nn::{BatchNorm, BatchNormRecord, Linear};
-use burn::prelude::Backend;
-use burn::record::{FullPrecisionSettings, Recorder};
-use burn_import::pytorch::PyTorchFileRecorder;
 use std::path::PathBuf;
 
+use burn::{
+    module::Module,
+    nn::{
+        BatchNorm,
+        BatchNormRecord,
+        Linear,
+        conv::{
+            Conv2d,
+            Conv2dRecord,
+        },
+        norm::Normalization,
+    },
+    prelude::Backend,
+};
+
+use crate::{
+    layers::blocks::{
+        cna::CNA2d,
+        conv_norm::ConvNorm2d,
+    },
+    models::resnet::{
+        basic_block::BasicBlock,
+        bottleneck_block::BottleneckBlock,
+        downsample::ResNetDownsample,
+        layer_block::LayerBlock,
+        residual_block::ResidualBlock,
+        resnet_model::ResNet,
+    },
+};
+
 /// Load a [`ResNetStubRecord`] from ``torch`` weights path.
+#[allow(unused)]
 pub fn load_resnet_stub_record<B: Backend>(
     path: PathBuf,
     device: &B::Device,
 ) -> anyhow::Result<ResNetStubRecord<B>> {
+    use burn::store::{
+        ModuleSnapshot,
+        PytorchStore,
+    };
+
+    let mut store = PytorchStore::from_file(path)
+        .with_key_remapping(r"downsample\.0", "downsample.conv")
+        .with_key_remapping(r"downsample\.1", "downsample.bn")
+        .with_key_remapping("layer([1-4])", "layers.$1.blocks");
+
+    /*
     let load_args = burn_import::pytorch::LoadArgs::new(path)
         .with_key_remap(r"downsample\.0", "downsample.conv")
         .with_key_remap(r"downsample\.1", "downsample.bn")
@@ -36,6 +64,9 @@ pub fn load_resnet_stub_record<B: Backend>(
     let record = PyTorchFileRecorder::<FullPrecisionSettings>::new().load(load_args, device)?;
 
     Ok(record)
+
+     */
+    todo!()
 }
 
 #[derive(Module, Debug)]

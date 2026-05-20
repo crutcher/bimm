@@ -1,10 +1,21 @@
-use crate::core::operations::operator::FirehoseOperator;
-use crate::core::operations::signature::FirehoseOperatorSignature;
-use crate::core::schema::{BuildPlan, FirehoseTableSchema};
+use std::{
+    fmt::Debug,
+    marker::PhantomData,
+};
+
 use anyhow::Context;
 use serde::de::DeserializeOwned;
-use std::fmt::Debug;
-use std::marker::PhantomData;
+
+use crate::core::{
+    operations::{
+        operator::FirehoseOperator,
+        signature::FirehoseOperatorSignature,
+    },
+    schema::{
+        BuildPlan,
+        FirehoseTableSchema,
+    },
+};
 
 /// A factory for creating `FirehoseOperator` instances from a specification.
 pub trait FirehoseOperatorFactory: Debug + Send + Sync {
@@ -19,16 +30,19 @@ pub trait FirehoseOperatorFactory: Debug + Send + Sync {
     /// Returns the operator specification.
     fn signature(&self) -> &FirehoseOperatorSignature;
 
-    /// Inits a build plan against the input and output types using an `OpInitContext`.
+    /// Inits a build plan against the input and output types using an
+    /// `OpInitContext`.
     ///
     /// # Arguments
     ///
-    /// * `context` - The context containing the build plan and input/output types.
+    /// * `context` - The context containing the build plan and input/output
+    ///   types.
     ///
     /// # Returns
     ///
     /// A `Result<Box<dyn BuildOperator>, String>` where:
-    /// * `Ok` contains a boxed operator that implements the `BuildOperator` trait,
+    /// * `Ok` contains a boxed operator that implements the `BuildOperator`
+    ///   trait,
     /// * `Err` contains an error message if the initialization fails.
     fn init(
         &self,
@@ -51,7 +65,8 @@ pub trait FirehoseOperatorInitContext {
     fn signature(&self) -> &FirehoseOperatorSignature;
 }
 
-/// A simple operator factory for types implementing `DeserializeOwned` and `FirehoseOperator`.
+/// A simple operator factory for types implementing `DeserializeOwned` and
+/// `FirehoseOperator`.
 #[derive(Debug)]
 pub struct SimpleConfigOperatorFactory<T>
 where
@@ -68,7 +83,8 @@ impl<T> SimpleConfigOperatorFactory<T>
 where
     T: DeserializeOwned + FirehoseOperator,
 {
-    /// Creates a new `SpecConfigOpBinding` with the given operator specification.
+    /// Creates a new `SpecConfigOpBinding` with the given operator
+    /// specification.
     pub fn new(spec: FirehoseOperatorSignature) -> Self {
         if spec.operator_id.is_none() {
             panic!("OperatorSpec must have an operator_id");
@@ -106,12 +122,25 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::core::operations::factory::SimpleConfigOperatorFactory;
-    use crate::core::operations::operator::FirehoseOperator;
-    use crate::core::operations::signature::{FirehoseOperatorSignature, ParameterSpec};
-    use crate::core::rows::FirehoseRowTransaction;
-    use crate::define_firehose_operator_id;
-    use serde::{Deserialize, Serialize};
+    use serde::{
+        Deserialize,
+        Serialize,
+    };
+
+    use crate::{
+        core::{
+            operations::{
+                factory::SimpleConfigOperatorFactory,
+                operator::FirehoseOperator,
+                signature::{
+                    FirehoseOperatorSignature,
+                    ParameterSpec,
+                },
+            },
+            rows::FirehoseRowTransaction,
+        },
+        define_firehose_operator_id,
+    };
 
     define_firehose_operator_id!(TEST_OP);
 

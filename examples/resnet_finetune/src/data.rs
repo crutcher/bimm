@@ -1,12 +1,17 @@
-use super::dataset::CLASSES;
-use burn::tensor::IndexingUpdateOp;
 use burn::{
     data::{
         dataloader::batcher::Batcher,
-        dataset::vision::{Annotation, ImageDatasetItem, PixelDepth},
+        dataset::vision::{
+            Annotation,
+            ImageDatasetItem,
+            PixelDepth,
+        },
     },
     prelude::*,
+    tensor::IndexingUpdateOp,
 };
+
+use super::dataset::CLASSES;
 
 // ImageNet mean and std values
 const MEAN: [f32; 3] = [0.485, 0.456, 0.406];
@@ -45,8 +50,9 @@ pub fn multi_hot<B: Backend>(
     )
 }
 
-/// Normalizer with `ImageNet` values as it helps accelerate training since we are fine-tuning from
-/// `ImageNet` pre-trained weights and the model expects the data to be in this normalized range.
+/// Normalizer with `ImageNet` values as it helps accelerate training since we
+/// are fine-tuning from `ImageNet` pre-trained weights and the model expects
+/// the data to be in this normalized range.
 #[derive(Clone)]
 pub struct Normalizer<B: Backend> {
     pub mean: Tensor<B, 4>,

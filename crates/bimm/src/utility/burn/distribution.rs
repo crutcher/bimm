@@ -1,7 +1,13 @@
 //! # [`Distribution`] Utility Module
 
-use burn::module::{Content, ModuleDisplay, ModuleDisplayDefault};
-use burn::tensor::Distribution;
+use burn::{
+    module::{
+        Content,
+        ModuleDisplay,
+        ModuleDisplayDefault,
+    },
+    tensor::Distribution,
+};
 
 /// Adapter to display a [`Distribution`] in a module.
 pub struct DistributionDisplayAdapter(Distribution);
@@ -39,8 +45,9 @@ impl ModuleDisplayDefault for DistributionDisplayAdapter {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use burn::module::DisplaySettings;
+
+    use super::*;
     #[test]
     fn test_distribution_display_adapter() {
         let settings = DisplaySettings::default();

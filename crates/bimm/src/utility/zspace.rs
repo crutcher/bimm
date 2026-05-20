@@ -9,10 +9,14 @@
 //! Z-Space has a limited notion of regions; limited to axis-aligned
 //! orthogonal regions. The partial ordering is chosen to simplify
 //! the description and containment testing of these regions.
-use crate::utility::results::expect_unwrap;
+use core::{
+    cmp::Ordering,
+    fmt::Debug,
+};
+
 use anyhow::bail;
-use core::cmp::Ordering;
-use core::fmt::Debug;
+
+use crate::utility::results::expect_unwrap;
 
 /// Z-space `PartialOrd`
 ///

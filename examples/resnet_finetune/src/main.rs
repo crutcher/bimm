@@ -5,38 +5,101 @@ extern crate core;
 mod data;
 mod dataset;
 
-use crate::data::{ClassificationBatch, ClassificationBatcher};
-use crate::dataset::{CLASSES, PlanetLoader, download};
-use bimm::cache::disk::DiskCacheConfig;
-use bimm::models::resnet::{PREFAB_RESNET_MAP, ResNet};
-use burn::config::Config;
-use burn::data::dataloader::{DataLoaderBuilder, Dataset};
-use burn::data::dataset::transform::ShuffledDataset;
-use burn::data::dataset::vision::ImageFolderDataset;
-use burn::lr_scheduler::composed::{ComposedLrSchedulerConfig, SchedulerReduction};
-use burn::lr_scheduler::cosine::CosineAnnealingLrSchedulerConfig;
-use burn::lr_scheduler::linear::LinearLrSchedulerConfig;
-use burn::module::Module;
-use burn::nn::activation::ActivationConfig;
-use burn::nn::loss::BinaryCrossEntropyLossConfig;
-use burn::nn::{LeakyReluConfig, PReluConfig};
-use burn::optim::AdamWConfig;
-use burn::prelude::{Int, Tensor};
-use burn::record::CompactRecorder;
-use burn::tensor::backend::{AutodiffBackend, Backend};
-use burn::train::metric::store::{Aggregate, Direction, Split};
-use burn::train::metric::{HammingScore, LearningRateMetric, LossMetric, MetricDefinition};
-use burn::train::renderer::{
-    EvaluationName, EvaluationProgress, MetricState, MetricsRenderer, MetricsRendererEvaluation,
-    MetricsRendererTraining, TrainingProgress,
-};
-use burn::train::{
-    InferenceStep, Learner, MetricEarlyStoppingStrategy, MultiLabelClassificationOutput,
-    StoppingCondition, SupervisedTraining, TrainOutput, TrainStep,
-};
-use clap::{Parser, ValueEnum};
 use core::clone::Clone;
 use std::time::Instant;
+
+use bimm::{
+    cache::disk::DiskCacheConfig,
+    models::resnet::{
+        PREFAB_RESNET_MAP,
+        ResNet,
+    },
+};
+use burn::{
+    config::Config,
+    data::{
+        dataloader::{
+            DataLoaderBuilder,
+            Dataset,
+        },
+        dataset::{
+            transform::ShuffledDataset,
+            vision::ImageFolderDataset,
+        },
+    },
+    lr_scheduler::{
+        composed::{
+            ComposedLrSchedulerConfig,
+            SchedulerReduction,
+        },
+        cosine::CosineAnnealingLrSchedulerConfig,
+        linear::LinearLrSchedulerConfig,
+    },
+    module::Module,
+    nn::{
+        LeakyReluConfig,
+        PReluConfig,
+        activation::ActivationConfig,
+        loss::BinaryCrossEntropyLossConfig,
+    },
+    optim::AdamWConfig,
+    prelude::{
+        Int,
+        Tensor,
+    },
+    record::CompactRecorder,
+    tensor::backend::{
+        AutodiffBackend,
+        Backend,
+    },
+    train::{
+        InferenceStep,
+        Learner,
+        MetricEarlyStoppingStrategy,
+        MultiLabelClassificationOutput,
+        StoppingCondition,
+        SupervisedTraining,
+        TrainOutput,
+        TrainStep,
+        metric::{
+            HammingScore,
+            LearningRateMetric,
+            LossMetric,
+            MetricDefinition,
+            store::{
+                Aggregate,
+                Direction,
+                Split,
+            },
+        },
+        renderer::{
+            EvaluationName,
+            EvaluationProgress,
+            MetricState,
+            MetricsRenderer,
+            MetricsRendererEvaluation,
+            MetricsRendererTraining,
+            ProgressType,
+            TrainingProgress,
+        },
+    },
+};
+use clap::{
+    Parser,
+    ValueEnum,
+};
+
+use crate::{
+    data::{
+        ClassificationBatch,
+        ClassificationBatcher,
+    },
+    dataset::{
+        CLASSES,
+        PlanetLoader,
+        download,
+    },
+};
 /*
 tracel-ai/models reference:
 | Split | Metric                         | Min.     | Epoch    | Max.     | Epoch    |
@@ -162,14 +225,21 @@ fn main() -> anyhow::Result<()> {
 
     let _source_tree = download();
 
-    #[cfg(feature = "wgpu")]
-    return train::<burn::backend::Autodiff<burn::backend::Wgpu>>(&args);
-
-    #[cfg(feature = "cuda")]
-    return train::<burn::backend::Autodiff<burn::backend::Cuda>>(&args);
-
-    #[cfg(feature = "metal")]
-    return train::<burn::backend::Autodiff<burn::backend::Metal>>(&args);
+    cfg_select! {
+        feature = "cuda" => {
+            type B =burn::backend::Cuda;
+        }
+        feature = "metal" => {
+            type B =burn::backend::Metal;
+        }
+        feature = "wgpu" => {
+            type B = burn::backend::Wgpu;
+        }
+        _ => {
+            type B =burn::backend::Flex;
+        }
+    }
+    train::<burn::backend::Autodiff<B>>(&args)
 }
 
 fn ensure_artifact_dir(artifact_dir: &str) -> anyhow::Result<()> {
@@ -427,6 +497,7 @@ impl MetricsRendererTraining for CustomRenderer {
     fn render_train(
         &mut self,
         item: TrainingProgress,
+        _: Vec<ProgressType>,
     ) {
         dbg!(item);
     }
@@ -434,6 +505,7 @@ impl MetricsRendererTraining for CustomRenderer {
     fn render_valid(
         &mut self,
         item: TrainingProgress,
+        _: Vec<ProgressType>,
     ) {
         dbg!(item);
     }
@@ -462,6 +534,7 @@ impl MetricsRendererEvaluation for CustomRenderer {
     fn render_test(
         &mut self,
         item: EvaluationProgress,
+        _: Vec<ProgressType>,
     ) {
         dbg!(item);
     }
@@ -488,11 +561,12 @@ impl<B: Backend> MultiLabelClassification<B> for Host<B> {
         images: Tensor<B, 4>,
         targets: Tensor<B, 2, Int>,
     ) -> MultiLabelClassificationOutput<B> {
+        let device = images.device();
         let output = self.resnet.forward(images);
 
         let mut loss_cfg = BinaryCrossEntropyLossConfig::new().with_logits(true);
 
-        if B::ad_enabled() {
+        if B::ad_enabled(&device) {
             loss_cfg = loss_cfg.with_smoothing(self.smoothing);
         }
 

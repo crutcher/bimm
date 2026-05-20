@@ -1,19 +1,26 @@
 //! # Support for Convolution Kernels
 
+use burn::{
+    prelude::{
+        Backend,
+        Tensor,
+    },
+    tensor::Numeric,
+};
+
 use crate::utility::zspace::expect_point_bounds_check;
-use burn::prelude::{Backend, Tensor};
-use burn::tensor::Numeric;
 
 /// Build a filter of kernel midpoints.
 ///
 /// Filter is `1.0` at the mid-points of kernels; `0.0` everywhere else.
 ///
-/// This predicts the kernel midpoints that ``conv2d`` (and related kernel functions)
-/// would place a kernel.
+/// This predicts the kernel midpoints that ``conv2d`` (and related kernel
+/// functions) would place a kernel.
 ///
 /// The *midpoint* of a kernel is computed as ``size / 2``:
 /// * the midpoint of odd kernels is the middle: `mid(3) == 1`
-/// * the midpoint of even kernels is the first point in the second half: `mid(4) == 2`
+/// * the midpoint of even kernels is the first point in the second half:
+///   `mid(4) == 2`
 ///
 /// # Argument
 ///
@@ -42,13 +49,17 @@ where
 
 #[cfg(test)]
 mod tests {
+    use bunsen::support::testing::SetupTestBackend;
+    use burn::prelude::{
+        Device,
+        TensorData,
+    };
+
     use super::*;
-    use burn::backend::NdArray;
-    use burn::prelude::{Device, TensorData};
 
     #[test]
     fn test_conv2d_kernel_midpoint_filter() {
-        type B = NdArray;
+        type B = SetupTestBackend;
         let device = Default::default();
 
         let shape = [7, 9];

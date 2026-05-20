@@ -119,7 +119,7 @@ This crate provides a stand-alone library for defining and enforcing tensor shap
 in-line with the Burn framework modules and methods.
 
 ```rust
-use bimm_contracts::{unpack_shape_contract, shape_contract, run_periodically};
+use bunsen::contracts::{unpack_shape_contract, shape_contract, run_periodically};
 
 pub fn window_partition<B: Backend, K>(
     tensor: Tensor<B, 4, K>,

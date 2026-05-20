@@ -1,8 +1,13 @@
 //! Windowing operations for Swin Transformer v2
 
-use bimm_contracts::unpack_shape_contract;
-use burn::prelude::{Backend, Tensor};
-use burn::tensor::BasicOps;
+use bunsen::contracts::unpack_shape_contract;
+use burn::{
+    prelude::{
+        Backend,
+        Tensor,
+    },
+    tensor::BasicOps,
+};
 
 /// Window Partition
 ///
@@ -13,7 +18,8 @@ use burn::tensor::BasicOps;
 ///
 /// # Returns
 ///
-/// Output tensor of ``[batch * h_windows * w_windows, window_size, window_size, channels]``.
+/// Output tensor of ``[batch * h_windows * w_windows, window_size, window_size,
+/// channels]``.
 ///
 /// # Panics
 ///
@@ -49,7 +55,8 @@ where
 ///
 /// # Arguments
 ///
-/// - `windows`: Input tensor of ``[batch * h_windows * w_windows, window_size, window_size, channels]``.
+/// - `windows`: Input tensor of ``[batch * h_windows * w_windows, window_size,
+///   window_size, channels]``.
 /// - `window_size`: Window size.
 /// - `height`: Height of the original image.
 /// - `width`: Width of the original image.
@@ -99,13 +106,20 @@ where
 
 #[cfg(test)]
 mod tests {
+    use bunsen::support::testing::PerfTestBackend;
+    use burn::{
+        prelude::Tensor,
+        tensor::{
+            Distribution,
+            Tolerance,
+        },
+    };
+
     use super::*;
-    use burn::backend::NdArray;
-    use burn::prelude::Tensor;
-    use burn::tensor::{Distribution, Tolerance};
 
     #[test]
     fn test_window_partition() {
+        type B = PerfTestBackend;
         let device = Default::default();
 
         let b = 3;
@@ -118,7 +132,7 @@ mod tests {
         let w = w_wins * window_size;
 
         let distribution = Distribution::Uniform(0.0, 1.0);
-        let input = Tensor::<NdArray, 4>::random([b, h, w, channels], distribution, &device);
+        let input = Tensor::<B, 4>::random([b, h, w, channels], distribution, &device);
 
         let windows = window_partition(input.clone(), window_size);
 

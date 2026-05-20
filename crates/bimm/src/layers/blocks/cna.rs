@@ -8,13 +8,32 @@
 //! With support for hooking the forward method,
 //! to run code between the norm and application layers.
 
-use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
-use burn::config::Config;
-use burn::module::Module;
-use burn::nn::activation::{Activation, ActivationConfig};
-use burn::nn::conv::{Conv2d, Conv2dConfig};
-use burn::nn::norm::{Normalization, NormalizationConfig};
-use burn::prelude::{Backend, Tensor};
+use bunsen::contracts::{
+    assert_shape_contract_periodically,
+    unpack_shape_contract,
+};
+use burn::{
+    config::Config,
+    module::Module,
+    nn::{
+        activation::{
+            Activation,
+            ActivationConfig,
+        },
+        conv::{
+            Conv2d,
+            Conv2dConfig,
+        },
+        norm::{
+            Normalization,
+            NormalizationConfig,
+        },
+    },
+    prelude::{
+        Backend,
+        Tensor,
+    },
+};
 
 /// Abstract policy for [`CNA2d`] Config.
 ///
@@ -183,8 +202,8 @@ impl<B: Backend> CNA2d<B> {
     ///
     /// # Arguments
     ///
-    /// - `input`: \
-    ///   ``[batch, in_channels, in_height=out_height*stride, in_width=out_width*stride]``.
+    /// - `input`: \ ``[batch, in_channels, in_height=out_height*stride,
+    ///   in_width=out_width*stride]``.
     ///
     /// # Returns
     ///
@@ -210,9 +229,10 @@ impl<B: Backend> CNA2d<B> {
     ///
     /// # Arguments
     ///
-    /// - `input`: \
-    ///   ``[batch, in_channels, in_height=out_height*stride, in_width=out_width*stride]``.
-    /// - `f`: a callback endofunction, from/to ``[batch, in_channels, out_height, out_width]``.
+    /// - `input`: \ ``[batch, in_channels, in_height=out_height*stride,
+    ///   in_width=out_width*stride]``.
+    /// - `f`: a callback endofunction, from/to ``[batch, in_channels,
+    ///   out_height, out_width]``.
     ///
     /// # Returns
     ///
@@ -276,12 +296,19 @@ impl<B: Backend> CNA2d<B> {
 
 #[cfg(test)]
 mod tests {
+    use bunsen::support::testing::PerfTestBackend;
+    use burn::{
+        backend::Autodiff,
+        nn::{
+            BatchNormConfig,
+            PaddingConfig2d,
+            activation::ActivationConfig,
+            norm::NormalizationConfig,
+        },
+        tensor::Distribution,
+    };
+
     use super::*;
-    use burn::backend::{Autodiff, NdArray};
-    use burn::nn::activation::ActivationConfig;
-    use burn::nn::norm::NormalizationConfig;
-    use burn::nn::{BatchNormConfig, PaddingConfig2d};
-    use burn::tensor::Distribution;
 
     #[test]
     fn test_conv_norm_config() {
@@ -290,7 +317,7 @@ mod tests {
 
         let conv_config = Conv2dConfig::new([2, 4], [3, 3])
             .with_stride([2, 2])
-            .with_padding(PaddingConfig2d::Explicit(1, 1))
+            .with_padding(PaddingConfig2d::Explicit(1, 1, 1, 1))
             .with_bias(false);
 
         let config: CNA2dConfig = abstract_config.build_config(conv_config.clone());
@@ -303,13 +330,13 @@ mod tests {
 
     #[test]
     fn test_cna() {
-        type B = Autodiff<NdArray<f32>>;
+        type B = Autodiff<PerfTestBackend>;
         let device = Default::default();
 
         let config = CNA2dConfig::new(
             Conv2dConfig::new([2, 4], [3, 3])
                 .with_stride([2, 2])
-                .with_padding(PaddingConfig2d::Explicit(1, 1))
+                .with_padding(PaddingConfig2d::Explicit(1, 1, 1, 1))
                 .with_bias(false),
             NormalizationConfig::Batch(BatchNormConfig::new(0)),
         )

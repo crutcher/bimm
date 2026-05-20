@@ -1,19 +1,27 @@
 //! [`Tensor`] ops.
 
-use alloc::vec;
-use alloc::vec::Vec;
-use burn::prelude::{Backend, Tensor};
+use alloc::{
+    vec,
+    vec::Vec,
+};
 use std::f64;
+
+use burn::prelude::{
+    Backend,
+    Tensor,
+};
 
 /// Create a vector with evenly spaced floating point values.
 ///
-/// This function generates a vector starting from `start`, ending at `end`, and incrementing by `step`.
+/// This function generates a vector starting from `start`, ending at `end`, and
+/// incrementing by `step`.
 ///
 /// # Parameters
 ///
 /// - `start`: The starting value of the range.
 /// - `end`: The end value of the range (exclusive).
-/// - `step`: An optional step value. If not provided, defaults to `1.0` if `start < end`, or `-1.0` if `start > end`.
+/// - `step`: An optional step value. If not provided, defaults to `1.0` if
+///   `start < end`, or `-1.0` if `start > end`.
 ///
 /// # Returns
 ///
@@ -53,7 +61,8 @@ pub fn float_vec_arange(
 
 /// Create a vector with evenly spaced floating point values.
 ///
-/// This function generates a vector with `num` values starting from `start`, ending at `end`, and evenly spaced.
+/// This function generates a vector with `num` values starting from `start`,
+/// ending at `end`, and evenly spaced.
 ///
 /// # Parameters
 ///
@@ -88,14 +97,16 @@ pub fn float_vec_linspace(
 }
 /// Create a 1D tensor with evenly spaced floating point values.
 ///
-/// This function generates a tensor with values starting from `start`, ending at `end`, and incrementing by `step`.
-/// If `step` is not provided, it defaults to `1.0` if `start < end`, or `-1.0` if `start > end`.
+/// This function generates a tensor with values starting from `start`, ending
+/// at `end`, and incrementing by `step`. If `step` is not provided, it defaults
+/// to `1.0` if `start < end`, or `-1.0` if `start > end`.
 ///
 /// # Parameters
 ///
 /// - `start`: The starting value of the range.
 /// - `end`: The end value of the range (exclusive).
-/// - `step`: An optional step value. If not provided, defaults to `1.0` or `-1.0` based on the order of `start` and `end`.
+/// - `step`: An optional step value. If not provided, defaults to `1.0` or
+///   `-1.0` based on the order of `start` and `end`.
 ///
 /// # Returns
 ///
@@ -113,7 +124,8 @@ pub fn float_arange<B: Backend>(
 
 /// Create a 1D tensor with evenly spaced floating point values.
 ///
-/// This function generates a tensor with `num` values starting from `start`, ending at `end`, and evenly spaced.
+/// This function generates a tensor with `num` values starting from `start`,
+/// ending at `end`, and evenly spaced.
 ///
 /// # Parameters
 ///
@@ -137,17 +149,19 @@ pub fn float_linspace<B: Backend>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use burn::backend::NdArray;
+    use bunsen::support::testing::SetupTestBackend;
     use burn::prelude::TensorData;
+
+    use super::*;
 
     #[test]
     fn test_float_arange() {
+        type B = SetupTestBackend;
         let device = Default::default();
         let start: f64 = 3.0;
         let end: f64 = -1.0 - f64::EPSILON;
 
-        let actual = float_arange::<NdArray>(start, end, None, &device);
+        let actual = float_arange::<B>(start, end, None, &device);
 
         actual
             .to_data()
@@ -157,27 +171,30 @@ mod tests {
     #[should_panic(expected = "Step must be negative when start > end")]
     #[test]
     fn test_float_arange_panic_step_negative() {
+        type B = SetupTestBackend;
         let device = Default::default();
         // This should panic because the step is not negative
-        let _ = float_arange::<NdArray>(3.0, -1.0, Some(1.0), &device);
+        let _ = float_arange::<B>(3.0, -1.0, Some(1.0), &device);
     }
 
     #[should_panic(expected = "Step must be positive when start < end")]
     #[test]
     fn test_float_arange_panic_step_positive() {
+        type B = SetupTestBackend;
         let device = Default::default();
         // This should panic because the step is not positive
-        let _ = float_arange::<NdArray>(-1.0, 3.0, Some(-1.0), &device);
+        let _ = float_arange::<B>(-1.0, 3.0, Some(-1.0), &device);
     }
 
     #[test]
     fn test_float_vec_linspace_int_step() {
+        type B = SetupTestBackend;
         let device = Default::default();
         let start: f64 = 0.0;
         let end: f64 = 1.0;
         let num: usize = 5;
 
-        let actual = float_linspace::<NdArray>(start, end, num, &device);
+        let actual = float_linspace::<B>(start, end, num, &device);
 
         actual
             .to_data()
@@ -186,12 +203,13 @@ mod tests {
 
     #[test]
     fn test_float_vec_linspace_neg_float_step() {
+        type B = SetupTestBackend;
         let device = Default::default();
         let start: f64 = 1.0;
         let end: f64 = -0.2;
         let num: usize = 5;
 
-        let actual = float_linspace::<NdArray>(start, end, num, &device);
+        let actual = float_linspace::<B>(start, end, num, &device);
 
         actual
             .to_data()
@@ -200,12 +218,13 @@ mod tests {
 
     #[test]
     fn test_float_vec_linspace_n1() {
+        type B = SetupTestBackend;
         let device = Default::default();
         let start: f64 = 0.0;
         let end: f64 = 1.0;
         let num: usize = 1;
 
-        let actual = float_linspace::<NdArray>(start, end, num, &device);
+        let actual = float_linspace::<B>(start, end, num, &device);
         // println!("{actual:?}");
 
         actual.to_data().assert_eq(&TensorData::from([0.0]), false);

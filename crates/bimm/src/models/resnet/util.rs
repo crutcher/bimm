@@ -1,7 +1,10 @@
 //! # `ResNet` Utilities
 
-use bimm_contracts::unpack_shape_contract;
-use burn::nn::{Initializer, PaddingConfig2d};
+use bunsen::contracts::unpack_shape_contract;
+use burn::nn::{
+    Initializer,
+    PaddingConfig2d,
+};
 
 /// Convert a `T` to a `[T; D]`.
 pub fn scalar_to_array<const D: usize, T>(v: T) -> [T; D]
@@ -17,7 +20,8 @@ where
 ///
 /// # Arguments
 ///
-/// - `input_resolution`: ``[in_height=out_height*stride, in_width=out_width*stride]``.
+/// - `input_resolution`: ``[in_height=out_height*stride,
+///   in_width=out_width*stride]``.
 ///
 /// # Returns
 ///
@@ -47,7 +51,8 @@ pub static CONV_INTO_RELU_INITIALIZER: Initializer = Initializer::KaimingNormal 
     fan_out_only: true,
 };
 
-/// Compute the necessary [`burn::nn::conv::Conv2d`] padding for the given square parameters.
+/// Compute the necessary [`burn::nn::conv::Conv2d`] padding for the given
+/// square parameters.
 ///
 /// All parameters are assumed square (the same in height and width).
 ///
@@ -71,7 +76,8 @@ pub fn get_square_conv2d_padding(
     ((stride - 1) + dilation * (kernel - 1)) / 2
 }
 
-/// Compute the necessary [`burn::nn::conv::Conv2d`] padding for the given square parameters.
+/// Compute the necessary [`burn::nn::conv::Conv2d`] padding for the given
+/// square parameters.
 ///
 /// All parameters are assumed square (the same in height and width).
 ///
@@ -89,8 +95,8 @@ pub fn build_square_conv2d_padding_config(
     stride: usize,
     dilation: usize,
 ) -> PaddingConfig2d {
-    let padding = get_square_conv2d_padding(kernel, stride, dilation);
-    PaddingConfig2d::Explicit(padding, padding)
+    let p = get_square_conv2d_padding(kernel, stride, dilation);
+    PaddingConfig2d::Explicit(p, p, p, p)
 }
 
 #[cfg(test)]
@@ -143,12 +149,12 @@ mod tests {
     fn test_build_square_conv2d_padding_config() {
         assert_eq!(
             build_square_conv2d_padding_config(1, 1, 1),
-            PaddingConfig2d::Explicit(0, 0)
+            PaddingConfig2d::Explicit(0, 0, 0, 0)
         );
 
         assert_eq!(
             build_square_conv2d_padding_config(3, 2, 2),
-            PaddingConfig2d::Explicit(2, 2)
+            PaddingConfig2d::Explicit(2, 2, 2, 2)
         );
     }
 }

@@ -1,12 +1,20 @@
 //! # Cache Policy
 
 use alloc::string::String;
+use std::{
+    fs::{
+        File,
+        remove_file,
+    },
+    io::Write,
+    path::PathBuf,
+};
+
 use anyhow::bail;
-use burn::config::Config;
-use burn::data::network::downloader;
-use std::fs::{File, remove_file};
-use std::io::Write;
-use std::path::PathBuf;
+use burn::{
+    config::Config,
+    data::network::downloader,
+};
 
 /// Cache Policy
 #[derive(Config, Debug)]
@@ -55,7 +63,8 @@ impl DiskCacheConfig {
         Ok(resource_key.iter().fold(path, |acc, s| acc.join(s)))
     }
 
-    /// Map a resource key to a cache path and ensure the parent directory exists.
+    /// Map a resource key to a cache path and ensure the parent directory
+    /// exists.
     pub fn ensure_resource_parent_dir(
         &self,
         resource_key: &[String],

@@ -1,15 +1,24 @@
 //! # Config Prefabs for Well-Known Model Configurations
 
-use crate::cache::weights::{
-    PretrainedWeightsDescriptor, PretrainedWeightsMap, StaticPretrainedWeightsMap,
+use alloc::{
+    collections::BTreeMap,
+    format,
+    string::{
+        String,
+        ToString,
+    },
+    sync::Arc,
 };
-use alloc::collections::BTreeMap;
-use alloc::format;
-use alloc::string::{String, ToString};
-use alloc::sync::Arc;
+use core::fmt::Debug;
+
 use anyhow::bail;
 use burn::config::Config;
-use core::fmt::Debug;
+
+use crate::cache::weights::{
+    PretrainedWeightsDescriptor,
+    PretrainedWeightsMap,
+    StaticPretrainedWeightsMap,
+};
 
 /// Static builder for a [`PreFabConfig`]
 pub struct StaticPreFabConfig<C>

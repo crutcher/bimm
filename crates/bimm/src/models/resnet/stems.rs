@@ -61,16 +61,29 @@
 //!     [Max|AvgPool]? [AA]?
 //!   ]
 //! ```
-//!
 
-use crate::layers::blocks::cna::{CNA2d, CNA2dConfig};
-use burn::module::Module;
-use burn::nn::PaddingConfig2d;
-use burn::nn::activation::ActivationConfig;
-use burn::nn::conv::Conv2dConfig;
-use burn::nn::norm::NormalizationConfig;
-use burn::nn::pool::{MaxPool2d, MaxPool2dConfig};
-use burn::prelude::{Backend, Tensor};
+use burn::{
+    module::Module,
+    nn::{
+        PaddingConfig2d,
+        activation::ActivationConfig,
+        conv::Conv2dConfig,
+        norm::NormalizationConfig,
+        pool::{
+            MaxPool2d,
+            MaxPool2dConfig,
+        },
+    },
+    prelude::{
+        Backend,
+        Tensor,
+    },
+};
+
+use crate::layers::blocks::cna::{
+    CNA2d,
+    CNA2dConfig,
+};
 
 /// stem contract configuration.
 #[derive(Debug, Clone, Default)]
@@ -114,7 +127,10 @@ impl ResNetStemContractConfig {
         let cna1 = CNA2dConfig {
             conv: Conv2dConfig::new([in_channels, 64], [7, 7])
                 .with_stride([2, 2])
-                .with_padding(PaddingConfig2d::Explicit(3, 3))
+                .with_padding({
+                    let d = 3;
+                    PaddingConfig2d::Explicit(d, d, d, d)
+                })
                 .with_bias(false),
             norm: normalization.clone(),
             act: activation.clone(),
@@ -123,7 +139,10 @@ impl ResNetStemContractConfig {
         let pool = Some(
             MaxPool2dConfig::new([3, 3])
                 .with_strides([2, 2])
-                .with_padding(PaddingConfig2d::Explicit(1, 1)),
+                .with_padding({
+                    let d = 1;
+                    PaddingConfig2d::Explicit(d, d, d, d)
+                }),
         );
 
         ResNetStemStructureConfig {

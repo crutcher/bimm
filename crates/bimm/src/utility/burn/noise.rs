@@ -1,11 +1,27 @@
 //! # Tensor Noise Generation Utilities.
 
-use crate::utility::burn::clamp::ClampConfig;
-use crate::utility::burn::distribution::DistributionDisplayAdapter;
-use burn::module::{Content, ModuleDisplay, ModuleDisplayDefault};
-use burn::prelude::{Backend, Shape, Tensor};
-use burn::tensor::Distribution;
-use serde::{Deserialize, Serialize};
+use burn::{
+    module::{
+        Content,
+        ModuleDisplay,
+        ModuleDisplayDefault,
+    },
+    prelude::{
+        Backend,
+        Shape,
+        Tensor,
+    },
+    tensor::Distribution,
+};
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
+use crate::utility::burn::{
+    clamp::ClampConfig,
+    distribution::DistributionDisplayAdapter,
+};
 
 /// Noise Configuration.
 ///
@@ -117,10 +133,14 @@ impl NoiseConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use burn::backend::NdArray;
-    use burn::module::DisplaySettings;
+    use bunsen::support::testing::PerfTestBackend;
+    use burn::{
+        backend::NdArray,
+        module::DisplaySettings,
+    };
     use num_traits::real::Real;
+
+    use super::*;
     #[test]
     fn test_noise_config_display() {
         let config = NoiseConfig::default().with_clamp(ClampConfig::min_max(0.5, 1.0));
@@ -185,7 +205,7 @@ mod tests {
 
     #[test]
     fn test_noise_like_default_clamp() {
-        type B = NdArray;
+        type B = PerfTestBackend;
         let device = Default::default();
 
         let reference: Tensor<B, 2> = Tensor::ones([20, 20], &device);
@@ -218,7 +238,7 @@ mod tests {
 
     #[test]
     fn test_noise_like_bernoulli() {
-        type B = NdArray;
+        type B = PerfTestBackend;
         let device = Default::default();
 
         let reference: Tensor<B, 2> = Tensor::ones([20, 20], &device);

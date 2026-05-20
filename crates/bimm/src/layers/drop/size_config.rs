@@ -1,6 +1,10 @@
-use serde::{Deserialize, Serialize};
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
-/// Helper option to describe the size of a wrapper, relative to a wrapped object.
+/// Helper option to describe the size of a wrapper, relative to a wrapped
+/// object.
 ///
 /// TODO: point this at `burn::...::SizeConfig` in "0.19.0"
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]

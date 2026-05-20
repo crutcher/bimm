@@ -1,15 +1,30 @@
-use crate::core::FirehoseValue;
-use crate::core::operations::signature::FirehoseOperatorSignature;
-use crate::core::schema::{BuildPlan, FirehoseTableSchema};
+use std::{
+    any::Any,
+    collections::HashMap,
+    fmt::Debug,
+    ops::{
+        Index,
+        IndexMut,
+        RangeBounds,
+    },
+    sync::Arc,
+    vec::Drain,
+};
+
 use anyhow::Context;
-use serde::Serialize;
-use serde::de::DeserializeOwned;
-use std::any::Any;
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::ops::{Index, IndexMut, RangeBounds};
-use std::sync::Arc;
-use std::vec::Drain;
+use serde::{
+    Serialize,
+    de::DeserializeOwned,
+};
+
+use crate::core::{
+    FirehoseValue,
+    operations::signature::FirehoseOperatorSignature,
+    schema::{
+        BuildPlan,
+        FirehoseTableSchema,
+    },
+};
 
 /// Represents a row in a Firehose table, containing values for each column.
 pub struct FirehoseRow {
@@ -35,7 +50,8 @@ impl Debug for FirehoseRow {
 }
 
 impl FirehoseRow {
-    /// Creates a new `ValueRow` with the given schema and initializes all slots to `None`.
+    /// Creates a new `ValueRow` with the given schema and initializes all slots
+    /// to `None`.
     pub fn new(schema: Arc<FirehoseTableSchema>) -> Self {
         let mut slots = Vec::with_capacity(schema.columns.len());
         slots.resize_with(schema.columns.len(), || None);
@@ -93,7 +109,8 @@ pub trait FirehoseRowReader {
     /// Returns the schema of the row.
     fn schema(&self) -> &Arc<FirehoseTableSchema>;
 
-    /// Returns an iterator over the column names and their corresponding values.
+    /// Returns an iterator over the column names and their corresponding
+    /// values.
     fn iter(&self) -> impl Iterator<Item = (&str, Option<&FirehoseValue>)>;
 
     /// Returns true if the row has a value for the specified column name.
@@ -108,7 +125,8 @@ pub trait FirehoseRowReader {
     ///
     /// # Returns
     ///
-    /// A boolean indicating whether the row has a value for the specified column.
+    /// A boolean indicating whether the row has a value for the specified
+    /// column.
     fn has_column_value(
         &self,
         column_name: &str,
@@ -122,8 +140,9 @@ pub trait FirehoseRowReader {
     ///
     /// # Returns
     ///
-    /// An `Option<&ValueBox>` containing a reference to the value of the specified column,
-    /// or `None` if the column does not exist or has no value.
+    /// An `Option<&ValueBox>` containing a reference to the value of the
+    /// specified column, or `None` if the column does not exist or has no
+    /// value.
     fn maybe_get(
         &self,
         column_name: &str,
@@ -137,7 +156,8 @@ pub trait FirehoseRowReader {
     ///
     /// # Returns
     ///
-    /// An `anyhow::Result<&FirehoseValue>` reference to the column value; or an error.
+    /// An `anyhow::Result<&FirehoseValue>` reference to the column value; or an
+    /// error.
     fn try_get(
         &self,
         column_name: &str,
@@ -268,7 +288,8 @@ pub trait FirehoseRowWriter {
     /// # Arguments
     ///
     /// * `column_name`: The name of the column to set the value for.
-    /// * `value`: The value to set for the specified column, wrapped in a `ValueBox`.
+    /// * `value`: The value to set for the specified column, wrapped in a
+    ///   `ValueBox`.
     ///
     /// # Panics
     ///
@@ -328,7 +349,8 @@ pub trait FirehoseRowWriter {
         }
     }
 
-    /// Take the value of the column, setting it to `None`, and returning it as an `Option<ValueBox>`.
+    /// Take the value of the column, setting it to `None`, and returning it as
+    /// an `Option<ValueBox>`.
     fn take_column(
         &mut self,
         column_name: &str,
@@ -407,7 +429,8 @@ impl Debug for FirehoseRowBatch {
 }
 
 impl FirehoseRowBatch {
-    /// Creates a new `ValueRowBatch` with the given schema and initializes an empty vector of rows.
+    /// Creates a new `ValueRowBatch` with the given schema and initializes an
+    /// empty vector of rows.
     pub fn new(schema: Arc<FirehoseTableSchema>) -> Self {
         Self::new_with_size(schema, 0)
     }
@@ -548,7 +571,8 @@ impl IndexMut<usize> for FirehoseRowBatch {
     }
 }
 
-/// A map of formal parameters to their corresponding input and output columns in a build plan.
+/// A map of formal parameters to their corresponding input and output columns
+/// in a build plan.
 struct ParameterMapper {
     /// The build plan that describes the operator and its inputs/outputs.
     build_plan: Arc<BuildPlan>,
@@ -560,7 +584,8 @@ impl ParameterMapper {
         ParameterMapper { build_plan }
     }
 
-    /// Maps an input parameter name to its corresponding column name in the build plan.
+    /// Maps an input parameter name to its corresponding column name in the
+    /// build plan.
     ///
     /// # Arguments
     ///
@@ -568,7 +593,8 @@ impl ParameterMapper {
     ///
     /// # Returns
     ///
-    /// An `Option<&str>` containing the column name if the parameter is an input parameter,
+    /// An `Option<&str>` containing the column name if the parameter is an
+    /// input parameter,
     fn try_map_input_name(
         &self,
         parameter_name: &str,
@@ -594,7 +620,8 @@ impl ParameterMapper {
         }
     }
 
-    /// Maps an output parameter name to its corresponding column name in the build plan.
+    /// Maps an output parameter name to its corresponding column name in the
+    /// build plan.
     ///
     /// # Arguments
     ///
@@ -602,7 +629,8 @@ impl ParameterMapper {
     ///
     /// # Returns
     ///
-    /// An `Option<&str>` containing the column name if the parameter is an output parameter,
+    /// An `Option<&str>` containing the column name if the parameter is an
+    /// output parameter,
     fn try_map_output_name(
         &self,
         parameter_name: &str,
@@ -713,7 +741,8 @@ impl<'a> FirehoseBatchTransaction<'a> {
     }
 }
 
-/// A row-transaction for a single row in a batch, allowing both reading and writing of values.
+/// A row-transaction for a single row in a batch, allowing both reading and
+/// writing of values.
 ///
 /// This is a view-class of a backing `FirehoseBatchTransaction`.
 pub struct FirehoseRowTransaction<'a> {
@@ -779,12 +808,20 @@ impl FirehoseRowWriter for FirehoseRowTransaction<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::core::operations::signature::ParameterSpec;
-    use crate::core::schema::{ColumnSchema, DataTypeDescription, FirehoseTableSchema};
     use std::sync::Arc;
 
-    /// Ensures that `ValueRow` is `Send`, allowing it to be safely shared across threads.
+    use super::*;
+    use crate::core::{
+        operations::signature::ParameterSpec,
+        schema::{
+            ColumnSchema,
+            DataTypeDescription,
+            FirehoseTableSchema,
+        },
+    };
+
+    /// Ensures that `ValueRow` is `Send`, allowing it to be safely shared
+    /// across threads.
     const VALUE_ROW_IS_SEND: fn() = || {
         fn assert_send<T: Send>() {}
         assert_send::<FirehoseRow>();

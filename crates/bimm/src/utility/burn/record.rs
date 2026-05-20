@@ -1,12 +1,26 @@
 //! # Burn Record Utilities
 
-use alloc::string::{String, ToString};
-use alloc::vec;
-use alloc::vec::Vec;
-use burn::prelude::Backend;
-use burn::record::{HalfPrecisionSettings, Record};
+use alloc::{
+    string::{
+        String,
+        ToString,
+    },
+    vec,
+    vec::Vec,
+};
 use core::iter;
-use serde_json::{Map, Value};
+
+use burn::{
+    prelude::Backend,
+    record::{
+        HalfPrecisionSettings,
+        Record,
+    },
+};
+use serde_json::{
+    Map,
+    Value,
+};
 
 /// Hacky function to display a record.
 pub fn display_record<B: Backend, R: Record<B>>(record: R) {

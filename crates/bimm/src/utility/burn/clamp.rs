@@ -1,8 +1,20 @@
 //! # Tensor Clamping Support
 
-use burn::module::{Content, ModuleDisplay, ModuleDisplayDefault};
-use burn::prelude::{Backend, Tensor};
-use serde::{Deserialize, Serialize};
+use burn::{
+    module::{
+        Content,
+        ModuleDisplay,
+        ModuleDisplayDefault,
+    },
+    prelude::{
+        Backend,
+        Tensor,
+    },
+};
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 /// Configuration for clamping.
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -35,6 +47,7 @@ impl ClampConfig {
             max: Some(max),
         }
     }
+
     /// Extend the clamp with a minimum value.
     pub fn with_min(
         self,
@@ -73,12 +86,18 @@ impl ClampConfig {
 
 #[cfg(test)]
 mod tests {
+    use bunsen::support::testing::SetupTestBackend;
+    use burn::{
+        module::{
+            DisplaySettings,
+            ModuleDisplay,
+        },
+        tensor::TensorData,
+    };
+    use num_traits::clamp;
+
     use super::*;
     use crate::layers::drop::drop_block::DropBlockOptions;
-    use burn::backend::NdArray;
-    use burn::module::{DisplaySettings, ModuleDisplay};
-    use burn::tensor::TensorData;
-    use num_traits::clamp;
 
     #[test]
     fn test_clamp_config_display() {
@@ -111,7 +130,7 @@ mod tests {
 
     #[test]
     fn test_config() {
-        type B = NdArray;
+        type B = SetupTestBackend;
         let device = Default::default();
 
         let cfg = ClampConfig::default();

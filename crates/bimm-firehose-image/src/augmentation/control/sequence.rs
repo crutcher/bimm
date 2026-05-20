@@ -1,12 +1,22 @@
 //! Stage that runs a sequence of stages.
-use crate::augmentation::{
-    AugmentationStage, AugmentationStageConfig, ImageAugContext, PluginBuilder,
-    WithAugmentationStageBuilder,
-};
-use crate::define_image_aug_plugin;
-use image::DynamicImage;
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+
+use image::DynamicImage;
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
+use crate::{
+    augmentation::{
+        AugmentationStage,
+        AugmentationStageConfig,
+        ImageAugContext,
+        PluginBuilder,
+        WithAugmentationStageBuilder,
+    },
+    define_image_aug_plugin,
+};
 
 define_image_aug_plugin!(STAGE_SEQUENCE, StageSequence::build_stage);
 

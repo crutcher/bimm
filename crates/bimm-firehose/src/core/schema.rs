@@ -1,8 +1,24 @@
+use std::{
+    collections::{
+        BTreeMap,
+        HashSet,
+    },
+    ops::{
+        Index,
+        IndexMut,
+    },
+};
+
+use anyhow::{
+    anyhow,
+    bail,
+};
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
 use crate::core::identifiers;
-use anyhow::{anyhow, bail};
-use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashSet};
-use std::ops::{Index, IndexMut};
 
 /// A serializable description of a data type.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -92,7 +108,8 @@ impl BuildPlan {
     ///
     /// # Arguments
     ///
-    /// - `config`: The configuration to attach to the build plan, serialized as JSON.
+    /// - `config`: The configuration to attach to the build plan, serialized as
+    ///   JSON.
     ///
     /// # Returns
     ///
@@ -114,7 +131,8 @@ impl BuildPlan {
     ///
     /// # Arguments
     ///
-    /// - `assoc`: A slice of tuples where each tuple contains a parameter name and a column name.
+    /// - `assoc`: A slice of tuples where each tuple contains a parameter name
+    ///   and a column name.
     ///
     /// # Returns
     ///
@@ -133,7 +151,8 @@ impl BuildPlan {
     ///
     /// # Arguments
     ///
-    /// - `inputs`: A slice of tuples where each tuple contains a parameter name and a column name.
+    /// - `inputs`: A slice of tuples where each tuple contains a parameter name
+    ///   and a column name.
     ///
     /// # Returns
     ///
@@ -152,7 +171,8 @@ impl BuildPlan {
     ///
     /// # Arguments
     ///
-    /// - `outputs`: A slice of tuples where each tuple contains a parameter name and a column name.
+    /// - `outputs`: A slice of tuples where each tuple contains a parameter
+    ///   name and a column name.
     ///
     /// # Returns
     ///
@@ -194,7 +214,8 @@ impl BuildPlan {
     ///
     /// # Returns
     ///
-    /// An `anyhow::Result<&str>` containing the column name corresponding to the input parameter.
+    /// An `anyhow::Result<&str>` containing the column name corresponding to
+    /// the input parameter.
     pub fn translate_input_name(
         &self,
         parameter_name: &str,
@@ -210,7 +231,8 @@ impl BuildPlan {
     ///
     /// # Returns
     ///
-    /// An `anyhow::Result<&str>` containing the column name corresponding to the output parameter.
+    /// An `anyhow::Result<&str>` containing the column name corresponding to
+    /// the output parameter.
     pub fn translate_output_name(
         &self,
         parameter_name: &str,
@@ -378,12 +400,15 @@ impl FirehoseTableSchema {
     ///
     /// # Arguments
     ///
-    /// - `columns`: A slice of `ColumnSchema` representing the columns in the table.
-    /// - `plans`: A slice of `BuildPlan` representing the build plans for the table.
+    /// - `columns`: A slice of `ColumnSchema` representing the columns in the
+    ///   table.
+    /// - `plans`: A slice of `BuildPlan` representing the build plans for the
+    ///   table.
     ///
     /// # Returns
     ///
-    /// An `anyhow::Result<(Vec<String>, Vec<BuildPlan>)>` containing the base columns and the ordered build plans.
+    /// An `anyhow::Result<(Vec<String>, Vec<BuildPlan>)>` containing the base
+    /// columns and the ordered build plans.
     fn check_graph(
         columns: &[ColumnSchema],
         plans: &[BuildPlan],
@@ -453,11 +478,13 @@ impl FirehoseTableSchema {
 
     /// Compute the build order for the table schema.
     ///
-    /// This function checks the build plans and their dependencies to determine the order in which they should be executed.
+    /// This function checks the build plans and their dependencies to determine
+    /// the order in which they should be executed.
     ///
     /// # Returns
     ///
-    /// An `anyhow::Result<(Vec<String>, Vec<BuildPlan>)>` containing the base columns and the ordered build plans.
+    /// An `anyhow::Result<(Vec<String>, Vec<BuildPlan>)>` containing the base
+    /// columns and the ordered build plans.
     pub fn build_order(&self) -> anyhow::Result<(Vec<String>, Vec<BuildPlan>)> {
         Self::check_graph(&self.columns, &self.build_plans)
     }
@@ -543,11 +570,13 @@ impl FirehoseTableSchema {
     /// # Arguments
     ///
     /// - `plan`: The build plan to add.
-    /// - `output_info`: A slice of tuples where each tuple contains the output column name, its data type, and a description.
+    /// - `output_info`: A slice of tuples where each tuple contains the output
+    ///   column name, its data type, and a description.
     ///
     /// # Returns
     ///
-    /// An `anyhow::Result<()>` indicating success or containing an error if the operation fails.
+    /// An `anyhow::Result<()>` indicating success or containing an error if the
+    /// operation fails.
     pub fn add_build_plan_and_outputs(
         &mut self,
         plan: BuildPlan,
@@ -576,7 +605,8 @@ impl FirehoseTableSchema {
     ///
     /// # Returns
     ///
-    /// An `anyhow::Result<()>` indicating success or containing an error if the operation fails.
+    /// An `anyhow::Result<()>` indicating success or containing an error if the
+    /// operation fails.
     pub fn extend_via_plan(
         &mut self,
         plan: BuildPlan,
@@ -652,7 +682,8 @@ impl FirehoseTableSchema {
     ///
     /// # Returns
     ///
-    /// An `Option<usize>` containing the index of the column if found, or `None` if not found.
+    /// An `Option<usize>` containing the index of the column if found, or
+    /// `None` if not found.
     pub fn column_index(
         &self,
         name: &str,
@@ -673,7 +704,8 @@ impl FirehoseTableSchema {
     ///
     /// # Returns
     ///
-    /// An `anyhow::Result<usize>` containing the index of the column if it exists.
+    /// An `anyhow::Result<usize>` containing the index of the column if it
+    /// exists.
     pub fn check_column_index(
         &self,
         name: &str,
@@ -687,8 +719,9 @@ impl FirehoseTableSchema {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use indoc::indoc;
+
+    use super::*;
 
     /// Ensures that `FirehoseTableSchema` is `Send`.
     const FIREHOSE_TABLE_SCHEMA_IS_SEND: fn() = || {

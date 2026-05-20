@@ -13,27 +13,72 @@
 //! [`ResNet`] implements [`Module`], and provides
 //! [`ResNet::forward`].
 
-use super::bottleneck_block::BottleneckPolicyConfig;
-use super::layer_block::{
-    LayerBlock, LayerBlockContractConfig, LayerBlockMeta, LayerBlockStructureConfig,
+use alloc::{
+    vec,
+    vec::Vec,
 };
-use super::residual_block::{ResidualBlock, ResidualBlockStructureConfig};
-use super::resnet_io::pytorch_stubs::load_resnet_stub_record;
-use super::util::CONV_INTO_RELU_INITIALIZER;
-use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig};
-use crate::layers::drop::drop_block::DropBlockOptions;
-use crate::utility::probability::expect_probability;
-use alloc::vec;
-use alloc::vec::Vec;
-use burn::module::Module;
-use burn::nn::BatchNormConfig;
-use burn::nn::activation::{Activation, ActivationConfig};
-use burn::nn::conv::Conv2dConfig;
-use burn::nn::norm::NormalizationConfig;
-use burn::nn::pool::{AdaptiveAvgPool2d, AdaptiveAvgPool2dConfig, MaxPool2d, MaxPool2dConfig};
-use burn::nn::{Initializer, Linear, LinearConfig, PaddingConfig2d};
-use burn::prelude::{Backend, Config, Tensor};
 use std::path::PathBuf;
+
+use burn::{
+    module::Module,
+    nn::{
+        BatchNormConfig,
+        Initializer,
+        Linear,
+        LinearConfig,
+        PaddingConfig2d,
+        activation::{
+            Activation,
+            ActivationConfig,
+        },
+        conv::Conv2dConfig,
+        norm::NormalizationConfig,
+        pool::{
+            AdaptiveAvgPool2d,
+            AdaptiveAvgPool2dConfig,
+            MaxPool2d,
+            MaxPool2dConfig,
+        },
+    },
+    prelude::{
+        Backend,
+        Config,
+        Tensor,
+    },
+};
+
+use super::{
+    bottleneck_block::BottleneckPolicyConfig,
+    layer_block::{
+        LayerBlock,
+        LayerBlockContractConfig,
+        LayerBlockMeta,
+        LayerBlockStructureConfig,
+    },
+    residual_block::{
+        ResidualBlock,
+        ResidualBlockStructureConfig,
+    },
+    resnet_io::pytorch_stubs::load_resnet_stub_record,
+    util::CONV_INTO_RELU_INITIALIZER,
+};
+use crate::{
+    layers::{
+        blocks::conv_norm::{
+            ConvNorm2d,
+            ConvNorm2dConfig,
+        },
+        drop::drop_block::DropBlockOptions,
+    },
+    models::resnet::resnet_io::pytorch_stubs::{
+        BasicBlockStub,
+        BottleneckStub,
+        LayerBlockStub,
+        ResNetStub,
+        ResidualBlockStub,
+    },
+    utility::probability::expect_probability,
+};
 
 /// ResNet-18 block depths.
 pub const RESNET18_BLOCKS: [usize; 4] = [2, 2, 2, 2];
@@ -149,7 +194,10 @@ impl ResNetContractConfig {
             ConvNorm2dConfig::from(
                 Conv2dConfig::new([3, self.stem_width], [7, 7])
                     .with_stride([2, 2])
-                    .with_padding(PaddingConfig2d::Explicit(3, 3))
+                    .with_padding({
+                        let d = 3;
+                        PaddingConfig2d::Explicit(d, d, d, d)
+                    })
                     .with_bias(false),
             )
             .with_initializer(CONV_INTO_RELU_INITIALIZER.clone()),
@@ -217,7 +265,10 @@ impl ResNetStructureConfig {
             input_act: self.input_act.init(device),
             input_pool: MaxPool2dConfig::new([3, 3])
                 .with_strides([2, 2])
-                .with_padding(PaddingConfig2d::Explicit(1, 1))
+                .with_padding({
+                    let d = 1;
+                    PaddingConfig2d::Explicit(d, d, d, d)
+                })
                 .init(),
 
             layers: self
@@ -370,13 +421,47 @@ impl<B: Backend> ResNet<B> {
     ) -> anyhow::Result<Self> {
         let device = &self.devices()[0];
 
+        /*
+        let stub: ResNetStub<B> = ResNetStub {
+            conv1: self.input_conv_norm.conv.clone(),
+            bn1: self.input_conv_norm.norm.clone(),
+            layers: self
+                .layers
+                .iter()
+                .map(|layer| LayerBlockStub {
+                    blocks: layer
+                        .blocks
+                        .iter()
+                        .map(|block| {
+                            use ResidualBlock as T;
+                            use ResidualBlockStub as S;
+
+                            match block {
+                                T::Basic(block) => S::Basic(BasicBlockStub {
+                                    conv1: block.cna1.conv.clone(),
+                                    bn1: (&block.cna1.norm).try_unwrap().clone(),
+                                    conv2: block.cna2.conv.clone(),
+                                    bn2: block.cna2.norm.clone(),
+                                    downsample: block.downsample.map(|t| t.clone()),
+                                }),
+                                T::Bottleneck(block) => S::Bottleneck(BottleneckStub {}),
+                            }
+                        })
+                        .collect::<Vec<_>>(),
+                })
+                .collect::<Vec<_>>(),
+            fc: self.output_fc.clone(),
+        };
+        */
+
         let stub_record = load_resnet_stub_record::<B>(path, device)?;
         let adapted_target = self.with_classes(stub_record.fc.weight.dims()[0]);
 
         Ok(stub_record.copy_stub_weights(adapted_target))
     }
 
-    /// Re-initialize the last layer with the specified number of output classes.
+    /// Re-initialize the last layer with the specified number of output
+    /// classes.
     pub fn with_classes(
         mut self,
         num_classes: usize,
@@ -483,8 +568,9 @@ impl<B: Backend> ResNet<B> {
 
 #[cfg(test)]
 mod tests {
+    use bunsen::support::testing::PerfTestBackend;
+
     use super::*;
-    use burn::backend::Wgpu;
 
     #[test]
     fn test_to_layers_34_basic() {
@@ -499,7 +585,7 @@ mod tests {
 
     #[test]
     fn test_to_layers_50_bottleneck() {
-        type B = Wgpu;
+        type B = PerfTestBackend;
         let device = Default::default();
 
         let cfg = ResNetContractConfig::new(RESNET50_BLOCKS.to_vec(), 1000).with_bottleneck(true);

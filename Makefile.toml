@@ -2,8 +2,8 @@
 CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = true
 
 [tasks.format]
-# toolchain = "nightly"
 install_crate = "rustfmt"
+toolchain = "nightly"
 command = "cargo"
 args = ["fmt", "--", "--emit=files"]
 

@@ -1,49 +1,110 @@
 #![recursion_limit = "256"]
 extern crate core;
 
-use bimm::cache::disk::DiskCacheConfig;
-use bimm::models::resnet::{PREFAB_RESNET_MAP, ResNet};
-use bimm_firehose::burn::batcher::{
-    BatcherInputAdapter, BatcherOutputAdapter, FirehoseExecutorBatcher,
+use core::{
+    clone::Clone,
+    default::Default,
+    iter::Iterator,
+    option::Option,
 };
-use bimm_firehose::burn::path_scanning;
-use bimm_firehose::core::operations::executor::SequentialBatchExecutor;
-use bimm_firehose::core::schema::ColumnSchema;
-use bimm_firehose::core::{
-    FirehoseRowBatch, FirehoseRowReader, FirehoseRowWriter, FirehoseTableSchema,
-};
-use bimm_firehose::ops::init_default_operator_environment;
-use bimm_firehose_image::augmentation::AugmentImageOperation;
-use bimm_firehose_image::augmentation::control::with_prob::WithProbStage;
-use bimm_firehose_image::augmentation::orientation::flip::HorizontalFlipStage;
-use bimm_firehose_image::burn_support::{ImageToTensorData, stack_tensor_data_column};
-use bimm_firehose_image::loader::{ImageLoader, ResizeSpec};
-use bimm_firehose_image::{ColorType, ImageShape};
-use burn::backend::Autodiff;
-use burn::data::dataloader::{DataLoaderBuilder, Dataset};
-use burn::data::dataset::transform::ShuffledDataset;
-use burn::lr_scheduler::cosine::CosineAnnealingLrSchedulerConfig;
-use burn::nn::activation::ActivationConfig;
-use burn::nn::loss::CrossEntropyLossConfig;
-use burn::optim::AdamConfig;
-use burn::optim::decay::WeightDecayConfig;
-use burn::prelude::{Backend, Int, Module, Tensor};
-use burn::record::CompactRecorder;
-use burn::tensor::backend::AutodiffBackend;
-use burn::train::metric::store::{Aggregate, Direction, Split};
-use burn::train::metric::{AccuracyMetric, LearningRateMetric, LossMetric, TopKAccuracyMetric};
-use burn::train::{
-    ClassificationOutput, InferenceStep, Learner, MetricEarlyStoppingStrategy, StoppingCondition,
-    SupervisedTraining,
-};
-use burn::train::{TrainOutput, TrainStep};
-use clap::Parser;
-use core::clone::Clone;
-use core::default::Default;
-use core::iter::Iterator;
-use core::option::Option;
-use rand::{Rng, rng};
 use std::sync::Arc;
+
+use bimm::{
+    cache::disk::DiskCacheConfig,
+    models::resnet::{
+        PREFAB_RESNET_MAP,
+        ResNet,
+    },
+};
+use bimm_firehose::{
+    burn::{
+        batcher::{
+            BatcherInputAdapter,
+            BatcherOutputAdapter,
+            FirehoseExecutorBatcher,
+        },
+        path_scanning,
+    },
+    core::{
+        FirehoseRowBatch,
+        FirehoseRowReader,
+        FirehoseRowWriter,
+        FirehoseTableSchema,
+        operations::executor::SequentialBatchExecutor,
+        schema::ColumnSchema,
+    },
+    ops::init_default_operator_environment,
+};
+use bimm_firehose_image::{
+    ColorType,
+    ImageShape,
+    augmentation::{
+        AugmentImageOperation,
+        control::with_prob::WithProbStage,
+        orientation::flip::HorizontalFlipStage,
+    },
+    burn_support::{
+        ImageToTensorData,
+        stack_tensor_data_column,
+    },
+    loader::{
+        ImageLoader,
+        ResizeSpec,
+    },
+};
+use burn::{
+    backend::Autodiff,
+    data::{
+        dataloader::{
+            DataLoaderBuilder,
+            Dataset,
+        },
+        dataset::transform::ShuffledDataset,
+    },
+    lr_scheduler::cosine::CosineAnnealingLrSchedulerConfig,
+    nn::{
+        activation::ActivationConfig,
+        loss::CrossEntropyLossConfig,
+    },
+    optim::{
+        AdamConfig,
+        decay::WeightDecayConfig,
+    },
+    prelude::{
+        Backend,
+        Int,
+        Module,
+        Tensor,
+    },
+    record::CompactRecorder,
+    tensor::backend::AutodiffBackend,
+    train::{
+        ClassificationOutput,
+        InferenceStep,
+        Learner,
+        MetricEarlyStoppingStrategy,
+        StoppingCondition,
+        SupervisedTraining,
+        TrainOutput,
+        TrainStep,
+        metric::{
+            AccuracyMetric,
+            LearningRateMetric,
+            LossMetric,
+            TopKAccuracyMetric,
+            store::{
+                Aggregate,
+                Direction,
+                Split,
+            },
+        },
+    },
+};
+use clap::Parser;
+use rand::{
+    Rng,
+    rng,
+};
 
 const PATH_COLUMN: &str = "path";
 const SEED_COLUMN: &str = "seed";
@@ -52,7 +113,8 @@ const IMAGE_COLUMN: &str = "image";
 const AUG_COLUMN: &str = "aug";
 const DATA_COLUMN: &str = "data";
 
-// $ --drop-path-prob=0.1 --drop-block-prob=0.2 --num-epochs=30 --batch-size=32 --learning-rate=1e-4
+// $ --drop-path-prob=0.1 --drop-block-prob=0.2 --num-epochs=30 --batch-size=32
+// --learning-rate=1e-4
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
@@ -105,7 +167,8 @@ pub struct Args {
     resnet_prefab: String,
 
     /// Resnet Pretrained
-    #[arg(long, default_value = "tv_in1k")]
+    // #[arg(long, default_value = "tv_in1k")]
+    #[arg(long, default_value = None)]
     resnet_pretrained: Option<String>,
 
     /// Drop Block Prob
@@ -124,12 +187,20 @@ pub struct Args {
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    #[cfg(feature = "wgpu")]
-    type B = burn::backend::Wgpu;
-    #[cfg(feature = "cuda")]
-    type B = burn::backend::Cuda;
-    #[cfg(feature = "metal")]
-    type B = burn::backend::Metal;
+    cfg_select! {
+        feature = "cuda" => {
+            type B =burn::backend::Cuda<burn::tensor::bf16>;
+        }
+        feature = "metal" => {
+            type B =burn::backend::Metal<burn::tensor::bf16>;
+        }
+        feature = "wgpu" => {
+            type B = burn::backend::Wgpu<burn::tensor::bf16>;
+        }
+        _ => {
+            type B =burn::backend::Flex;
+        }
+    }
     backend_main::<Autodiff<B>>(&args)
 }
 
@@ -195,7 +266,8 @@ pub fn backend_main<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
             ColumnSchema::new::<u64>(SEED_COLUMN).with_description("instance rng seed"),
         ]);
 
-        // Load the image from the path, resize it to 32x32 pixels, and convert it to RGB8.
+        // Load the image from the path, resize it to 32x32 pixels, and convert it to
+        // RGB8.
         ImageLoader::default()
             .with_resize(ResizeSpec::new(image_shape))
             .with_recolor(ColorType::Rgb8)
@@ -210,8 +282,8 @@ pub fn backend_main<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         let ds = path_scanning::image_dataset_for_folder(args.training_root.clone())?;
 
         let ds = ShuffledDataset::new(ds, args.seed);
-        // let num_samples = (args.oversample_ratio * (ds.len() as f64)).ceil() as usize;
-        // let ds = SamplerDataset::with_replacement(ds, num_samples);
+        // let num_samples = (args.oversample_ratio * (ds.len() as f64)).ceil() as
+        // usize; let ds = SamplerDataset::with_replacement(ds, num_samples);
         train_size = ds.len();
 
         let schema = Arc::new({

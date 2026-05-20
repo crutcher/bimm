@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" focusToolWindowBeforeRun="true">
+  <configuration default="false" name="Test (cuda)" type="CargoCommandRunConfiguration" factoryName="Cargo Command" focusToolWindowBeforeRun="true">
     <option name="buildProfileId" value="test" />
-    <option name="command" value="test --features cuda" />
+    <option name="command" value="test --features cuda,bunsen/cuda" />
     <option name="workingDirectory" value="file://$PROJECT_DIR$" />
     <envs>
       <env name="CINIC10_PATH" value="/media/Data/CINIC-10" />
@@ -17,8 +17,6 @@
     <option name="redirectInputPath" value="" />
     <method v="2">
       <option name="RunConfigurationTask" enabled="true" run_configuration_name="Fix" run_configuration_type="CargoCommandRunConfiguration" />
-      <option name="RunConfigurationTask" enabled="true" run_configuration_name="Format" run_configuration_type="CargoCommandRunConfiguration" />
-      <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
     </method>
   </configuration>
 </component>

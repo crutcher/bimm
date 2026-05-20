@@ -1,8 +1,21 @@
-use crate::core::operations::environment::FirehoseOperatorEnvironment;
-use crate::core::operations::signature::FirehoseOperatorSignature;
-use crate::core::schema::{BuildPlan, ColumnSchema, FirehoseTableSchema};
-use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
+use crate::core::{
+    operations::{
+        environment::FirehoseOperatorEnvironment,
+        signature::FirehoseOperatorSignature,
+    },
+    schema::{
+        BuildPlan,
+        ColumnSchema,
+        FirehoseTableSchema,
+    },
+};
 
 /// A builder for constructing a call to an operator in a `BuildPlan`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -85,7 +98,8 @@ impl OperationPlan {
     ///
     /// # Arguments
     ///
-    /// * `config` - The configuration to be added, which must implement `Serialize`.
+    /// * `config` - The configuration to be added, which must implement
+    ///   `Serialize`.
     ///
     /// # Returns
     ///
@@ -136,12 +150,15 @@ impl OperationPlan {
     ///
     /// # Arguments
     ///
-    /// * `schema` - The mutable reference to the table schema to which the operation will be applied.
-    /// * `env` - The environment that can create the operator based on the build plan.
+    /// * `schema` - The mutable reference to the table schema to which the
+    ///   operation will be applied.
+    /// * `env` - The environment that can create the operator based on the
+    ///   build plan.
     ///
     /// # Returns
     ///
-    /// A result containing a `BuildPlan` if successful, or an error message if the operation fails.
+    /// A result containing a `BuildPlan` if successful, or an error message if
+    /// the operation fails.
     pub fn apply_to_schema(
         self,
         schema: &mut FirehoseTableSchema,
