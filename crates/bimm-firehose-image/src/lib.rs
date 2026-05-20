@@ -42,10 +42,8 @@ mod tests {
         },
         ops::init_default_operator_environment,
     };
-    use burn::{
-        backend::NdArray,
-        prelude::TensorData,
-    };
+    use bunsen::support::testing::PerfTestBackend;
+    use burn::prelude::TensorData;
     use image::{
         ColorType,
         DynamicImage,
@@ -71,7 +69,7 @@ mod tests {
     fn test_example() -> anyhow::Result<()> {
         let temp_dir = tempfile::tempdir().unwrap();
 
-        type B = NdArray;
+        type B = PerfTestBackend;
 
         let device = Default::default();
 

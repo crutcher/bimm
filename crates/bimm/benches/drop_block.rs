@@ -7,10 +7,8 @@ use bimm::{
     },
     utility::burn::noise::NoiseConfig,
 };
-use burn::{
-    backend::NdArray,
-    prelude::Tensor,
-};
+use bunsen::support::testing::PerfTestBackend;
+use burn::prelude::Tensor;
 use criterion::{
     Criterion,
     criterion_group,
@@ -18,7 +16,7 @@ use criterion::{
 };
 
 fn bench_drop_block_10x32x32x3_7_normalise(c: &mut Criterion) {
-    type B = NdArray<f32>;
+    type B = PerfTestBackend;
     let device = Default::default();
 
     let batch_size = 10;

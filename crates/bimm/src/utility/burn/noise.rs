@@ -134,10 +134,7 @@ impl NoiseConfig {
 #[cfg(test)]
 mod tests {
     use bunsen::support::testing::PerfTestBackend;
-    use burn::{
-        backend::NdArray,
-        module::DisplaySettings,
-    };
+    use burn::module::DisplaySettings;
     use num_traits::real::Real;
 
     use super::*;
