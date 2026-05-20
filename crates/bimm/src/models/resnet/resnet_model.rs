@@ -70,13 +70,6 @@ use crate::{
         },
         drop::drop_block::DropBlockOptions,
     },
-    models::resnet::resnet_io::pytorch_stubs::{
-        BasicBlockStub,
-        BottleneckStub,
-        LayerBlockStub,
-        ResNetStub,
-        ResidualBlockStub,
-    },
     utility::probability::expect_probability,
 };
 
