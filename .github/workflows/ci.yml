@@ -10,6 +10,22 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install nightly --profile minimal --component rustfmt
+      - run: cargo +nightly fmt -- --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal --component clippy
+      - run: cargo clippy --no-deps -- -D warnings
+
   test:
     name: CI
     runs-on: ubuntu-latest
@@ -37,12 +53,6 @@ jobs:
 
       - name: Install Tools
         run: cargo install -q cargo-tarpaulin || true
-
-      - name: Check Format
-        run: cargo fmt --check
-
-      - name: Clippy Lint
-        run: cargo clippy --no-deps --features=wgpu
 
       - name: Build and Test
         run: |
