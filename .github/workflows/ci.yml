@@ -51,9 +51,12 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Install Tools
-        run: cargo install -q cargo-tarpaulin || true
+      # - name: Install Tools
+      #   run: cargo install -q cargo-tarpaulin || true
+
+      # - name: Build and Test
+      #   run: |
+      #     cargo tarpaulin --features=wgpu --coveralls=${{ secrets.COVERALLS_REPO_TOKEN }}
 
       - name: Build and Test
-        run: |
-          cargo tarpaulin --features=wgpu --coveralls=${{ secrets.COVERALLS_REPO_TOKEN }}
+        run: cargo test --features=wgpu
