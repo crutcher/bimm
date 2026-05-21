@@ -32,6 +32,7 @@ use bunsen::{
 use burn::{
     module::Module,
     nn::{
+        BatchNorm,
         BatchNormConfig,
         Initializer,
         Linear,
@@ -42,7 +43,10 @@ use burn::{
             ActivationConfig,
         },
         conv::Conv2dConfig,
-        norm::NormalizationConfig,
+        norm::{
+            Normalization,
+            NormalizationConfig,
+        },
         pool::{
             AdaptiveAvgPool2d,
             AdaptiveAvgPool2dConfig,
@@ -69,8 +73,16 @@ use super::{
         ResidualBlock,
         ResidualBlockStructureConfig,
     },
-    resnet_io::pytorch_stubs::load_resnet_stub_record,
     util::CONV_INTO_RELU_INITIALIZER,
+};
+use crate::models::resnet::resnet_io::pytorch_stubs::{
+    BasicBlockStub,
+    BottleneckStub,
+    DownsampleStub,
+    LayerBlockStub,
+    ResNetStub,
+    ResidualBlockStub,
+    load_resnet_stub,
 };
 
 /// ResNet-18 block depths.
@@ -412,10 +424,14 @@ impl<B: Backend> ResNet<B> {
         self,
         path: PathBuf,
     ) -> anyhow::Result<Self> {
-        let device = &self.devices()[0];
+        fn expect_batch_norm<B: Backend>(norm: &Normalization<B>) -> anyhow::Result<&BatchNorm<B>> {
+            match norm {
+                Normalization::Batch(bn) => Ok(bn),
+                _ => Err(anyhow::anyhow!("Expected BatchNorm")),
+            }
+        }
 
-        /*
-        let stub: ResNetStub<B> = ResNetStub {
+        let mut stub: ResNetStub<B> = ResNetStub {
             conv1: self.input_conv_norm.conv.clone(),
             bn1: self.input_conv_norm.norm.clone(),
             layers: self
@@ -432,12 +448,26 @@ impl<B: Backend> ResNet<B> {
                             match block {
                                 T::Basic(block) => S::Basic(BasicBlockStub {
                                     conv1: block.cna1.conv.clone(),
-                                    bn1: (&block.cna1.norm).try_unwrap().clone(),
+                                    bn1: expect_batch_norm(&block.cna1.norm).unwrap().clone(),
                                     conv2: block.cna2.conv.clone(),
-                                    bn2: block.cna2.norm.clone(),
-                                    downsample: block.downsample.map(|t| t.clone()),
+                                    bn2: expect_batch_norm(&block.cna2.norm).unwrap().clone(),
+                                    downsample: block.downsample.as_ref().map(|d| DownsampleStub {
+                                        conv: d.conv.clone(),
+                                        bn: expect_batch_norm(&d.norm).unwrap().clone(),
+                                    }),
                                 }),
-                                T::Bottleneck(block) => S::Bottleneck(BottleneckStub {}),
+                                T::Bottleneck(block) => S::Bottleneck(BottleneckStub {
+                                    conv1: block.cna1.conv.clone(),
+                                    bn1: expect_batch_norm(&block.cna1.norm).unwrap().clone(),
+                                    conv2: block.cna2.conv.clone(),
+                                    bn2: expect_batch_norm(&block.cna2.norm).unwrap().clone(),
+                                    conv3: block.cna3.conv.clone(),
+                                    bn3: expect_batch_norm(&block.cna3.norm).unwrap().clone(),
+                                    downsample: block.downsample.as_ref().map(|d| DownsampleStub {
+                                        conv: d.conv.clone(),
+                                        bn: expect_batch_norm(&d.norm).unwrap().clone(),
+                                    }),
+                                }),
                             }
                         })
                         .collect::<Vec<_>>(),
@@ -445,12 +475,10 @@ impl<B: Backend> ResNet<B> {
                 .collect::<Vec<_>>(),
             fc: self.output_fc.clone(),
         };
-        */
 
-        let stub_record = load_resnet_stub_record::<B>(path, device)?;
-        let adapted_target = self.with_classes(stub_record.fc.weight.dims()[0]);
-
-        Ok(stub_record.copy_stub_weights(adapted_target))
+        load_resnet_stub(path, &mut stub)?;
+        let adapted_target = self.with_classes(stub.fc.weight.dims()[0]);
+        Ok(stub.copy_stub_weights(adapted_target))
     }
 
     /// Re-initialize the last layer with the specified number of output

@@ -9,6 +9,7 @@
 use alloc::vec::Vec;
 use std::path::PathBuf;
 
+use anyhow::Context;
 use bunsen::blocks::images::conv::{
     cna::CNA2d,
     conv_norm::ConvNorm2d,
@@ -17,12 +18,8 @@ use burn::{
     module::Module,
     nn::{
         BatchNorm,
-        BatchNormRecord,
         Linear,
-        conv::{
-            Conv2d,
-            Conv2dRecord,
-        },
+        conv::Conv2d,
         norm::Normalization,
     },
     prelude::Backend,
@@ -39,32 +36,24 @@ use crate::models::resnet::{
 
 /// Load a [`ResNetStubRecord`] from ``torch`` weights path.
 #[allow(unused)]
-pub fn load_resnet_stub_record<B: Backend>(
+pub fn load_resnet_stub<B: Backend>(
     path: PathBuf,
-    device: &B::Device,
-) -> anyhow::Result<ResNetStubRecord<B>> {
+    stub: &mut ResNetStub<B>,
+) -> anyhow::Result<()> {
     use burn::store::{
         ModuleSnapshot,
         PytorchStore,
     };
 
-    let mut store = PytorchStore::from_file(path)
+    let mut store = PytorchStore::from_file(path.clone())
         .with_key_remapping(r"downsample\.0", "downsample.conv")
         .with_key_remapping(r"downsample\.1", "downsample.bn")
         .with_key_remapping("layer([1-4])", "layers.$1.blocks");
 
-    /*
-    let load_args = burn_import::pytorch::LoadArgs::new(path)
-        .with_key_remap(r"downsample\.0", "downsample.conv")
-        .with_key_remap(r"downsample\.1", "downsample.bn")
-        .with_key_remap("layer([1-4])", "layers.$1.blocks");
+    stub.load_from(&mut store)
+        .with_context(|| format!("Failed to load ResNet stub from {:?}", path))?;
 
-    let record = PyTorchFileRecorder::<FullPrecisionSettings>::new().load(load_args, device)?;
-
-    Ok(record)
-
-     */
-    todo!()
+    Ok(())
 }
 
 #[derive(Module, Debug)]
@@ -75,20 +64,23 @@ pub struct ResNetStub<B: Backend> {
     pub fc: Linear<B>,
 }
 
-impl<B: Backend> ResNetStubRecord<B> {
+impl<B: Backend> ResNetStub<B> {
     pub fn copy_stub_weights(
         self,
         target: ResNet<B>,
     ) -> ResNet<B> {
         ResNet {
-            input_conv_norm: copy_conv_norm_weights(self.conv1, self.bn1, target.input_conv_norm),
+            input_conv_norm: ConvNorm2d {
+                conv: self.conv1.clone(),
+                norm: self.bn1.clone(),
+            },
             layers: self
                 .layers
                 .into_iter()
                 .zip(target.layers)
-                .map(|(s, t)| s.copy_stub_weights(t))
+                .map(|(lbs, t)| lbs.copy_weights(t))
                 .collect(),
-            output_fc: target.output_fc.load_record(self.fc),
+            output_fc: target.output_fc.clone(),
             ..target
         }
     }
@@ -99,18 +91,18 @@ pub struct LayerBlockStub<B: Backend> {
     pub blocks: Vec<ResidualBlockStub<B>>,
 }
 
-impl<B: Backend> LayerBlockStubRecord<B> {
-    pub fn copy_stub_weights(
-        self,
+impl<B: Backend> LayerBlockStub<B> {
+    pub fn copy_weights(
+        &self,
         target: LayerBlock<B>,
     ) -> LayerBlock<B> {
         LayerBlock {
             blocks: self
                 .blocks
-                .into_iter()
+                .iter()
                 .zip(target.blocks)
-                .map(|(s, t)| s.copy_stub_weights(t))
-                .collect(),
+                .map(|(b, tb)| b.copy_weights(tb))
+                .collect::<Vec<_>>(),
         }
     }
 }
@@ -122,16 +114,16 @@ pub enum ResidualBlockStub<B: Backend> {
     Basic(BasicBlockStub<B>),
 }
 
-impl<B: Backend> ResidualBlockStubRecord<B> {
-    pub fn copy_stub_weights(
-        self,
+impl<B: Backend> ResidualBlockStub<B> {
+    pub fn copy_weights(
+        &self,
         target: ResidualBlock<B>,
     ) -> ResidualBlock<B> {
         use ResidualBlock as T;
-        use ResidualBlockStubRecord as S;
+        use ResidualBlockStub as S;
         match (self, target) {
-            (S::Basic(stub), T::Basic(block)) => stub.copy_stub_weights(block).into(),
-            (S::Bottleneck(stub), T::Bottleneck(block)) => stub.copy_stub_weights(block).into(),
+            (S::Basic(stub), T::Basic(block)) => stub.copy_weights(block).into(),
+            (S::Bottleneck(stub), T::Bottleneck(block)) => stub.copy_weights(block).into(),
             (S::Basic(_), T::Bottleneck(_)) => {
                 panic!("Cannot apply basic block stub to bottleneck block")
             }
@@ -142,12 +134,12 @@ impl<B: Backend> ResidualBlockStubRecord<B> {
     }
 }
 
-pub fn copy_downsample_weights<B: Backend>(
-    downsample: Option<DownsampleStubRecord<B>>,
+pub fn copy_downsample_mod_weights<B: Backend>(
+    downsample: &Option<DownsampleStub<B>>,
     target: Option<ResNetDownsample<B>>,
 ) -> Option<ResNetDownsample<B>> {
     match (downsample, target) {
-        (Some(stub), Some(target)) => Some(stub.copy_stub_weights(target)),
+        (Some(stub), Some(target)) => Some(stub.copy_weights(target)),
         (None, None) => None,
         (None, Some(_)) => panic!("None stub cannot be applied to Some<Downsample>"),
         (Some(_), None) => panic!("Some<Downsample> stub cannot be applied to None"),
@@ -160,45 +152,68 @@ pub struct DownsampleStub<B: Backend> {
     pub bn: BatchNorm<B>,
 }
 
-impl<B: Backend> DownsampleStubRecord<B> {
-    pub fn copy_stub_weights(
-        self,
-        target: ResNetDownsample<B>,
+impl<B: Backend> DownsampleStub<B> {
+    pub fn copy_weights(
+        &self,
+        mut target: ResNetDownsample<B>,
     ) -> ResNetDownsample<B> {
-        match target.norm {
-            Normalization::Batch(norm) => ResNetDownsample {
-                conv: target.conv.load_record(self.conv),
-                norm: norm.load_record(self.bn).into(),
-            },
+        match &mut target.norm {
+            Normalization::Batch(norm) => {
+                norm.gamma = self.bn.gamma.clone();
+                norm.beta = self.bn.beta.clone();
+            }
             _ => panic!("Stub cannot be applied to {:?}", target.norm),
         }
+        target.conv = copy_conv2d_mod_weights(&self.conv, target.conv);
+        target
     }
 }
 
-pub fn copy_cna_weights<B: Backend>(
-    conv: Conv2dRecord<B>,
-    bn: BatchNormRecord<B>,
-    target: CNA2d<B>,
+pub fn copy_batchnorm_mod_weights<B: Backend>(
+    source: &BatchNorm<B>,
+    target: BatchNorm<B>,
+) -> BatchNorm<B> {
+    BatchNorm {
+        beta: source.beta.clone(),
+        gamma: source.gamma.clone(),
+        ..target
+    }
+}
+
+pub fn copy_conv2d_mod_weights<B: Backend>(
+    source: &Conv2d<B>,
+    target: Conv2d<B>,
+) -> Conv2d<B> {
+    let device = source.weight.device();
+    let dtype = source.weight.dtype();
+
+    Conv2d {
+        weight: source
+            .weight
+            .clone()
+            .map(|w| w.cast(dtype).to_device(&device)),
+        bias: source
+            .bias
+            .as_ref()
+            .map(|p| p.clone().map(|w| w.cast(dtype).to_device(&device))),
+        ..target
+    }
+}
+
+pub fn copy_cna_mod_weights<B: Backend>(
+    conv: &Conv2d<B>,
+    bn: &BatchNorm<B>,
+    mut target: CNA2d<B>,
 ) -> CNA2d<B> {
-    match target.norm {
-        Normalization::Batch(norm) => CNA2d {
-            conv: target.conv.load_record(conv),
-            norm: norm.load_record(bn).into(),
-            ..target
-        },
+    match &mut target.norm {
+        Normalization::Batch(norm) => {
+            norm.gamma = bn.gamma.clone();
+            norm.beta = bn.beta.clone();
+        }
         _ => panic!("Stub cannot be applied to {:?}", target.norm),
     }
-}
-
-pub fn copy_conv_norm_weights<B: Backend>(
-    conv: Conv2dRecord<B>,
-    bn: BatchNormRecord<B>,
-    target: ConvNorm2d<B>,
-) -> ConvNorm2d<B> {
-    ConvNorm2d {
-        conv: target.conv.load_record(conv),
-        norm: target.norm.load_record(bn),
-    }
+    target.conv = conv.clone();
+    target
 }
 
 #[derive(Module, Debug)]
@@ -210,15 +225,15 @@ pub struct BasicBlockStub<B: Backend> {
     pub downsample: Option<DownsampleStub<B>>,
 }
 
-impl<B: Backend> BasicBlockStubRecord<B> {
-    pub fn copy_stub_weights(
-        self,
+impl<B: Backend> BasicBlockStub<B> {
+    pub fn copy_weights(
+        &self,
         target: BasicBlock<B>,
     ) -> BasicBlock<B> {
         BasicBlock {
-            downsample: copy_downsample_weights(self.downsample, target.downsample),
-            cna1: copy_cna_weights(self.conv1, self.bn1, target.cna1),
-            cna2: copy_cna_weights(self.conv2, self.bn2, target.cna2),
+            cna1: copy_cna_mod_weights(&self.conv1, &self.bn1, target.cna1),
+            cna2: copy_cna_mod_weights(&self.conv2, &self.bn2, target.cna2),
+            downsample: copy_downsample_mod_weights(&self.downsample, target.downsample),
             ..target
         }
     }
@@ -235,16 +250,16 @@ pub struct BottleneckStub<B: Backend> {
     pub downsample: Option<DownsampleStub<B>>,
 }
 
-impl<B: Backend> BottleneckStubRecord<B> {
-    pub fn copy_stub_weights(
-        self,
+impl<B: Backend> BottleneckStub<B> {
+    pub fn copy_weights(
+        &self,
         target: BottleneckBlock<B>,
     ) -> BottleneckBlock<B> {
         BottleneckBlock {
-            cna1: copy_cna_weights(self.conv1, self.bn1, target.cna1),
-            cna2: copy_cna_weights(self.conv2, self.bn2, target.cna2),
-            cna3: copy_cna_weights(self.conv3, self.bn3, target.cna3),
-            downsample: copy_downsample_weights(self.downsample, target.downsample),
+            cna1: copy_cna_mod_weights(&self.conv1, &self.bn1, target.cna1),
+            cna2: copy_cna_mod_weights(&self.conv2, &self.bn2, target.cna2),
+            cna3: copy_cna_mod_weights(&self.conv3, &self.bn3, target.cna3),
+            downsample: copy_downsample_mod_weights(&self.downsample, target.downsample),
             ..target
         }
     }
