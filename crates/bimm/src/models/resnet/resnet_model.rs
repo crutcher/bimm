@@ -32,7 +32,6 @@ use bunsen::{
 use burn::{
     module::Module,
     nn::{
-        BatchNorm,
         BatchNormConfig,
         Initializer,
         Linear,
@@ -43,10 +42,7 @@ use burn::{
             ActivationConfig,
         },
         conv::Conv2dConfig,
-        norm::{
-            Normalization,
-            NormalizationConfig,
-        },
+        norm::NormalizationConfig,
         pool::{
             AdaptiveAvgPool2d,
             AdaptiveAvgPool2dConfig,
@@ -59,6 +55,10 @@ use burn::{
         Config,
         Tensor,
     },
+};
+use burn_store::{
+    ModuleSnapshot,
+    PytorchStore,
 };
 
 use super::{
@@ -74,15 +74,6 @@ use super::{
         ResidualBlockStructureConfig,
     },
     util::CONV_INTO_RELU_INITIALIZER,
-};
-use crate::models::resnet::resnet_io::pytorch_stubs::{
-    BasicBlockStub,
-    BottleneckStub,
-    DownsampleStub,
-    LayerBlockStub,
-    ResNetStub,
-    ResidualBlockStub,
-    load_resnet_stub,
 };
 
 /// ResNet-18 block depths.
@@ -421,64 +412,25 @@ impl<B: Backend> ResNet<B> {
 
     /// Load weights from a `PyTorch` weights path.
     pub fn load_pytorch_weights(
-        self,
+        mut self,
         path: PathBuf,
     ) -> anyhow::Result<Self> {
-        fn expect_batch_norm<B: Backend>(norm: &Normalization<B>) -> anyhow::Result<&BatchNorm<B>> {
-            match norm {
-                Normalization::Batch(bn) => Ok(bn),
-                _ => Err(anyhow::anyhow!("Expected BatchNorm")),
-            }
-        }
+        let mut store = PytorchStore::from_file(path.clone())
+            .skip_enum_variants(true)
+            .with_key_remapping(r"bn(\d+)\.weight", "bn$1.gamma")
+            .with_key_remapping(r"bn(\d+)\.bias", "bn$1.beta")
+            .with_key_remapping(r"^conv1\.", "input_conv_norm.conv.")
+            .with_key_remapping(r"^bn1\.", "input_conv_norm.norm.")
+            .with_key_remapping(r"bn(\d+)\.", "cna$1.norm.")
+            .with_key_remapping(r"conv(\d+)\.", "cna$1.conv.")
+            .with_key_remapping(r"downsample\.0\.", "downsample.conv.")
+            .with_key_remapping(r"downsample\.1\.", "downsample.norm.")
+            .with_key_remapping(r"fc\.", "output_fc.")
+            .with_key_remapping(r"layer(\d+)\.", "layers.$1.blocks.");
 
-        let mut stub: ResNetStub<B> = ResNetStub {
-            conv1: self.input_conv_norm.conv.clone(),
-            bn1: self.input_conv_norm.norm.clone(),
-            layers: self
-                .layers
-                .iter()
-                .map(|layer| LayerBlockStub {
-                    blocks: layer
-                        .blocks
-                        .iter()
-                        .map(|block| {
-                            use ResidualBlock as T;
-                            use ResidualBlockStub as S;
+        self.load_from(&mut store)?;
 
-                            match block {
-                                T::Basic(block) => S::Basic(BasicBlockStub {
-                                    conv1: block.cna1.conv.clone(),
-                                    bn1: expect_batch_norm(&block.cna1.norm).unwrap().clone(),
-                                    conv2: block.cna2.conv.clone(),
-                                    bn2: expect_batch_norm(&block.cna2.norm).unwrap().clone(),
-                                    downsample: block.downsample.as_ref().map(|d| DownsampleStub {
-                                        conv: d.conv.clone(),
-                                        bn: expect_batch_norm(&d.norm).unwrap().clone(),
-                                    }),
-                                }),
-                                T::Bottleneck(block) => S::Bottleneck(BottleneckStub {
-                                    conv1: block.cna1.conv.clone(),
-                                    bn1: expect_batch_norm(&block.cna1.norm).unwrap().clone(),
-                                    conv2: block.cna2.conv.clone(),
-                                    bn2: expect_batch_norm(&block.cna2.norm).unwrap().clone(),
-                                    conv3: block.cna3.conv.clone(),
-                                    bn3: expect_batch_norm(&block.cna3.norm).unwrap().clone(),
-                                    downsample: block.downsample.as_ref().map(|d| DownsampleStub {
-                                        conv: d.conv.clone(),
-                                        bn: expect_batch_norm(&d.norm).unwrap().clone(),
-                                    }),
-                                }),
-                            }
-                        })
-                        .collect::<Vec<_>>(),
-                })
-                .collect::<Vec<_>>(),
-            fc: self.output_fc.clone(),
-        };
-
-        load_resnet_stub(path, &mut stub)?;
-        let adapted_target = self.with_classes(stub.fc.weight.dims()[0]);
-        Ok(stub.copy_stub_weights(adapted_target))
+        Ok(self)
     }
 
     /// Re-initialize the last layer with the specified number of output
@@ -592,6 +544,78 @@ mod tests {
     use bunsen::support::testing::PerfTestBackend;
 
     use super::*;
+    use crate::{
+        cache::DiskCacheConfig,
+        models::resnet::PREFAB_RESNET_MAP,
+    };
+
+    fn test_load_pytorch<B: Backend>(
+        prefab: &str,
+        pretrained: &str,
+    ) -> anyhow::Result<()> {
+        let device = Default::default();
+
+        let prefab = PREFAB_RESNET_MAP.expect_lookup_prefab(&prefab);
+
+        let resnet_config = prefab.to_config().to_structure();
+        println!("{:#?}", resnet_config);
+        let model: ResNet<B> = resnet_config.init(&device);
+
+        let path = prefab
+            .expect_lookup_pretrained_weights(pretrained)
+            .fetch_weights(&DiskCacheConfig::default())?;
+
+        /*
+        let store = PytorchStore::from_file(path.clone());
+        //         println!("{:#?}", store.keys());
+
+        let mut store = store
+            .skip_enum_variants(true)
+            .with_key_remapping(r"bn(\d+)\.weight", "bn$1.gamma")
+            .with_key_remapping(r"bn(\d+)\.bias", "bn$1.beta")
+            .with_key_remapping(r"^conv1\.", "input_conv_norm.conv.")
+            .with_key_remapping(r"^bn1\.", "input_conv_norm.norm.")
+            .with_key_remapping(r"bn(\d+)\.", "cna$1.norm.")
+            .with_key_remapping(r"conv(\d+)\.", "cna$1.conv.")
+            .with_key_remapping(r"downsample\.0\.", "downsample.conv.")
+            .with_key_remapping(r"downsample\.1\.", "downsample.norm.")
+            .with_key_remapping(r"fc\.", "output_fc.")
+            .with_key_remapping(r"layer(\d+)\.", "layers.$1.blocks.");
+
+        println!("{:#?}", store.keys());
+
+        model.load_from(&mut store)?;
+
+         */
+        let _model: ResNet<B> = model.load_pytorch_weights(path.clone())?;
+
+        Ok(())
+    }
+    #[test]
+    fn test_load_pytorch_prefab() -> anyhow::Result<()> {
+        type B = PerfTestBackend;
+        let prefab = "resnet18";
+        let pretrained = "tv_in1k";
+        test_load_pytorch::<B>(&prefab, &pretrained)
+    }
+
+    #[test]
+    #[cfg(feature = "cuda")]
+    fn test_load_pytorch_prefab_cuda() -> anyhow::Result<()> {
+        type B = burn::backend::Cuda;
+        let prefab = "resnet34";
+        let pretrained = "tv_in1k";
+        test_load_pytorch::<B>(&prefab, &pretrained)
+    }
+
+    #[test]
+    #[cfg(feature = "cuda")]
+    fn test_load_pytorch_prefab_cuda_bf16() -> anyhow::Result<()> {
+        type B = burn::backend::Cuda<burn::tensor::bf16>;
+        let prefab = "resnet34";
+        let pretrained = "tv_in1k";
+        test_load_pytorch::<B>(&prefab, &pretrained)
+    }
 
     #[test]
     fn test_to_layers_34_basic() {

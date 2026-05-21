@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use bimm::{
     cache::DiskCacheConfig,
+    compat::type_mapper::DTypeMapper,
     models::resnet::{
         PREFAB_RESNET_MAP,
         ResNet,
@@ -66,10 +67,7 @@ use burn::{
         activation::ActivationConfig,
         loss::CrossEntropyLossConfig,
     },
-    optim::{
-        AdamConfig,
-        decay::WeightDecayConfig,
-    },
+    optim::AdamWConfig,
     prelude::{
         Backend,
         Int,
@@ -131,7 +129,7 @@ pub struct Args {
     grads_accumulation: usize,
 
     /// Number of workers for data loading.
-    #[arg(long, default_value = "2")]
+    #[arg(long, default_value = "0")]
     num_workers: Option<usize>,
 
     /// Number of epochs to train the model.
@@ -143,7 +141,7 @@ pub struct Args {
     drop_block_rate: f64,
 
     /// Learning rate for the optimizer.
-    #[arg(long, default_value = "1.0e-4")]
+    #[arg(long, default_value = "1.0e-5")]
     learning_rate: f64,
 
     /// Learning rate decay gamma.
@@ -176,7 +174,7 @@ pub struct Args {
     drop_block_prob: f64,
 
     /// Drop Path Prob
-    #[arg(long, default_value = "0.0")]
+    #[arg(long, default_value = "0.05")]
     drop_path_prob: f64,
 
     /// Early stopping patience
@@ -189,6 +187,7 @@ fn main() -> anyhow::Result<()> {
 
     cfg_select! {
         feature = "cuda" => {
+            // type B =burn::backend::Cuda<burn::tensor::bf16>;
             type B =burn::backend::Cuda<burn::tensor::bf16>;
         }
         feature = "metal" => {
@@ -234,10 +233,15 @@ pub fn backend_main<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
 
     let resnet: ResNet<B> = match &args.resnet_pretrained {
         Some(pretrained) => {
+            let old_float_type = resnet.output_fc.weight.dtype();
+
             let weights = prefab
                 .expect_lookup_pretrained_weights(pretrained)
                 .fetch_weights(&DiskCacheConfig::default())?;
-            resnet.load_pytorch_weights(weights)?
+
+            resnet
+                .load_pytorch_weights(weights)?
+                .map(&mut DTypeMapper::new(old_float_type))
         }
         None => resnet,
     }
@@ -247,7 +251,9 @@ pub fn backend_main<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
 
     let model: Model<B> = Model { resnet };
 
-    let optim_config = AdamConfig::new().with_weight_decay(WeightDecayConfig::new(5e-4).into());
+    let optim_config = AdamWConfig::new()
+        .with_weight_decay(5e-4)
+        .with_cautious_weight_decay(true);
     // .with_grad_clipping(Some(GradientClippingConfig::Norm(3.0)));
 
     let artifact_dir = args.artifact_dir.as_ref().unwrap().as_ref();

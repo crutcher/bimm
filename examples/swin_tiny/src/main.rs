@@ -117,7 +117,7 @@ pub struct Args {
     batch_size: usize,
 
     /// Number of workers for data loading.
-    #[arg(long, default_value = "4")]
+    #[arg(long, default_value = "0")]
     num_workers: Option<usize>,
 
     /// Number of epochs to train the model.
