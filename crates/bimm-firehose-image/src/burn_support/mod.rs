@@ -1,10 +1,28 @@
 //! # Image/Tensor conversion utilities.
-use bimm_firehose::core::operations::factory::SimpleConfigOperatorFactory;
-use bimm_firehose::core::operations::signature::{FirehoseOperatorSignature, ParameterSpec};
-use bimm_firehose::core::{FirehoseRowBatch, FirehoseRowReader};
-use bimm_firehose::define_firehose_operator;
-use burn::prelude::{Backend, Tensor};
-use burn::tensor::TensorData;
+use bimm_firehose::{
+    core::{
+        FirehoseRowBatch,
+        FirehoseRowReader,
+        operations::{
+            factory::SimpleConfigOperatorFactory,
+            signature::{
+                FirehoseOperatorSignature,
+                ParameterSpec,
+            },
+        },
+    },
+    define_firehose_operator,
+};
+use burn::{
+    prelude::{
+        Backend,
+        Tensor,
+    },
+    tensor::{
+        TensorCreationOptions,
+        TensorData,
+    },
+};
 use image::DynamicImage;
 
 pub mod image_to_tensor_data;
@@ -97,9 +115,8 @@ pub fn image_to_f32_tensor<B: Backend>(
         .map(|p| pixeldepth_support::pixel_depth_to_f32(*p))
         .collect();
 
-    Tensor::from_data_dtype(
+    Tensor::from_data(
         TensorData::new(data, shape),
-        device,
-        burn::tensor::DType::F32,
+        TensorCreationOptions::new(device.clone()).with_dtype(burn::tensor::DType::F32),
     )
 }

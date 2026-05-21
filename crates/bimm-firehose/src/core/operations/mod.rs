@@ -17,9 +17,10 @@ pub mod signature;
 ///
 /// # Arguments
 ///
-/// * `$name`: The name of the operator ID to define;
-///   will create a self-referential static string constant.
-/// * `$constructor`: A closure that returns an `Arc<dyn FirehoseOperatorFactory>`.
+/// * `$name`: The name of the operator ID to define; will create a
+///   self-referential static string constant.
+/// * `$constructor`: A closure that returns an `Arc<dyn
+///   FirehoseOperatorFactory>`.
 ///
 /// This macro combines the functionality of `define_firehose_operator_id`
 /// and `register_firehose_operator_factory`.
@@ -33,12 +34,12 @@ macro_rules! define_firehose_operator {
 
 /// Define a self-referential operator ID.
 ///
-/// The id will be defined as a static string constant that refers to its own namespace path.
+/// The id will be defined as a static string constant that refers to its own
+/// namespace path.
 ///
 /// # Arguments
 ///
 /// * `$name`: The name of the operator ID to define.
-///
 #[macro_export]
 macro_rules! define_firehose_operator_id {
     ($name:ident) => {
@@ -49,7 +50,8 @@ macro_rules! define_firehose_operator_id {
 /// Macro to register a default operator factory.
 ///
 /// Builders which do not require runtime configuration can be registered
-/// using this macro; and collected globally using `list_default_operator_builders`.
+/// using this macro; and collected globally using
+/// `list_default_operator_builders`.
 ///
 /// You can also collect a default environment with all registered builders
 /// using `new_default_operator_environment`.
@@ -71,23 +73,50 @@ macro_rules! register_firehose_operator_factory {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::operations::environment::{FirehoseOperatorEnvironment, MapOpEnvironment};
-    use crate::core::operations::factory::SimpleConfigOperatorFactory;
-    use crate::core::operations::operator::OperationRunner;
-    use crate::core::operations::operator::{FirehoseOperator, OperatorSchedulingMetadata};
-    use crate::core::operations::signature::{FirehoseOperatorSignature, ParameterSpec};
-
-    use crate::core::FirehoseValue;
-    use crate::core::rows::{
-        FirehoseRowBatch, FirehoseRowReader, FirehoseRowTransaction, FirehoseRowWriter,
+    use std::{
+        collections::BTreeMap,
+        fmt::Debug,
+        sync::Arc,
     };
-    use crate::core::schema::{BuildPlan, ColumnSchema, DataTypeDescription, FirehoseTableSchema};
+
     // use crate::define_firehose_operator_id;
     use indoc::indoc;
-    use serde::{Deserialize, Serialize};
-    use std::collections::BTreeMap;
-    use std::fmt::Debug;
-    use std::sync::Arc;
+    use serde::{
+        Deserialize,
+        Serialize,
+    };
+
+    use crate::core::{
+        FirehoseValue,
+        operations::{
+            environment::{
+                FirehoseOperatorEnvironment,
+                MapOpEnvironment,
+            },
+            factory::SimpleConfigOperatorFactory,
+            operator::{
+                FirehoseOperator,
+                OperationRunner,
+                OperatorSchedulingMetadata,
+            },
+            signature::{
+                FirehoseOperatorSignature,
+                ParameterSpec,
+            },
+        },
+        rows::{
+            FirehoseRowBatch,
+            FirehoseRowReader,
+            FirehoseRowTransaction,
+            FirehoseRowWriter,
+        },
+        schema::{
+            BuildPlan,
+            ColumnSchema,
+            DataTypeDescription,
+            FirehoseTableSchema,
+        },
+    };
 
     define_firehose_operator_id!(ADD);
 

@@ -1,5 +1,8 @@
 //! # [`ColorType`] Utilities
-use image::{ColorType, DynamicImage};
+use image::{
+    ColorType,
+    DynamicImage,
+};
 
 /// Convert an `image::DynamicImage` to a specific `ColorType`.
 ///
@@ -41,10 +44,14 @@ pub mod serialization {
     //! provide a Serialization / Deserialization workaround.
 
     use image::ColorType;
-    use serde::{Deserialize, Serialize};
+    use serde::{
+        Deserialize,
+        Serialize,
+    };
 
-    /// Temporary color type (with support for serialization and deserialization).
-    /// To be replaced with `image::ColorType` on the next release.
+    /// Temporary color type (with support for serialization and
+    /// deserialization). To be replaced with `image::ColorType` on the next
+    /// release.
     #[derive(Copy, PartialEq, Eq, Debug, Clone, Hash, Serialize, Deserialize)]
     pub enum TmpColorType {
         /// Pixel is 8-bit luminance
@@ -175,12 +182,23 @@ pub mod serialization {
 
 #[cfg(test)]
 mod tests {
-    use super::serialization;
-    use super::*;
-    use crate::ImageShape;
-    use crate::test_util::generate_gradient_pattern;
-    use image::{ColorType, DynamicImage};
-    use serde::{Deserialize, Serialize};
+    use image::{
+        ColorType,
+        DynamicImage,
+    };
+    use serde::{
+        Deserialize,
+        Serialize,
+    };
+
+    use super::{
+        serialization,
+        *,
+    };
+    use crate::{
+        ImageShape,
+        test_util::generate_gradient_pattern,
+    };
 
     #[derive(Debug, Serialize, Deserialize)]
     pub struct ExampleStruct {

@@ -1,7 +1,19 @@
-use crate::core::schema::{BuildPlan, ColumnSchema, DataTypeDescription};
-use anyhow::{Context, bail};
-use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+
+use anyhow::{
+    Context,
+    bail,
+};
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
+use crate::core::schema::{
+    BuildPlan,
+    ColumnSchema,
+    DataTypeDescription,
+};
 
 /// Defines a single parameter specification
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -26,11 +38,13 @@ impl ParameterSpec {
     /// # Parameters
     ///
     /// - `name`: The name of the parameter.
-    /// - `T`: The type of the parameter, which is used to determine the data type description.
+    /// - `T`: The type of the parameter, which is used to determine the data
+    ///   type description.
     ///
     /// # Returns
     ///
-    /// A new `ParameterSpec` instance with the specified name, data type, and required arity.
+    /// A new `ParameterSpec` instance with the specified name, data type, and
+    /// required arity.
     pub fn new<T>(name: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -101,7 +115,8 @@ impl FirehoseOperatorSignature {
         }
     }
 
-    /// Creates a new `FirehoseOperatorSignature` with the specified operator ID.
+    /// Creates a new `FirehoseOperatorSignature` with the specified operator
+    /// ID.
     pub fn from_operator_id(operator_id: &str) -> Self {
         Self {
             operator_id: Some(operator_id.into()),
@@ -137,17 +152,21 @@ impl FirehoseOperatorSignature {
         }
     }
 
-    /// Internal helper to add a parameter specification to the list of inputs or outputs.
+    /// Internal helper to add a parameter specification to the list of inputs
+    /// or outputs.
     ///
     /// # Parameters
     ///
     /// * `spec`: The parameter specification to add.
-    /// * `ptype`: A string indicating the type of parameter ("input" or "output").
-    /// * `specs`: The current list of parameter specifications (either inputs or outputs).
+    /// * `ptype`: A string indicating the type of parameter ("input" or
+    ///   "output").
+    /// * `specs`: The current list of parameter specifications (either inputs
+    ///   or outputs).
     ///
     /// # Returns
     ///
-    /// An `anyhow::Result<Vec<ParameterSpec>>` containing a new vector of parameter specifications with the added parameter.
+    /// An `anyhow::Result<Vec<ParameterSpec>>` containing a new vector of
+    /// parameter specifications with the added parameter.
     fn with_parameter(
         spec: ParameterSpec,
         ptype: &str,
@@ -176,8 +195,10 @@ impl FirehoseOperatorSignature {
     /// # Returns
     ///
     /// An `Result<Self, String>` where:
-    /// * `Ok(Self)`: A new `FirehoseOperatorSignature` with the input parameter added.
-    /// * `Err(String)`: An error message if the input parameter name already exists in the signature.
+    /// * `Ok(Self)`: A new `FirehoseOperatorSignature` with the input parameter
+    ///   added.
+    /// * `Err(String)`: An error message if the input parameter name already
+    ///   exists in the signature.
     pub fn with_input_result(
         self,
         spec: ParameterSpec,
@@ -222,8 +243,10 @@ impl FirehoseOperatorSignature {
     /// # Returns
     ///
     /// An `Result<Self, String>` where:
-    /// * `Ok(Self)`: A new `FirehoseOperatorSignature` with the output parameter added.
-    /// * `Err(String)`: An error message if the output parameter name already exists in the signature.
+    /// * `Ok(Self)`: A new `FirehoseOperatorSignature` with the output
+    ///   parameter added.
+    /// * `Err(String)`: An error message if the output parameter name already
+    ///   exists in the signature.
     pub fn with_output_result(
         self,
         spec: ParameterSpec,
@@ -302,9 +325,12 @@ impl FirehoseOperatorSignature {
     ///
     /// # Arguments
     ///
-    /// * `param_type`: A string indicating the type of parameters being validated ("input" or "output").
-    /// * `specs`: A slice of `ParameterSpec` that defines the expected parameters.
-    /// * `provided`: A map of provided parameters, where keys are parameter names and values are their data types.
+    /// * `param_type`: A string indicating the type of parameters being
+    ///   validated ("input" or "output").
+    /// * `specs`: A slice of `ParameterSpec` that defines the expected
+    ///   parameters.
+    /// * `provided`: A map of provided parameters, where keys are parameter
+    ///   names and values are their data types.
     ///
     /// # Returns
     ///

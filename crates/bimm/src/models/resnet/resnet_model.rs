@@ -13,27 +13,68 @@
 //! [`ResNet`] implements [`Module`], and provides
 //! [`ResNet::forward`].
 
-use super::bottleneck_block::BottleneckPolicyConfig;
-use super::layer_block::{
-    LayerBlock, LayerBlockContractConfig, LayerBlockMeta, LayerBlockStructureConfig,
+use alloc::{
+    vec,
+    vec::Vec,
 };
-use super::residual_block::{ResidualBlock, ResidualBlockStructureConfig};
-use super::resnet_io::pytorch_stubs::load_resnet_stub_record;
-use super::util::CONV_INTO_RELU_INITIALIZER;
-use crate::layers::blocks::conv_norm::{ConvNorm2d, ConvNorm2dConfig};
-use crate::layers::drop::drop_block::DropBlockOptions;
-use crate::utility::probability::expect_probability;
-use alloc::vec;
-use alloc::vec::Vec;
-use burn::module::Module;
-use burn::nn::BatchNormConfig;
-use burn::nn::activation::{Activation, ActivationConfig};
-use burn::nn::conv::Conv2dConfig;
-use burn::nn::norm::NormalizationConfig;
-use burn::nn::pool::{AdaptiveAvgPool2d, AdaptiveAvgPool2dConfig, MaxPool2d, MaxPool2dConfig};
-use burn::nn::{Initializer, Linear, LinearConfig, PaddingConfig2d};
-use burn::prelude::{Backend, Config, Tensor};
 use std::path::PathBuf;
+
+use bunsen::{
+    blocks::images::{
+        conv::conv_norm::{
+            ConvNorm2d,
+            ConvNorm2dConfig,
+        },
+        drop::drop_block::DropBlockOptions,
+    },
+    support::validators::expect_probability,
+};
+use burn::{
+    module::Module,
+    nn::{
+        BatchNormConfig,
+        Initializer,
+        Linear,
+        LinearConfig,
+        PaddingConfig2d,
+        activation::{
+            Activation,
+            ActivationConfig,
+        },
+        conv::Conv2dConfig,
+        norm::NormalizationConfig,
+        pool::{
+            AdaptiveAvgPool2d,
+            AdaptiveAvgPool2dConfig,
+            MaxPool2d,
+            MaxPool2dConfig,
+        },
+    },
+    prelude::{
+        Backend,
+        Config,
+        Tensor,
+    },
+};
+use burn_store::{
+    ModuleSnapshot,
+    PytorchStore,
+};
+
+use super::{
+    bottleneck_block::BottleneckPolicyConfig,
+    layer_block::{
+        LayerBlock,
+        LayerBlockContractConfig,
+        LayerBlockMeta,
+        LayerBlockStructureConfig,
+    },
+    residual_block::{
+        ResidualBlock,
+        ResidualBlockStructureConfig,
+    },
+    util::CONV_INTO_RELU_INITIALIZER,
+};
 
 /// ResNet-18 block depths.
 pub const RESNET18_BLOCKS: [usize; 4] = [2, 2, 2, 2];
@@ -149,7 +190,10 @@ impl ResNetContractConfig {
             ConvNorm2dConfig::from(
                 Conv2dConfig::new([3, self.stem_width], [7, 7])
                     .with_stride([2, 2])
-                    .with_padding(PaddingConfig2d::Explicit(3, 3))
+                    .with_padding({
+                        let d = 3;
+                        PaddingConfig2d::Explicit(d, d, d, d)
+                    })
                     .with_bias(false),
             )
             .with_initializer(CONV_INTO_RELU_INITIALIZER.clone()),
@@ -217,7 +261,10 @@ impl ResNetStructureConfig {
             input_act: self.input_act.init(device),
             input_pool: MaxPool2dConfig::new([3, 3])
                 .with_strides([2, 2])
-                .with_padding(PaddingConfig2d::Explicit(1, 1))
+                .with_padding({
+                    let d = 1;
+                    PaddingConfig2d::Explicit(d, d, d, d)
+                })
                 .init(),
 
             layers: self
@@ -365,18 +412,29 @@ impl<B: Backend> ResNet<B> {
 
     /// Load weights from a `PyTorch` weights path.
     pub fn load_pytorch_weights(
-        self,
+        mut self,
         path: PathBuf,
     ) -> anyhow::Result<Self> {
-        let device = &self.devices()[0];
+        let mut store = PytorchStore::from_file(path.clone())
+            .skip_enum_variants(true)
+            .with_key_remapping(r"bn(\d+)\.weight", "bn$1.gamma")
+            .with_key_remapping(r"bn(\d+)\.bias", "bn$1.beta")
+            .with_key_remapping(r"^conv1\.", "input_conv_norm.conv.")
+            .with_key_remapping(r"^bn1\.", "input_conv_norm.norm.")
+            .with_key_remapping(r"bn(\d+)\.", "cna$1.norm.")
+            .with_key_remapping(r"conv(\d+)\.", "cna$1.conv.")
+            .with_key_remapping(r"downsample\.0\.", "downsample.conv.")
+            .with_key_remapping(r"downsample\.1\.", "downsample.norm.")
+            .with_key_remapping(r"fc\.", "output_fc.")
+            .with_key_remapping(r"layer(\d+)\.", "layers.$1.blocks.");
 
-        let stub_record = load_resnet_stub_record::<B>(path, device)?;
-        let adapted_target = self.with_classes(stub_record.fc.weight.dims()[0]);
+        self.load_from(&mut store)?;
 
-        Ok(stub_record.copy_stub_weights(adapted_target))
+        Ok(self)
     }
 
-    /// Re-initialize the last layer with the specified number of output classes.
+    /// Re-initialize the last layer with the specified number of output
+    /// classes.
     pub fn with_classes(
         mut self,
         num_classes: usize,
@@ -483,8 +541,81 @@ impl<B: Backend> ResNet<B> {
 
 #[cfg(test)]
 mod tests {
+    use bunsen::support::testing::PerfTestBackend;
+
     use super::*;
-    use burn::backend::Wgpu;
+    use crate::{
+        cache::DiskCacheConfig,
+        models::resnet::PREFAB_RESNET_MAP,
+    };
+
+    fn test_load_pytorch<B: Backend>(
+        prefab: &str,
+        pretrained: &str,
+    ) -> anyhow::Result<()> {
+        let device = Default::default();
+
+        let prefab = PREFAB_RESNET_MAP.expect_lookup_prefab(&prefab);
+
+        let resnet_config = prefab.to_config().to_structure();
+        println!("{:#?}", resnet_config);
+        let model: ResNet<B> = resnet_config.init(&device);
+
+        let path = prefab
+            .expect_lookup_pretrained_weights(pretrained)
+            .fetch_weights(&DiskCacheConfig::default())?;
+
+        /*
+        let store = PytorchStore::from_file(path.clone());
+        //         println!("{:#?}", store.keys());
+
+        let mut store = store
+            .skip_enum_variants(true)
+            .with_key_remapping(r"bn(\d+)\.weight", "bn$1.gamma")
+            .with_key_remapping(r"bn(\d+)\.bias", "bn$1.beta")
+            .with_key_remapping(r"^conv1\.", "input_conv_norm.conv.")
+            .with_key_remapping(r"^bn1\.", "input_conv_norm.norm.")
+            .with_key_remapping(r"bn(\d+)\.", "cna$1.norm.")
+            .with_key_remapping(r"conv(\d+)\.", "cna$1.conv.")
+            .with_key_remapping(r"downsample\.0\.", "downsample.conv.")
+            .with_key_remapping(r"downsample\.1\.", "downsample.norm.")
+            .with_key_remapping(r"fc\.", "output_fc.")
+            .with_key_remapping(r"layer(\d+)\.", "layers.$1.blocks.");
+
+        println!("{:#?}", store.keys());
+
+        model.load_from(&mut store)?;
+
+         */
+        let _model: ResNet<B> = model.load_pytorch_weights(path.clone())?;
+
+        Ok(())
+    }
+    #[test]
+    fn test_load_pytorch_prefab() -> anyhow::Result<()> {
+        type B = PerfTestBackend;
+        let prefab = "resnet18";
+        let pretrained = "tv_in1k";
+        test_load_pytorch::<B>(&prefab, &pretrained)
+    }
+
+    #[test]
+    #[cfg(feature = "cuda")]
+    fn test_load_pytorch_prefab_cuda() -> anyhow::Result<()> {
+        type B = burn::backend::Cuda;
+        let prefab = "resnet34";
+        let pretrained = "tv_in1k";
+        test_load_pytorch::<B>(&prefab, &pretrained)
+    }
+
+    #[test]
+    #[cfg(feature = "cuda")]
+    fn test_load_pytorch_prefab_cuda_bf16() -> anyhow::Result<()> {
+        type B = burn::backend::Cuda<burn::tensor::bf16>;
+        let prefab = "resnet34";
+        let pretrained = "tv_in1k";
+        test_load_pytorch::<B>(&prefab, &pretrained)
+    }
 
     #[test]
     fn test_to_layers_34_basic() {
@@ -499,7 +630,7 @@ mod tests {
 
     #[test]
     fn test_to_layers_50_bottleneck() {
-        type B = Wgpu;
+        type B = PerfTestBackend;
         let device = Default::default();
 
         let cfg = ResNetContractConfig::new(RESNET50_BLOCKS.to_vec(), 1000).with_bottleneck(true);

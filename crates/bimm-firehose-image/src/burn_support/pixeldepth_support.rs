@@ -1,6 +1,9 @@
 //! Pixel depth conversion functions.
 use burn::data::dataset::vision::PixelDepth;
-use image::{ColorType, DynamicImage};
+use image::{
+    ColorType,
+    DynamicImage,
+};
 
 /// Converts a `PixelDepth` to a `u8`.
 pub fn pixel_depth_to_u8(p: PixelDepth) -> u8 {

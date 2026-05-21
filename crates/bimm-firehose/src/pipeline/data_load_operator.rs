@@ -1,5 +1,6 @@
-use crate::pipeline::DataLoadMetaDataItem;
 use std::fmt::Debug;
+
+use crate::pipeline::DataLoadMetaDataItem;
 
 /// Support super-trait for loadable data types.
 ///
@@ -10,7 +11,8 @@ use std::fmt::Debug;
 /// - `Send` and `Sync`: the data item must be thread-safe.
 pub trait DataLoadDataItem: Debug + Clone + Send + Sync {}
 
-/// Blanket implementation of `DataLoadDataItem` for any type that meets the requirements.
+/// Blanket implementation of `DataLoadDataItem` for any type that meets the
+/// requirements.
 impl<T> DataLoadDataItem for T where T: Debug + Clone + Send + Sync {}
 
 /// Trait for data load operators.
@@ -23,7 +25,8 @@ where
     ///
     /// # Arguments
     ///
-    /// * `meta` - Metadata item that contains information needed to load the data.
+    /// * `meta` - Metadata item that contains information needed to load the
+    ///   data.
     ///
     /// # Returns
     ///
@@ -46,7 +49,8 @@ where
     /// The function that defines how to load the data.
     func: F,
 
-    /// Phantom data to associate the operator with specific metadata and data types.
+    /// Phantom data to associate the operator with specific metadata and data
+    /// types.
     phantom: std::marker::PhantomData<(M, T)>,
 }
 

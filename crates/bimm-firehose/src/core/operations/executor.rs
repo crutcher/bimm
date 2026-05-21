@@ -1,9 +1,16 @@
-use crate::core::operations::environment::FirehoseOperatorEnvironment;
-use crate::core::operations::operator::OperationRunner;
-use crate::core::rows::FirehoseRowBatch;
-use crate::core::schema::FirehoseTableSchema;
-use std::fmt::Debug;
-use std::sync::Arc;
+use std::{
+    fmt::Debug,
+    sync::Arc,
+};
+
+use crate::core::{
+    operations::{
+        environment::FirehoseOperatorEnvironment,
+        operator::OperationRunner,
+    },
+    rows::FirehoseRowBatch,
+    schema::FirehoseTableSchema,
+};
 
 /// Trait for executing a batch of operations on a `RowBatch`.
 pub trait FirehoseBatchExecutor: Debug + Send + Sync {
@@ -37,7 +44,8 @@ pub struct SequentialBatchExecutor {
 }
 
 impl SequentialBatchExecutor {
-    /// Creates a new `DefaultBatchExecutor` with the given operator environment.
+    /// Creates a new `DefaultBatchExecutor` with the given operator
+    /// environment.
     pub fn new(
         schema: Arc<FirehoseTableSchema>,
         environment: Arc<dyn FirehoseOperatorEnvironment>,

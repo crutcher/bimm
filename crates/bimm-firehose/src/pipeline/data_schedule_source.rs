@@ -1,5 +1,9 @@
-use crate::pipeline::{DataLoadMetaDataItem, DataLoadSchedule};
 use std::fmt::Debug;
+
+use crate::pipeline::{
+    DataLoadMetaDataItem,
+    DataLoadSchedule,
+};
 
 /// Data-pipeline trait for schedule sources.
 pub trait DataScheduleSource<M>: Debug
@@ -21,7 +25,8 @@ where
     }
 }
 
-/// Blanket implementation of `DataScheduleSourceExt` for any type that meets the requirements.
+/// Blanket implementation of `DataScheduleSourceExt` for any type that meets
+/// the requirements.
 impl<M, S> DataScheduleSourceExt<M> for S
 where
     M: DataLoadMetaDataItem,
@@ -66,7 +71,8 @@ where
     }
 }
 
-/// Demo of a simple filter source that filters items based on a predicate function.
+/// Demo of a simple filter source that filters items based on a predicate
+/// function.
 pub struct SimpleFilterSource<M>
 where
     M: DataLoadMetaDataItem,
@@ -96,7 +102,8 @@ impl<M> SimpleFilterSource<M>
 where
     M: DataLoadMetaDataItem,
 {
-    /// Creates a new `SimpleFilterSource` with the provided inner source and predicate.
+    /// Creates a new `SimpleFilterSource` with the provided inner source and
+    /// predicate.
     ///
     /// # Arguments
     ///
@@ -121,7 +128,8 @@ where
     }
 }
 
-/// A wrapper that maps the output of a schedule source to a different type using a mapping function.
+/// A wrapper that maps the output of a schedule source to a different type
+/// using a mapping function.
 pub struct ScheduleSourceMappingWrapper<A, B, F>
 where
     A: DataLoadMetaDataItem,
@@ -157,7 +165,8 @@ where
     B: DataLoadMetaDataItem,
     F: Fn(&DataLoadSchedule<A>) -> anyhow::Result<DataLoadSchedule<B>> + Send + Sync + 'static,
 {
-    /// Creates a new `ScheduleSourceMappingWrapper` with the provided inner source and mapping function.
+    /// Creates a new `ScheduleSourceMappingWrapper` with the provided inner
+    /// source and mapping function.
     ///
     /// # Arguments
     ///

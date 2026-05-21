@@ -1,12 +1,24 @@
 //! Image to tensor data conversion functions.
-use crate::burn_support::{IMAGE_TO_TENSOR_DATA, pixeldepth_support};
-use bimm_firehose::core::operations::operator::FirehoseOperator;
-use bimm_firehose::core::operations::planner::OperationPlan;
-use bimm_firehose::core::rows::FirehoseRowTransaction;
-use bimm_firehose::core::{FirehoseRowReader, FirehoseRowWriter};
+use bimm_firehose::core::{
+    FirehoseRowReader,
+    FirehoseRowWriter,
+    operations::{
+        operator::FirehoseOperator,
+        planner::OperationPlan,
+    },
+    rows::FirehoseRowTransaction,
+};
 use burn::prelude::TensorData;
 use image::DynamicImage;
-use serde::{Deserialize, Serialize};
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
+use crate::burn_support::{
+    IMAGE_TO_TENSOR_DATA,
+    pixeldepth_support,
+};
 
 /// The `ImageToTensorData` operator.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -24,7 +36,8 @@ impl ImageToTensorData {
         ImageToTensorData {}
     }
 
-    /// Converts this configuration to an `OperationPlanner` for the `ImgToTensor` operator.
+    /// Converts this configuration to an `OperationPlanner` for the
+    /// `ImgToTensor` operator.
     ///
     /// # Arguments
     ///

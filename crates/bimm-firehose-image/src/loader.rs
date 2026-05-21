@@ -1,16 +1,37 @@
-/// # # [`Image`] loader operators.
-use crate::{ImageShape, colortype_support};
 use anyhow::Context;
-use bimm_firehose::core::operations::factory::SimpleConfigOperatorFactory;
-use bimm_firehose::core::operations::operator::FirehoseOperator;
-use bimm_firehose::core::operations::planner::OperationPlan;
-use bimm_firehose::core::operations::signature::{FirehoseOperatorSignature, ParameterSpec};
-use bimm_firehose::core::rows::FirehoseRowTransaction;
-use bimm_firehose::core::{FirehoseRowReader, FirehoseRowWriter, FirehoseValue};
-use bimm_firehose::define_firehose_operator;
-pub use image::imageops::FilterType;
-pub use image::{ColorType, DynamicImage};
-use serde::{Deserialize, Serialize};
+use bimm_firehose::{
+    core::{
+        FirehoseRowReader,
+        FirehoseRowWriter,
+        FirehoseValue,
+        operations::{
+            factory::SimpleConfigOperatorFactory,
+            operator::FirehoseOperator,
+            planner::OperationPlan,
+            signature::{
+                FirehoseOperatorSignature,
+                ParameterSpec,
+            },
+        },
+        rows::FirehoseRowTransaction,
+    },
+    define_firehose_operator,
+};
+pub use image::{
+    ColorType,
+    DynamicImage,
+    imageops::FilterType,
+};
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
+/// # # [`Image`] loader operators.
+use crate::{
+    ImageShape,
+    colortype_support,
+};
 
 define_firehose_operator!(
     LOAD_IMAGE,
@@ -46,7 +67,8 @@ impl ResizeSpec {
         }
     }
 
-    /// Extends the `ResizeSpec` with a new shape, keeping the existing filter type.
+    /// Extends the `ResizeSpec` with a new shape, keeping the existing filter
+    /// type.
     pub fn with_filter(
         self,
         filter: FilterType,
@@ -85,7 +107,8 @@ impl Default for ImageLoader {
 }
 
 impl ImageLoader {
-    /// Creates a new `ImageLoader` with optional resize and recolor specifications.
+    /// Creates a new `ImageLoader` with optional resize and recolor
+    /// specifications.
     pub fn new() -> Self {
         ImageLoader {
             resize: None,
@@ -135,8 +158,10 @@ impl ImageLoader {
     ///
     /// # Arguments
     ///
-    /// * `path_column`: The name of the input column containing the image file paths.
-    /// * `image_column`: The name of the output column where the loaded images will be stored.
+    /// * `path_column`: The name of the input column containing the image file
+    ///   paths.
+    /// * `image_column`: The name of the output column where the loaded images
+    ///   will be stored.
     pub fn to_plan(
         &self,
         path_column: &str,
@@ -178,20 +203,33 @@ impl FirehoseOperator for ImageLoader {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use crate::test_util::{assert_image_close, generate_gradient_pattern};
-    use anyhow::Context;
-    use bimm_firehose::core::operations::executor::{
-        FirehoseBatchExecutor, SequentialBatchExecutor,
-    };
-    use bimm_firehose::core::schema::{ColumnSchema, FirehoseTableSchema};
-    use bimm_firehose::core::{
-        FirehoseRowBatch, FirehoseRowReader, FirehoseRowWriter, FirehoseValue,
-    };
-    use bimm_firehose::ops::init_default_operator_environment;
-    use image::DynamicImage;
     use std::sync::Arc;
+
+    use anyhow::Context;
+    use bimm_firehose::{
+        core::{
+            FirehoseRowBatch,
+            FirehoseRowReader,
+            FirehoseRowWriter,
+            FirehoseValue,
+            operations::executor::{
+                FirehoseBatchExecutor,
+                SequentialBatchExecutor,
+            },
+            schema::{
+                ColumnSchema,
+                FirehoseTableSchema,
+            },
+        },
+        ops::init_default_operator_environment,
+    };
+    use image::DynamicImage;
+
+    use super::*;
+    use crate::test_util::{
+        assert_image_close,
+        generate_gradient_pattern,
+    };
 
     #[test]
     fn test_image_loader() -> anyhow::Result<()> {

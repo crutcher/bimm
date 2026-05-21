@@ -1,12 +1,22 @@
-use bimm::layers::drop::drop_block::{DropBlockOptions, drop_block_2d};
-use bimm::utility::burn::noise::NoiseConfig;
-use burn::backend::NdArray;
-use burn::prelude::Tensor;
-use criterion::{Criterion, criterion_group, criterion_main};
 use std::hint::black_box;
 
+use bunsen::{
+    blocks::images::drop::drop_block::{
+        DropBlockOptions,
+        drop_block_2d,
+    },
+    ops::noise::NoiseConfig,
+    support::testing::PerfTestBackend,
+};
+use burn::prelude::Tensor;
+use criterion::{
+    Criterion,
+    criterion_group,
+    criterion_main,
+};
+
 fn bench_drop_block_10x32x32x3_7_normalise(c: &mut Criterion) {
-    type B = NdArray<f32>;
+    type B = PerfTestBackend;
     let device = Default::default();
 
     let batch_size = 10;

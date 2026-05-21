@@ -5,38 +5,103 @@ extern crate core;
 mod data;
 mod dataset;
 
-use crate::data::{ClassificationBatch, ClassificationBatcher};
-use crate::dataset::{CLASSES, PlanetLoader, download};
-use bimm::cache::disk::DiskCacheConfig;
-use bimm::models::resnet::{PREFAB_RESNET_MAP, ResNet};
-use burn::config::Config;
-use burn::data::dataloader::{DataLoaderBuilder, Dataset};
-use burn::data::dataset::transform::ShuffledDataset;
-use burn::data::dataset::vision::ImageFolderDataset;
-use burn::lr_scheduler::composed::{ComposedLrSchedulerConfig, SchedulerReduction};
-use burn::lr_scheduler::cosine::CosineAnnealingLrSchedulerConfig;
-use burn::lr_scheduler::linear::LinearLrSchedulerConfig;
-use burn::module::Module;
-use burn::nn::activation::ActivationConfig;
-use burn::nn::loss::BinaryCrossEntropyLossConfig;
-use burn::nn::{LeakyReluConfig, PReluConfig};
-use burn::optim::AdamWConfig;
-use burn::prelude::{Int, Tensor};
-use burn::record::CompactRecorder;
-use burn::tensor::backend::{AutodiffBackend, Backend};
-use burn::train::metric::store::{Aggregate, Direction, Split};
-use burn::train::metric::{HammingScore, LearningRateMetric, LossMetric, MetricDefinition};
-use burn::train::renderer::{
-    EvaluationName, EvaluationProgress, MetricState, MetricsRenderer, MetricsRendererEvaluation,
-    MetricsRendererTraining, TrainingProgress,
-};
-use burn::train::{
-    InferenceStep, Learner, MetricEarlyStoppingStrategy, MultiLabelClassificationOutput,
-    StoppingCondition, SupervisedTraining, TrainOutput, TrainStep,
-};
-use clap::{Parser, ValueEnum};
 use core::clone::Clone;
 use std::time::Instant;
+
+use anyhow::Context;
+use bimm::{
+    cache::DiskCacheConfig,
+    compat::type_mapper::DTypeMapper,
+    models::resnet::{
+        PREFAB_RESNET_MAP,
+        ResNet,
+    },
+};
+use burn::{
+    config::Config,
+    data::{
+        dataloader::{
+            DataLoaderBuilder,
+            Dataset,
+        },
+        dataset::{
+            transform::ShuffledDataset,
+            vision::ImageFolderDataset,
+        },
+    },
+    lr_scheduler::{
+        composed::{
+            ComposedLrSchedulerConfig,
+            SchedulerReduction,
+        },
+        cosine::CosineAnnealingLrSchedulerConfig,
+        linear::LinearLrSchedulerConfig,
+    },
+    module::Module,
+    nn::{
+        LeakyReluConfig,
+        PReluConfig,
+        activation::ActivationConfig,
+        loss::BinaryCrossEntropyLossConfig,
+    },
+    optim::AdamWConfig,
+    prelude::{
+        Int,
+        Tensor,
+    },
+    record::CompactRecorder,
+    tensor::backend::{
+        AutodiffBackend,
+        Backend,
+    },
+    train::{
+        InferenceStep,
+        Learner,
+        MetricEarlyStoppingStrategy,
+        MultiLabelClassificationOutput,
+        StoppingCondition,
+        SupervisedTraining,
+        TrainOutput,
+        TrainStep,
+        metric::{
+            HammingScore,
+            LearningRateMetric,
+            LossMetric,
+            MetricDefinition,
+            store::{
+                Aggregate,
+                Direction,
+                Split,
+            },
+        },
+        renderer::{
+            EvaluationName,
+            EvaluationProgress,
+            MetricState,
+            MetricsRenderer,
+            MetricsRendererEvaluation,
+            MetricsRendererTraining,
+            ProgressType,
+            TrainingProgress,
+        },
+    },
+};
+use clap::{
+    Parser,
+    ValueEnum,
+};
+
+use crate::{
+    data::{
+        ClassificationBatch,
+        ClassificationBatcher,
+    },
+    dataset::{
+        CLASSES,
+        PlanetLoader,
+        download,
+    },
+};
 /*
 tracel-ai/models reference:
 | Split | Metric                         | Min.     | Epoch    | Max.     | Epoch    |
@@ -49,6 +114,7 @@ tracel-ai/models reference:
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum ReplaceActivationOption {
+    Relu,
     Gelu,
     PRelu,
     LeakyRelu,
@@ -69,12 +135,16 @@ pub struct Args {
     #[arg(long, default_value = "/tmp/resnet_finetune")]
     pub artifact_dir: String,
 
+    /// Use half precision for training.
+    #[arg(long, default_value = "false")]
+    pub half_precision: bool,
+
     /// Batch size for processing
-    #[arg(short, long, default_value_t = 24)]
+    #[arg(short, long, default_value_t = 100)]
     pub batch_size: usize,
 
     /// Grads accumulation size for processing
-    #[arg(short, long, default_value_t = 4)]
+    #[arg(short, long, default_value_t = 8)]
     pub grads_accumulation: usize,
 
     /// Category smoothing factor for training.
@@ -82,7 +152,7 @@ pub struct Args {
     pub smoothing: Option<f32>,
 
     /// Number of workers for data loading.
-    #[arg(long, default_value = "4")]
+    #[arg(long, default_value = "0")]
     pub num_workers: usize,
 
     /// Number of epochs to train the model.
@@ -99,7 +169,7 @@ pub struct Args {
     pub pretrained: String,
 
     /// Replace activation function?
-    #[arg(long, default_value = "gelu")]
+    #[arg(long, default_value = "relu")]
     pub replace_activation: Option<ReplaceActivationOption>,
 
     /// Freeze the body layers during training.
@@ -162,14 +232,39 @@ fn main() -> anyhow::Result<()> {
 
     let _source_tree = download();
 
-    #[cfg(feature = "wgpu")]
-    return train::<burn::backend::Autodiff<burn::backend::Wgpu>>(&args);
-
-    #[cfg(feature = "cuda")]
-    return train::<burn::backend::Autodiff<burn::backend::Cuda>>(&args);
-
-    #[cfg(feature = "metal")]
-    return train::<burn::backend::Autodiff<burn::backend::Metal>>(&args);
+    if args.half_precision {
+        cfg_select! {
+            feature = "cuda" => {
+                type B =burn::backend::Cuda<burn::tensor::bf16>;
+            }
+            feature = "metal" => {
+                type B =burn::backend::Metal<burn::tensor::bf16>;
+            }
+            feature = "wgpu" => {
+                type B = burn::backend::Wgpu<burn::tensor::bf16>;
+            }
+            _ => {
+                type B =burn::backend::Flex;
+            }
+        }
+        train::<burn::backend::Autodiff<B>>(&args)
+    } else {
+        cfg_select! {
+            feature = "cuda" => {
+                type B =burn::backend::Cuda;
+            }
+            feature = "metal" => {
+                type B =burn::backend::Metal;
+            }
+            feature = "wgpu" => {
+                type B = burn::backend::Wgpu;
+            }
+            _ => {
+                type B =burn::backend::Flex;
+            }
+        }
+        train::<burn::backend::Autodiff<B>>(&args)
+    }
 }
 
 fn ensure_artifact_dir(artifact_dir: &str) -> anyhow::Result<()> {
@@ -232,6 +327,9 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
 
     if let Some(option) = &args.replace_activation {
         match option {
+            ReplaceActivationOption::Relu => {
+                resnet_config = resnet_config.with_activation(ActivationConfig::Relu);
+            }
             ReplaceActivationOption::Gelu => {
                 resnet_config = resnet_config.with_activation(ActivationConfig::Gelu);
             }
@@ -246,12 +344,14 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         }
     }
 
-    let mut model: ResNet<B> = resnet_config
-        .clone()
-        .to_structure()
-        .init(&device)
+    let model: ResNet<B> = resnet_config.clone().to_structure().init(&device);
+
+    let old_float_type = model.output_fc.weight.dtype();
+
+    let mut model: ResNet<B> = model
         .load_pytorch_weights(weights)
-        .expect("Failed to load pretrained weights")
+        .context("Failed to load pretrained weights")?
+        .map(&mut DTypeMapper::new(old_float_type))
         .with_classes(CLASSES.len())
         .with_stochastic_drop_block(args.drop_block_prob)
         .with_stochastic_path_depth(args.stochastic_depth_prob);
@@ -292,7 +392,7 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     let batcher_valid = ClassificationBatcher::<B::InnerBackend>::new(device.clone());
 
     let (train, valid) =
-        ImageFolderDataset::planet_train_val_split(args.train_percentage, args.seed).unwrap();
+        ImageFolderDataset::planet_train_val_split(args.train_percentage, args.seed)?;
 
     let train_set_size = train.len();
 
@@ -307,16 +407,16 @@ pub fn train<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .num_workers(args.num_workers)
         .build(valid);
 
-    let iters_per_epoch = train_set_size / args.batch_size;
+    let iters_per_epoch = train_set_size as f64 / args.batch_size as f64;
     let lr_scheduler = ComposedLrSchedulerConfig::new()
         .linear(LinearLrSchedulerConfig::new(
             1e-7,
             1.0,
-            iters_per_epoch * args.warmup_epochs,
+            (iters_per_epoch * args.warmup_epochs as f64) as usize,
         ))
         .cosine(CosineAnnealingLrSchedulerConfig::new(
             args.learning_rate,
-            iters_per_epoch * args.num_epochs,
+            (iters_per_epoch * args.num_epochs as f64) as usize,
         ))
         .with_reduction(SchedulerReduction::Prod)
         .init()
@@ -427,6 +527,7 @@ impl MetricsRendererTraining for CustomRenderer {
     fn render_train(
         &mut self,
         item: TrainingProgress,
+        _: Vec<ProgressType>,
     ) {
         dbg!(item);
     }
@@ -434,6 +535,7 @@ impl MetricsRendererTraining for CustomRenderer {
     fn render_valid(
         &mut self,
         item: TrainingProgress,
+        _: Vec<ProgressType>,
     ) {
         dbg!(item);
     }
@@ -462,6 +564,7 @@ impl MetricsRendererEvaluation for CustomRenderer {
     fn render_test(
         &mut self,
         item: EvaluationProgress,
+        _: Vec<ProgressType>,
     ) {
         dbg!(item);
     }
@@ -488,11 +591,12 @@ impl<B: Backend> MultiLabelClassification<B> for Host<B> {
         images: Tensor<B, 4>,
         targets: Tensor<B, 2, Int>,
     ) -> MultiLabelClassificationOutput<B> {
+        let device = images.device();
         let output = self.resnet.forward(images);
 
         let mut loss_cfg = BinaryCrossEntropyLossConfig::new().with_logits(true);
 
-        if B::ad_enabled() {
+        if B::ad_enabled(&device) {
             loss_cfg = loss_cfg.with_smoothing(self.smoothing);
         }
 

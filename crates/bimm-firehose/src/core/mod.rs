@@ -12,8 +12,12 @@ pub mod values;
 
 // TODO: Work out what the `$crate::core::*` re-exports should be.
 pub use rows::{
-    FirehoseBatchTransaction, FirehoseRow, FirehoseRowBatch, FirehoseRowReader,
-    FirehoseRowTransaction, FirehoseRowWriter,
+    FirehoseBatchTransaction,
+    FirehoseRow,
+    FirehoseRowBatch,
+    FirehoseRowReader,
+    FirehoseRowTransaction,
+    FirehoseRowWriter,
 };
 pub use schema::FirehoseTableSchema;
 pub use values::FirehoseValue;

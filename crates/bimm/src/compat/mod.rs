@@ -4,4 +4,4 @@
 //! module to link against multiple versions of `burn_support`.
 
 pub mod conv_shape;
-pub mod ops;
+pub mod type_mapper;

@@ -9,7 +9,8 @@
 //! * [`ResidualBlockStructureConfig`]
 //!
 //! [`ResidualBlockStructureConfig`] implements [`Config`], and provides an
-//! [`ResidualBlockStructureConfig::init`] constructor pathway to [`ResidualBlock`].
+//! [`ResidualBlockStructureConfig::init`] constructor pathway to
+//! [`ResidualBlock`].
 //!
 //! [`ResidualBlock`] implements [`Module`],
 //! and provides [`ResidualBlock::forward`].
@@ -18,17 +19,38 @@
 //! * [`From<BasicBlock<B>>`](`BasicBlock`),
 //! * [`From<BottleneckBlock<B>>`](`BottleneckBlock`).
 
-use crate::layers::drop::drop_block::DropBlockOptions;
-use crate::models::resnet::basic_block::{BasicBlock, BasicBlockConfig, BasicBlockMeta};
-use crate::models::resnet::bottleneck_block::{
-    BottleneckBlock, BottleneckBlockConfig, BottleneckBlockMeta, BottleneckPolicyConfig,
+use bunsen::{
+    blocks::images::drop::drop_block::DropBlockOptions,
+    support::validators::expect_probability,
 };
-use crate::models::resnet::util::stride_div_output_resolution;
-use crate::utility::probability::expect_probability;
-use burn::nn::BatchNormConfig;
-use burn::nn::activation::ActivationConfig;
-use burn::nn::norm::NormalizationConfig;
-use burn::prelude::{Backend, Config, Module, Tensor};
+use burn::{
+    nn::{
+        BatchNormConfig,
+        activation::ActivationConfig,
+        norm::NormalizationConfig,
+    },
+    prelude::{
+        Backend,
+        Config,
+        Module,
+        Tensor,
+    },
+};
+
+use crate::models::resnet::{
+    basic_block::{
+        BasicBlock,
+        BasicBlockConfig,
+        BasicBlockMeta,
+    },
+    bottleneck_block::{
+        BottleneckBlock,
+        BottleneckBlockConfig,
+        BottleneckBlockMeta,
+        BottleneckPolicyConfig,
+    },
+    util::stride_div_output_resolution,
+};
 
 /// Abstract [`ResidualBlock`] Config.
 #[derive(Config, Debug)]
@@ -100,7 +122,8 @@ impl From<ResidualBlockContractConfig> for ResidualBlockStructureConfig {
 
 /// [`ResidualBlock`] Meta API.
 ///
-/// Defines a shared API for [`ResidualBlock`] and [`ResidualBlockStructureConfig`].
+/// Defines a shared API for [`ResidualBlock`] and
+/// [`ResidualBlockStructureConfig`].
 pub trait ResidualBlockMeta {
     /// The number of input feature planes.
     fn in_planes(&self) -> usize;
@@ -119,8 +142,8 @@ pub trait ResidualBlockMeta {
     ///
     /// # Arguments
     ///
-    /// - `input_resolution`: \
-    ///   ``[in_height=out_height*stride, in_width=out_width*stride]``.
+    /// - `input_resolution`: \ ``[in_height=out_height*stride,
+    ///   in_width=out_width*stride]``.
     ///
     /// # Returns
     ///
@@ -291,7 +314,8 @@ impl<B: Backend> ResidualBlock<B> {
     ///
     /// # Arguments
     ///
-    /// - `input`: ``[batch, in_planes, in_height=out_height*stride, in_width=out_width*stride]``.
+    /// - `input`: ``[batch, in_planes, in_height=out_height*stride,
+    ///   in_width=out_width*stride]``.
     ///
     /// # Returns
     ///
@@ -332,9 +356,12 @@ impl<B: Backend> ResidualBlock<B> {
 
 #[cfg(test)]
 mod tests {
+    use bunsen::{
+        contracts::assert_shape_contract,
+        support::testing::PerfTestBackend,
+    };
+
     use super::*;
-    use bimm_contracts::assert_shape_contract;
-    use burn::backend::NdArray;
 
     #[test]
     fn test_residual_block_config() {
@@ -366,7 +393,7 @@ mod tests {
 
     #[test]
     fn test_residual_block_basic_block() {
-        type B = NdArray;
+        type B = PerfTestBackend;
         let device = Default::default();
 
         let batch_size = 2;
@@ -405,8 +432,7 @@ mod tests {
 
     #[test]
     fn test_residual_block_bottleneck_block() {
-        use burn::backend::Wgpu;
-        type B = Wgpu;
+        type B = PerfTestBackend;
         let device = Default::default();
 
         let batch_size = 2;

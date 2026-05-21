@@ -1,4 +1,7 @@
-use serde::{Deserialize, Serialize};
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 pub mod augmentation;
 pub mod burn_support;
@@ -20,31 +23,53 @@ pub use image::ColorType;
 
 #[cfg(test)]
 mod tests {
-    use crate::burn_support::ImageToTensorData;
-    use crate::burn_support::image_to_f32_tensor;
-    use crate::loader::{ImageLoader, ResizeSpec};
-    use crate::test_util::assert_image_close;
-    use crate::{ImageShape, test_util};
-
-    use bimm_firehose::core::FirehoseValue;
-    use bimm_firehose::core::operations::executor::FirehoseBatchExecutor;
-    use bimm_firehose::core::operations::executor::SequentialBatchExecutor;
-    use bimm_firehose::core::rows::{FirehoseRowReader, FirehoseRowWriter};
-    use bimm_firehose::core::schema::ColumnSchema;
-    use bimm_firehose::core::{FirehoseRowBatch, FirehoseTableSchema};
-    use bimm_firehose::ops::init_default_operator_environment;
-    use burn::backend::NdArray;
-    use burn::prelude::TensorData;
-    use image::imageops::FilterType;
-    use image::{ColorType, DynamicImage};
-    use indoc::indoc;
     use std::sync::Arc;
+
+    use bimm_firehose::{
+        core::{
+            FirehoseRowBatch,
+            FirehoseTableSchema,
+            FirehoseValue,
+            operations::executor::{
+                FirehoseBatchExecutor,
+                SequentialBatchExecutor,
+            },
+            rows::{
+                FirehoseRowReader,
+                FirehoseRowWriter,
+            },
+            schema::ColumnSchema,
+        },
+        ops::init_default_operator_environment,
+    };
+    use bunsen::support::testing::PerfTestBackend;
+    use burn::prelude::TensorData;
+    use image::{
+        ColorType,
+        DynamicImage,
+        imageops::FilterType,
+    };
+    use indoc::indoc;
+
+    use crate::{
+        ImageShape,
+        burn_support::{
+            ImageToTensorData,
+            image_to_f32_tensor,
+        },
+        loader::{
+            ImageLoader,
+            ResizeSpec,
+        },
+        test_util,
+        test_util::assert_image_close,
+    };
 
     #[test]
     fn test_example() -> anyhow::Result<()> {
         let temp_dir = tempfile::tempdir().unwrap();
 
-        type B = NdArray;
+        type B = PerfTestBackend;
 
         let device = Default::default();
 

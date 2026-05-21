@@ -1,19 +1,40 @@
 //! # Image augmentation operators.
-use anyhow::Context;
-use bimm_firehose::core::operations::factory::{
-    FirehoseOperatorFactory, FirehoseOperatorInitContext,
+use std::{
+    fmt::Debug,
+    sync::Arc,
 };
-use bimm_firehose::core::operations::operator::FirehoseOperator;
-use bimm_firehose::core::operations::planner::OperationPlan;
-use bimm_firehose::core::operations::signature::{FirehoseOperatorSignature, ParameterSpec};
-use bimm_firehose::core::{FirehoseRowReader, FirehoseRowTransaction, FirehoseRowWriter};
-use bimm_firehose::define_firehose_operator;
-pub use image::imageops::FilterType;
-pub use image::{ColorType, DynamicImage};
+
+use anyhow::Context;
+use bimm_firehose::{
+    core::{
+        FirehoseRowReader,
+        FirehoseRowTransaction,
+        FirehoseRowWriter,
+        operations::{
+            factory::{
+                FirehoseOperatorFactory,
+                FirehoseOperatorInitContext,
+            },
+            operator::FirehoseOperator,
+            planner::OperationPlan,
+            signature::{
+                FirehoseOperatorSignature,
+                ParameterSpec,
+            },
+        },
+    },
+    define_firehose_operator,
+};
+pub use image::{
+    ColorType,
+    DynamicImage,
+    imageops::FilterType,
+};
 use rand::SeedableRng;
-use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
-use std::sync::Arc;
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 pub mod control;
 
@@ -33,8 +54,8 @@ macro_rules! define_image_aug_plugin {
 ///
 /// # Arguments
 ///
-/// - `name`: the local reference name of the plugin ID;
-///   used by `define_image_aug_plugin!()`.
+/// - `name`: the local reference name of the plugin ID; used by
+///   `define_image_aug_plugin!()`.
 /// - `builder`: the plugin builder operation.
 #[macro_export]
 macro_rules! register_image_aug_plugin {
@@ -194,7 +215,8 @@ impl AugmentImageConfig {
     ///
     /// # Arguments
     ///
-    /// * `seed_column`: The name of the input column containing the augmentation seed.
+    /// * `seed_column`: The name of the input column containing the
+    ///   augmentation seed.
     /// * `source_column`: The name of the input image column.
     /// * `result_column`: The name of the output image column.
     pub fn to_plan(
@@ -295,7 +317,8 @@ impl AugmentImageOperation {
     ///
     /// # Arguments
     ///
-    /// * `seed_column`: The name of the input column containing the augmentation seed.
+    /// * `seed_column`: The name of the input column containing the
+    ///   augmentation seed.
     /// * `source_column`: The name of the input image column.
     /// * `result_column`: The name of the output image column.
     pub fn to_plan(
@@ -334,10 +357,13 @@ impl FirehoseOperator for AugmentImageOperation {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::augmentation::control::noop::NOOP_STAGE;
-    use crate::augmentation::control::sequence::STAGE_SEQUENCE;
     use serde_json::json;
+
+    use super::*;
+    use crate::augmentation::control::{
+        noop::NOOP_STAGE,
+        sequence::STAGE_SEQUENCE,
+    };
 
     #[test]
     fn test_plugin_builder() -> anyhow::Result<()> {

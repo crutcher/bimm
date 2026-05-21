@@ -1,10 +1,23 @@
 //! # Pretrained `ResNet` Models and Configs
 
-use crate::cache::prefabs::{PreFabConfig, StaticPreFabConfig, StaticPreFabMap};
-use crate::cache::weights::{StaticPretrainedWeightsDescriptor, StaticPretrainedWeightsMap};
-use crate::models::resnet::{ResNetContractConfig, ResNetStructureConfig};
-use alloc::sync::Arc;
-use alloc::vec;
+use alloc::{
+    sync::Arc,
+    vec,
+};
+
+use crate::{
+    cache::{
+        PreFabConfig,
+        StaticPreFabConfig,
+        StaticPreFabMap,
+        StaticPretrainedWeightsDescriptor,
+        StaticPretrainedWeightsMap,
+    },
+    models::resnet::{
+        ResNetContractConfig,
+        ResNetStructureConfig,
+    },
+};
 
 impl PreFabConfig<ResNetContractConfig> {
     /// Convert to a prefab for [`ResNetStructureConfig`].

@@ -1,10 +1,31 @@
-use crate::core::operations::environment::{BuildPlanContext, FirehoseOperatorEnvironment};
-use crate::core::operations::signature::FirehoseOperatorSignature;
-use crate::core::rows::{FirehoseBatchTransaction, FirehoseRowBatch, FirehoseRowTransaction};
-use crate::core::schema::{BuildPlan, FirehoseTableSchema};
-use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
-use std::sync::Arc;
+use std::{
+    fmt::Debug,
+    sync::Arc,
+};
+
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
+use crate::core::{
+    operations::{
+        environment::{
+            BuildPlanContext,
+            FirehoseOperatorEnvironment,
+        },
+        signature::FirehoseOperatorSignature,
+    },
+    rows::{
+        FirehoseBatchTransaction,
+        FirehoseRowBatch,
+        FirehoseRowTransaction,
+    },
+    schema::{
+        BuildPlan,
+        FirehoseTableSchema,
+    },
+};
 
 /// Scheduling metadata for an operator.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -27,7 +48,8 @@ pub trait FirehoseOperator: 'static + Send + Sync + Debug {
     ///
     /// # Returns
     ///
-    /// An `anyhow::Result<()>` indicating success or containing an error if the operation fails.
+    /// An `anyhow::Result<()>` indicating success or containing an error if the
+    /// operation fails.
     #[must_use]
     fn apply_to_batch(
         &self,
@@ -44,7 +66,8 @@ pub trait FirehoseOperator: 'static + Send + Sync + Debug {
     ///
     /// # Returns
     ///
-    /// An `anyhow::Result<()>` indicating success or containing an error if the operation fails.
+    /// An `anyhow::Result<()>` indicating success or containing an error if the
+    /// operation fails.
     #[must_use]
     fn apply_to_row(
         &self,
@@ -52,7 +75,8 @@ pub trait FirehoseOperator: 'static + Send + Sync + Debug {
     ) -> anyhow::Result<()>;
 }
 
-/// Represents a schema + instantiated column operator for a particular build plan.
+/// Represents a schema + instantiated column operator for a particular build
+/// plan.
 pub struct OperationRunner {
     /// The table schema that this operator is bound to.
     pub table_schema: Arc<FirehoseTableSchema>,
@@ -87,17 +111,21 @@ impl Debug for OperationRunner {
 }
 
 impl OperationRunner {
-    /// Create a new `BoundPlanBuilder` by binding a `BuildPlan` to a `BimmTableSchema`.
+    /// Create a new `BoundPlanBuilder` by binding a `BuildPlan` to a
+    /// `BimmTableSchema`.
     ///
     /// # Arguments
     ///
     /// * `table_schema` - The schema of the table to which this plan is bound.
-    /// * `build_plan` - The build plan that describes the operator and its inputs/outputs.
-    /// * `env` - An environment that can create the operator based on the build plan.
+    /// * `build_plan` - The build plan that describes the operator and its
+    ///   inputs/outputs.
+    /// * `env` - An environment that can create the operator based on the build
+    ///   plan.
     ///
     /// # Returns
     ///
-    /// A result containing a `BoundPlanBuilder` if successful, or an error message if the binding fails.
+    /// A result containing a `BoundPlanBuilder` if successful, or an error
+    /// message if the binding fails.
     #[must_use]
     pub fn new_for_plan(
         table_schema: Arc<FirehoseTableSchema>,
@@ -134,7 +162,8 @@ impl OperationRunner {
     ///
     /// # Arguments
     ///
-    /// * `rows` - A mutable slice of `BimmRow` instances that will be processed by the operator.
+    /// * `rows` - A mutable slice of `BimmRow` instances that will be processed
+    ///   by the operator.
     ///
     /// # Returns
     ///

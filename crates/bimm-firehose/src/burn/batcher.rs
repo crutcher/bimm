@@ -1,9 +1,15 @@
-use crate::core::FirehoseRowBatch;
-use crate::core::operations::executor::FirehoseBatchExecutor;
-use anyhow::Context;
-use burn::data::dataloader::batcher::Batcher;
-use burn::prelude::Backend;
 use std::sync::Arc;
+
+use anyhow::Context;
+use burn::{
+    data::dataloader::batcher::Batcher,
+    prelude::Backend,
+};
+
+use crate::core::{
+    FirehoseRowBatch,
+    operations::executor::FirehoseBatchExecutor,
+};
 
 /// Input Adapter for `HackyBatcher`.
 pub trait BatcherInputAdapter<I>: Send + Sync
@@ -54,7 +60,8 @@ where
     I: Send + Sync + Clone + std::fmt::Debug + 'static,
     O: Send + Clone + std::fmt::Debug + 'static,
 {
-    /// Creates a new `HackyBatcher` with the given executor, input adapter, and output adapter.
+    /// Creates a new `HackyBatcher` with the given executor, input adapter, and
+    /// output adapter.
     pub fn new(
         executor: Arc<dyn FirehoseBatchExecutor>,
         input_adapter: Arc<dyn BatcherInputAdapter<I>>,

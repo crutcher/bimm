@@ -1,14 +1,33 @@
-use crate::core::operations::factory::{FirehoseOperatorFactory, FirehoseOperatorInitContext};
-use crate::core::operations::operator::FirehoseOperator;
-use crate::core::operations::planner::OperationPlan;
-use crate::core::operations::signature::FirehoseOperatorSignature;
-use crate::core::schema::{BuildPlan, DataTypeDescription, FirehoseTableSchema};
-use anyhow::{Context, bail};
-use std::collections::BTreeMap;
-use std::fmt::Debug;
-use std::sync::Arc;
+use std::{
+    collections::BTreeMap,
+    fmt::Debug,
+    sync::Arc,
+};
 
-/// `OpEnvironment` is a trait that provides access to a collection of operator bindings.
+use anyhow::{
+    Context,
+    bail,
+};
+
+use crate::core::{
+    operations::{
+        factory::{
+            FirehoseOperatorFactory,
+            FirehoseOperatorInitContext,
+        },
+        operator::FirehoseOperator,
+        planner::OperationPlan,
+        signature::FirehoseOperatorSignature,
+    },
+    schema::{
+        BuildPlan,
+        DataTypeDescription,
+        FirehoseTableSchema,
+    },
+};
+
+/// `OpEnvironment` is a trait that provides access to a collection of operator
+/// bindings.
 pub trait FirehoseOperatorEnvironment: Debug + Send + Sync {
     /// Returns a reference to the map of operator bindings.
     // TODO: This should be an iterator.
@@ -24,7 +43,8 @@ pub trait FirehoseOperatorEnvironment: Debug + Send + Sync {
     ///
     /// # Returns
     ///
-    /// An `anyhow::Result<Arc<dyn FirehoseOperatorFactory>>` containing the operator factory.
+    /// An `anyhow::Result<Arc<dyn FirehoseOperatorFactory>>` containing the
+    /// operator factory.
     fn lookup_operator_factory(
         &self,
         operator_id: &str,
@@ -43,7 +63,8 @@ pub trait FirehoseOperatorEnvironment: Debug + Send + Sync {
     ///
     /// # Arguments
     ///
-    /// * `context` - The context containing the build plan and input/output types.
+    /// * `context` - The context containing the build plan and input/output
+    ///   types.
     ///
     /// # Returns
     ///
@@ -59,11 +80,13 @@ pub trait FirehoseOperatorEnvironment: Debug + Send + Sync {
     ///
     /// # Arguments
     ///
-    /// * `plan_context` - The context containing the build plan and input/output types.
+    /// * `plan_context` - The context containing the build plan and
+    ///   input/output types.
     ///
     /// # Returns
     ///
-    /// An `anyhow::Result<Box<dyn FirehoseOperator>>` containing the initialized operator.
+    /// An `anyhow::Result<Box<dyn FirehoseOperator>>` containing the
+    /// initialized operator.
     fn init_operator(
         &self,
         plan_context: BuildPlanContext,
@@ -84,11 +107,13 @@ pub trait FirehoseOperatorEnvironment: Debug + Send + Sync {
     /// # Arguments
     ///
     /// * `schema` - A mutable reference to the `TableSchema` to be extended.
-    /// * `planner` - An `OperationPlanner` that contains the details of the operation to be planned.
+    /// * `planner` - An `OperationPlanner` that contains the details of the
+    ///   operation to be planned.
     ///
     /// # Returns
     ///
-    /// An `anyhow::Result<BuildPlan>` containing the build plan for the operation.
+    /// An `anyhow::Result<BuildPlan>` containing the build plan for the
+    /// operation.
     fn apply_plan_to_schema(
         &self,
         schema: &mut FirehoseTableSchema,
@@ -115,7 +140,8 @@ pub trait FirehoseOperatorEnvironment: Debug + Send + Sync {
     }
 }
 
-/// `MapOpEnvironment` is a simple implementation of `OpEnvironment` that uses a `BTreeMap` to store operators.
+/// `MapOpEnvironment` is a simple implementation of `OpEnvironment` that uses a
+/// `BTreeMap` to store operators.
 #[derive(Debug)]
 pub struct MapOpEnvironment {
     /// A map of operator IDs to their corresponding operator factories.
@@ -161,7 +187,8 @@ impl MapOpEnvironment {
     ///
     /// # Returns
     ///
-    /// An `anyhow::Result<()>` indicating success or containing an error if the binding already exists.
+    /// An `anyhow::Result<()>` indicating success or containing an error if the
+    /// binding already exists.
     pub fn add_operator(
         &mut self,
         factory: Arc<dyn FirehoseOperatorFactory>,
@@ -182,7 +209,8 @@ impl MapOpEnvironment {
     ///
     /// # Returns
     ///
-    /// An `anyhow::Result<()>` indicating success or containing an error if any binding fails to be added.
+    /// An `anyhow::Result<()>` indicating success or containing an error if any
+    /// binding fails to be added.
     pub fn add_all_operators(
         &mut self,
         factories: Vec<Arc<dyn FirehoseOperatorFactory>>,
@@ -215,7 +243,8 @@ pub struct BuildPlanContext {
 }
 
 impl BuildPlanContext {
-    /// Creates a new `OperationInitPlanContext` with the given table schema and build plan.
+    /// Creates a new `OperationInitPlanContext` with the given table schema and
+    /// build plan.
     pub fn new(
         table_schema: Arc<FirehoseTableSchema>,
         build_plan: Arc<BuildPlan>,
@@ -245,7 +274,8 @@ impl BuildPlanContext {
     ///
     /// # Returns
     ///
-    /// An `anyhow::Result<OperationInitializationContext>` containing the bound context.
+    /// An `anyhow::Result<OperationInitializationContext>` containing the bound
+    /// context.
     pub fn bind_signature(
         self,
         signature: &FirehoseOperatorSignature,
@@ -253,7 +283,8 @@ impl BuildPlanContext {
         OperationInitializationContext::init(self, signature.clone())
     }
 
-    /// Computes the input types for the operator based on the build plan and table schema.
+    /// Computes the input types for the operator based on the build plan and
+    /// table schema.
     pub fn input_types(&self) -> BTreeMap<String, DataTypeDescription> {
         self.build_plan
             .inputs
@@ -267,7 +298,8 @@ impl BuildPlanContext {
             .collect()
     }
 
-    /// Computes the output types for the operator based on the build plan and table schema.
+    /// Computes the output types for the operator based on the build plan and
+    /// table schema.
     pub fn output_types(&self) -> BTreeMap<String, DataTypeDescription> {
         self.build_plan
             .outputs
@@ -312,7 +344,8 @@ impl FirehoseOperatorInitContext for OperationInitializationContext {
 }
 
 impl OperationInitializationContext {
-    /// Creates a new `OperationInitSignatureContext` with the given plan context and signature.
+    /// Creates a new `OperationInitSignatureContext` with the given plan
+    /// context and signature.
     ///
     /// # Returns
     ///

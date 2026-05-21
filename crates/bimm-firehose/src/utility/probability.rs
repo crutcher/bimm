@@ -1,6 +1,7 @@
+use std::fmt::Debug;
+
 use anyhow::bail;
 use num_traits::Float;
-use std::fmt::Debug;
 
 /// Validate a probability in the range ``[0.0, 1.0]``.
 ///

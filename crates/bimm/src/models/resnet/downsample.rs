@@ -1,13 +1,37 @@
 //! # The `ResNet` Downsample Implementation.
 
-use crate::compat::conv_shape::expect_conv_output_shape;
-use crate::models::resnet::util::scalar_to_array;
-use crate::models::resnet::util::{build_square_conv2d_padding_config, get_square_conv2d_padding};
-use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
-use burn::nn::BatchNormConfig;
-use burn::nn::conv::{Conv2d, Conv2dConfig};
-use burn::nn::norm::{Normalization, NormalizationConfig};
-use burn::prelude::{Backend, Config, Module, Tensor};
+use bunsen::contracts::{
+    assert_shape_contract_periodically,
+    unpack_shape_contract,
+};
+use burn::{
+    nn::{
+        BatchNormConfig,
+        conv::{
+            Conv2d,
+            Conv2dConfig,
+        },
+        norm::{
+            Normalization,
+            NormalizationConfig,
+        },
+    },
+    prelude::{
+        Backend,
+        Config,
+        Module,
+        Tensor,
+    },
+};
+
+use crate::{
+    compat::conv_shape::expect_conv_output_shape,
+    models::resnet::util::{
+        build_square_conv2d_padding_config,
+        get_square_conv2d_padding,
+        scalar_to_array,
+    },
+};
 
 /// [`ResNetDownsample`] Meta trait.
 ///
@@ -17,7 +41,8 @@ use burn::prelude::{Backend, Config, Module, Tensor};
 ///
 /// # Missing Features
 ///
-/// - *avg*: support for average pooling is blocked on support for ``ceil_mode`` in [`burn`].
+/// - *avg*: support for average pooling is blocked on support for ``ceil_mode``
+///   in [`burn`].
 pub trait ResNetDownsampleMeta {
     /// The size of the in channels dimension.
     fn in_channels(&self) -> usize;
@@ -40,7 +65,8 @@ pub trait ResNetDownsampleMeta {
     ///
     /// # Arguments
     ///
-    /// - `input_resolution`: ``[in_height=out_height*stride, in_width=out_width*stride]``.
+    /// - `input_resolution`: ``[in_height=out_height*stride,
+    ///   in_width=out_width*stride]``.
     ///
     /// # Returns
     ///
@@ -73,7 +99,8 @@ pub trait ResNetDownsampleMeta {
 ///
 /// # Missing Features
 ///
-/// - *avg*: support for average pooling is blocked on support for ``ceil_mode`` in [`burn`].
+/// - *avg*: support for average pooling is blocked on support for ``ceil_mode``
+///   in [`burn`].
 #[derive(Config, Debug)]
 pub struct ResNetDownsampleConfig {
     /// The size of the in channels dimension.
@@ -159,7 +186,8 @@ impl ResNetDownsampleConfig {
 ///
 /// # Missing Features
 ///
-/// - *avg*: support for average pooling is blocked on support for ``ceil_mode`` in [`burn`].
+/// - *avg*: support for average pooling is blocked on support for ``ceil_mode``
+///   in [`burn`].
 #[derive(Module, Debug)]
 pub struct ResNetDownsample<B: Backend> {
     /// Conv layer.
@@ -171,11 +199,11 @@ pub struct ResNetDownsample<B: Backend> {
 
 impl<B: Backend> ResNetDownsampleMeta for ResNetDownsample<B> {
     fn in_channels(&self) -> usize {
-        self.conv.weight.shape().dims[1]
+        self.conv.weight.shape()[1]
     }
 
     fn out_channels(&self) -> usize {
-        self.conv.weight.shape().dims[0]
+        self.conv.weight.shape()[0]
     }
 
     fn kernel_size(&self) -> usize {
@@ -196,8 +224,8 @@ impl<B: Backend> ResNetDownsample<B> {
     ///
     /// # Arguments
     ///
-    /// - `input`: \
-    ///   ``[batch, in_channels, in_height=out_height*stride, in_width=out_width*stride]``
+    /// - `input`: \ ``[batch, in_channels, in_height=out_height*stride,
+    ///   in_width=out_width*stride]``
     ///
     /// # Returns
     ///
@@ -235,9 +263,12 @@ impl<B: Backend> ResNetDownsample<B> {
 
 #[cfg(test)]
 mod tests {
+    use bunsen::{
+        contracts::assert_shape_contract,
+        support::testing::PerfTestBackend,
+    };
+
     use super::*;
-    use bimm_contracts::assert_shape_contract;
-    use burn::backend::NdArray;
 
     #[test]
     fn test_downsample_config() {
@@ -256,7 +287,7 @@ mod tests {
 
     #[test]
     fn test_downsample() {
-        type B = NdArray<f32>;
+        type B = PerfTestBackend;
         let device = Default::default();
 
         let batch_size = 2;

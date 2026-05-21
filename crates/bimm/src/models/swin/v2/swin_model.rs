@@ -1,27 +1,69 @@
 //! # Top-Level Swin Transformer v2 model components.
 
-use crate::layers::drop::rate_table::DropPathRateDepthTable;
-use crate::layers::patching::patch_embed::{PatchEmbed, PatchEmbedConfig, PatchEmbedMeta};
-use crate::models::swin::v2::block_sequence::{
-    StochasticDepthTransformerBlockSequence, StochasticDepthTransformerBlockSequenceConfig,
-    StochasticDepthTransformerBlockSequenceMeta,
+use alloc::{
+    string::{
+        String,
+        ToString,
+    },
+    vec::Vec,
 };
-use crate::models::swin::v2::patch_merge::{PatchMerging, PatchMergingConfig};
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
-use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
-use burn::config::Config;
-use burn::module::{Module, Param};
-use burn::nn::pool::{AdaptiveAvgPool1d, AdaptiveAvgPool1dConfig};
-use burn::nn::{
-    Dropout, DropoutConfig, Initializer, LayerNorm, LayerNormConfig, Linear, LinearConfig,
+
+use bunsen::{
+    blocks::images::{
+        drop::rate_table::DropPathRateDepthTable,
+        patching::patch_embed::{
+            PatchEmbed,
+            PatchEmbedConfig,
+            PatchEmbedMeta,
+        },
+    },
+    contracts::{
+        assert_shape_contract_periodically,
+        unpack_shape_contract,
+    },
 };
-use burn::prelude::{Backend, Tensor};
+use burn::{
+    config::Config,
+    module::{
+        Module,
+        Param,
+    },
+    nn::{
+        Dropout,
+        DropoutConfig,
+        Initializer,
+        LayerNorm,
+        LayerNormConfig,
+        Linear,
+        LinearConfig,
+        pool::{
+            AdaptiveAvgPool1d,
+            AdaptiveAvgPool1dConfig,
+        },
+    },
+    prelude::{
+        Backend,
+        Tensor,
+    },
+};
+
+use crate::models::swin::v2::{
+    block_sequence::{
+        StochasticDepthTransformerBlockSequence,
+        StochasticDepthTransformerBlockSequenceConfig,
+        StochasticDepthTransformerBlockSequenceMeta,
+    },
+    patch_merge::{
+        PatchMerging,
+        PatchMergingConfig,
+    },
+};
 
 /// Configuration for a single layer in the Swin Transformer V2 model.
 #[derive(Config, Debug, PartialEq, Eq)]
 pub struct LayerConfig {
-    /// The depth of the layer, i.e., the number of transformer blocks in this layer.
+    /// The depth of the layer, i.e., the number of transformer blocks in this
+    /// layer.
     pub depth: usize,
 
     /// The number of attention heads in the transformer blocks of this layer.
@@ -142,12 +184,12 @@ impl SwinTransformerV2Meta for SwinTransformerV2Config {
         self.input_resolution
     }
 
-    fn patch_size(&self) -> usize {
-        self.patch_size
-    }
-
     fn d_input(&self) -> usize {
         self.d_input
+    }
+
+    fn patch_size(&self) -> usize {
+        self.patch_size
     }
 
     fn num_classes(&self) -> usize {
@@ -212,13 +254,15 @@ pub struct SwinTransformerV2Plan {
 }
 
 impl SwinTransformerV2Config {
-    /// Check config validity and return a plan for the Swin Transformer V2 model.
+    /// Check config validity and return a plan for the Swin Transformer V2
+    /// model.
     ///
     /// Performs model constraint validation tests without initializing a model.
     ///
     /// # Returns
     ///
-    /// A [`SwinTransformerV2Plan`] containing the patch embedding configuration.
+    /// A [`SwinTransformerV2Plan`] containing the patch embedding
+    /// configuration.
     pub fn validate(&self) -> Result<SwinTransformerV2Plan, String> {
         let patch_config = PatchEmbedConfig::new(
             self.input_resolution,
@@ -385,7 +429,8 @@ pub struct SwinTransformerV2<B: Backend> {
     /// The patch merging layers that reduce the spatial dimensions of the grid.
     pub grid_merge_layers: Vec<PatchMerging<B>>,
 
-    /// The layer normalization applied to the output of the grid transformer blocks.
+    /// The layer normalization applied to the output of the grid transformer
+    /// blocks.
     pub grid_output_norm: LayerNorm<B>,
 
     /// The number of output features after the grid transformer blocks.
@@ -412,12 +457,12 @@ impl<B: Backend> SwinTransformerV2Meta for SwinTransformerV2<B> {
         self.patch_embed.input_resolution()
     }
 
-    fn patch_size(&self) -> usize {
-        self.patch_embed.patch_size()
-    }
-
     fn d_input(&self) -> usize {
         self.patch_embed.d_input()
+    }
+
+    fn patch_size(&self) -> usize {
+        self.patch_embed.patch_size()
     }
 
     fn num_classes(&self) -> usize {
@@ -472,7 +517,8 @@ impl<B: Backend> SwinTransformerV2Meta for SwinTransformerV2<B> {
 }
 
 impl<B: Backend> SwinTransformerV2<B> {
-    /// Apply patch embedding and absolute positional encoding (APE) to the input image tensor.
+    /// Apply patch embedding and absolute positional encoding (APE) to the
+    /// input image tensor.
     #[inline(always)]
     #[must_use]
     fn apply_patching(
@@ -534,7 +580,8 @@ impl<B: Backend> SwinTransformerV2<B> {
         self.head.forward(input)
     }
 
-    /// Applies the model to the input image tensor and returns the classification logits.
+    /// Applies the model to the input image tensor and returns the
+    /// classification logits.
     ///
     /// # Arguments
     ///
@@ -594,10 +641,17 @@ impl<B: Backend> SwinTransformerV2<B> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use alloc::vec;
-    use burn::backend::NdArray;
-    use burn::tensor::Distribution;
+
+    use bunsen::support::testing::PerfTestBackend;
+    use burn::tensor::{
+        Distribution,
+        Tolerance,
+    };
+
+    use super::*;
+
+    type B = PerfTestBackend;
 
     #[test]
     fn test_swin_transformer_v2_meta() {
@@ -665,7 +719,7 @@ mod tests {
         );
 
         let device = Default::default();
-        let model = config.init::<NdArray>(&device);
+        let model = config.init::<B>(&device);
 
         assert_eq!(model.input_resolution(), [224, 224]);
         assert_eq!(model.input_height(), 224);
@@ -703,8 +757,7 @@ mod tests {
 
     #[test]
     fn test_smoke_test_ape() {
-        type B = NdArray;
-
+        type B = PerfTestBackend;
         let device = Default::default();
 
         let b = 2;
@@ -755,37 +808,36 @@ mod tests {
         let output = model.forward(input.clone());
         assert_eq!(output.dims(), [b, num_classes]);
 
-        output.to_data().assert_eq(
-            &{
-                let patched = model.apply_patching(input.clone());
-                assert_eq!(
-                    patched.dims(),
-                    [b, h * w / (patch_size * patch_size), d_embed]
-                );
+        let expected: Tensor<B, 2> = {
+            let patched = model.apply_patching(input.clone());
+            assert_eq!(
+                patched.dims(),
+                [b, h * w / (patch_size * patch_size), d_embed]
+            );
 
-                let stacked = model.apply_stack(patched);
-                assert_eq!(
-                    stacked.dims(),
-                    [b, last_h * last_w, model.grid_output_features]
-                );
+            let stacked = model.apply_stack(patched);
+            assert_eq!(
+                stacked.dims(),
+                [b, last_h * last_w, model.grid_output_features]
+            );
 
-                let aggregated = model.aggregate_grid(stacked);
-                assert_eq!(aggregated.dims(), [b, model.grid_output_features]);
+            let aggregated = model.aggregate_grid(stacked);
+            assert_eq!(aggregated.dims(), [b, model.grid_output_features]);
 
-                let classed = model.apply_head(aggregated);
-                assert_eq!(classed.dims(), [b, num_classes]);
+            let classed = model.apply_head(aggregated);
+            assert_eq!(classed.dims(), [b, num_classes]);
 
-                classed
-            }
-            .to_data(),
-            true,
-        );
+            classed
+        };
+
+        output
+            .to_data()
+            .assert_approx_eq::<f32>(&expected.to_data(), Tolerance::default());
     }
 
     #[test]
     fn test_smoke_test_no_ape() {
-        type B = NdArray;
-
+        type B = PerfTestBackend;
         let device = Default::default();
 
         let b = 2;
@@ -837,30 +889,30 @@ mod tests {
         let output = model.forward(input.clone());
         assert_eq!(output.dims(), [b, num_classes]);
 
-        output.to_data().assert_eq(
-            &{
-                let patched = model.apply_patching(input.clone());
-                assert_eq!(
-                    patched.dims(),
-                    [b, h * w / (patch_size * patch_size), d_embed]
-                );
+        let expected: Tensor<B, 2> = {
+            let patched = model.apply_patching(input.clone());
+            assert_eq!(
+                patched.dims(),
+                [b, h * w / (patch_size * patch_size), d_embed]
+            );
 
-                let stacked = model.apply_stack(patched);
-                assert_eq!(
-                    stacked.dims(),
-                    [b, last_h * last_w, model.grid_output_features]
-                );
+            let stacked = model.apply_stack(patched);
+            assert_eq!(
+                stacked.dims(),
+                [b, last_h * last_w, model.grid_output_features]
+            );
 
-                let aggregated = model.aggregate_grid(stacked);
-                assert_eq!(aggregated.dims(), [b, model.grid_output_features]);
+            let aggregated = model.aggregate_grid(stacked);
+            assert_eq!(aggregated.dims(), [b, model.grid_output_features]);
 
-                let classed = model.apply_head(aggregated);
-                assert_eq!(classed.dims(), [b, num_classes]);
+            let classed = model.apply_head(aggregated);
+            assert_eq!(classed.dims(), [b, num_classes]);
 
-                classed
-            }
-            .to_data(),
-            true,
-        );
+            classed
+        };
+
+        output
+            .to_data()
+            .assert_approx_eq::<f32>(&expected.to_data(), Tolerance::default());
     }
 }

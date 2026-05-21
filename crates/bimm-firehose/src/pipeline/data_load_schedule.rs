@@ -1,21 +1,29 @@
-use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
-use std::hash::Hash;
+use std::{
+    fmt::Debug,
+    hash::Hash,
+};
+
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 /// A fixed schedule for loading data items.
 ///
-/// The type `M` must implement the `ScheduleItem` trait, which requires it to be
-/// Debug, Serialize, Sync, and Send safe.
+/// The type `M` must implement the `ScheduleItem` trait, which requires it to
+/// be Debug, Serialize, Sync, and Send safe.
 ///
 /// # Motivation
 ///
-/// This structure is designed to hold the intermediate schedule for a data pipeline
-/// load operation; in a format which can be serialized and deserialized;
-/// and can be transformed into modified schedules without forcing a data load.
+/// This structure is designed to hold the intermediate schedule for a data
+/// pipeline load operation; in a format which can be serialized and
+/// deserialized; and can be transformed into modified schedules without forcing
+/// a data load.
 ///
 /// As such, it is a thin wrapper around a `Vec<M>`, where `M` carries complex
 /// constraints; but the expectation is that additional metadata will be added
-/// to the schedule in the future (such as block size, or item load cost estimates).
+/// to the schedule in the future (such as block size, or item load cost
+/// estimates).
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(bound = "M: DataLoadMetaDataItem")]
 pub struct DataLoadSchedule<M>
@@ -28,9 +36,9 @@ where
 
 /// Support super-trait for `DataLoadSchedule` items.
 ///
-/// This trait exists to simplify the requirements for items in a `DataLoadSchedule`;
-/// blanket implementations of `ScheduleItem` are provided for any type that meets
-/// the requirements.
+/// This trait exists to simplify the requirements for items in a
+/// `DataLoadSchedule`; blanket implementations of `ScheduleItem` are provided
+/// for any type that meets the requirements.
 ///
 /// # Trait Requirements
 ///
@@ -38,13 +46,15 @@ where
 /// - `Clone`: the schedule must be cloneable.
 /// - `PartialEq` and `Eq`: the schedule must be comparable for equality.
 /// - `Send` and `Sync`: the schedule must be thread-safe.
-/// - `Serialize` and `Deserialize`: the schedule must be serializable and deserializable.
+/// - `Serialize` and `Deserialize`: the schedule must be serializable and
+///   deserializable.
 pub trait DataLoadMetaDataItem:
     Debug + Clone + Hash + PartialEq + Eq + Send + Sync + Serialize + for<'de> Deserialize<'de>
 {
 }
 
-/// Blanket implementation of `ScheduleItem` for any type that meets the requirements.
+/// Blanket implementation of `ScheduleItem` for any type that meets the
+/// requirements.
 impl<T> DataLoadMetaDataItem for T where
     T: Debug + Clone + Hash + PartialEq + Eq + Send + Sync + Serialize + for<'de> Deserialize<'de>
 {
@@ -95,11 +105,13 @@ where
     ///
     /// # Arguments
     ///
-    /// - `predicate`: A closure that takes a reference to an item of type `M` and returns a boolean.
+    /// - `predicate`: A closure that takes a reference to an item of type `M`
+    ///   and returns a boolean.
     ///
     /// # Returns
     ///
-    /// A new `DataLoadSchedule<M>` containing only the items that match the predicate.
+    /// A new `DataLoadSchedule<M>` containing only the items that match the
+    /// predicate.
     pub fn filter<P>(
         &self,
         predicate: P,
@@ -121,15 +133,18 @@ where
     /// Filters the items in the schedule based on a provided filter function,
     /// and maps them to a new type `R` if the predicate returns `Some(R)`.
     ///
-    /// This function is useful for transforming the schedule items while filtering them.
+    /// This function is useful for transforming the schedule items while
+    /// filtering them.
     ///
     /// # Arguments
     ///
-    /// - `predicate`: A closure that takes a reference to an item of type `M` and returns an `Option<R>`.
+    /// - `predicate`: A closure that takes a reference to an item of type `M`
+    ///   and returns an `Option<R>`.
     ///
     /// # Returns
     ///
-    /// A new `DataLoadSchedule<R>` containing the items that matched the predicate and were transformed to type `R`.
+    /// A new `DataLoadSchedule<R>` containing the items that matched the
+    /// predicate and were transformed to type `R`.
     pub fn filter_map<P, R>(
         &self,
         predicate: P,

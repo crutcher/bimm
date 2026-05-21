@@ -1,9 +1,13 @@
+use std::{
+    fmt::Debug,
+    sync::Arc,
+};
+
 use crate::core::operations::factory::FirehoseOperatorFactory;
-use std::fmt::Debug;
-use std::sync::Arc;
 
 // This leverages the `inventory` crate to define a collection scheme for
-// later invocations of `inventory::submit! { <instance> }` by the registration macro.
+// later invocations of `inventory::submit! { <instance> }` by the registration
+// macro.
 inventory::collect!(FirehoseOperatorFactoryRegistration);
 
 /// Struct describing a name to constructor for an operator builder.
@@ -56,12 +60,23 @@ impl FirehoseOperatorFactoryRegistration {
 
 #[cfg(test)]
 mod tests {
+    use serde::{
+        Deserialize,
+        Serialize,
+    };
+
     use super::*;
-    use crate::core::operations::factory::SimpleConfigOperatorFactory;
-    use crate::core::operations::operator::FirehoseOperator;
-    use crate::core::operations::signature::{FirehoseOperatorSignature, ParameterSpec};
-    use crate::define_firehose_operator;
-    use serde::{Deserialize, Serialize};
+    use crate::{
+        core::operations::{
+            factory::SimpleConfigOperatorFactory,
+            operator::FirehoseOperator,
+            signature::{
+                FirehoseOperatorSignature,
+                ParameterSpec,
+            },
+        },
+        define_firehose_operator,
+    };
 
     define_firehose_operator!(
         EXAMPLE_OPERATOR,

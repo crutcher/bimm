@@ -4,9 +4,12 @@
 //! ## Example
 //!
 //! ```rust,no_run
-//! use bimm::models::swin::v2::swin_model::{SwinTransformerV2, SwinTransformerV2Config};
-//! use bimm::models::swin::v2::swin_model::LayerConfig;
-//! use burn::backend::NdArray;
+//! use bimm::models::swin::v2::swin_model::{
+//!     LayerConfig,
+//!     SwinTransformerV2,
+//!     SwinTransformerV2Config,
+//! };
+//! use burn::backend::Flex;
 //!
 //! let image_dimensions = [224, 224];
 //! let patch_size = 4;
@@ -17,7 +20,7 @@
 //!
 //! let device = Default::default();
 //!
-//! let swin_model: SwinTransformerV2<NdArray> = SwinTransformerV2Config::new(
+//! let swin_model: SwinTransformerV2<Flex> = SwinTransformerV2Config::new(
 //!     image_dimensions,
 //!     patch_size,
 //!     image_channels,

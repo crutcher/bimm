@@ -1,6 +1,7 @@
 //! # [`BottleneckBlock`] Block for `ResNet`
 //!
-//! [`BottleneckBlock`] is the bottleneck form of the core `ResNet` convolution unit.
+//! [`BottleneckBlock`] is the bottleneck form of the core `ResNet` convolution
+//! unit.
 //!
 //! [`BottleneckBlockMeta`] defines a common meta-API for [`BottleneckBlock`]
 //! and [`BottleneckBlockConfig`].
@@ -11,17 +12,54 @@
 //! [`BottleneckBlock`] implements [`Module`] and provides
 //! [`BottleneckBlock::forward`].
 
-use crate::layers::blocks::cna::{AbstractCNA2dConfig, CNA2d, CNA2dConfig, CNA2dMeta};
-use crate::layers::drop::drop_block::{DropBlock2d, DropBlock2dConfig, DropBlockOptions};
-use crate::layers::drop::drop_path::{DropPath, DropPathConfig};
-use crate::models::resnet::downsample::{ResNetDownsample, ResNetDownsampleConfig};
-use crate::models::resnet::util::{scalar_to_array, stride_div_output_resolution};
-use crate::utility::probability::expect_probability;
-use burn::nn::activation::ActivationConfig;
-use burn::nn::conv::Conv2dConfig;
-use burn::nn::norm::NormalizationConfig;
-use burn::nn::{BatchNormConfig, PaddingConfig2d};
-use burn::prelude::{Backend, Config, Module, Tensor};
+use bunsen::{
+    blocks::images::{
+        conv::cna::{
+            AbstractCNA2dConfig,
+            CNA2d,
+            CNA2dConfig,
+            CNA2dMeta,
+        },
+        drop::{
+            drop_block::{
+                DropBlock2d,
+                DropBlock2dConfig,
+                DropBlockOptions,
+            },
+            drop_path::{
+                DropPath,
+                DropPathConfig,
+            },
+        },
+    },
+    support::validators::expect_probability,
+};
+use burn::{
+    nn::{
+        BatchNormConfig,
+        PaddingConfig2d,
+        activation::ActivationConfig,
+        conv::Conv2dConfig,
+        norm::NormalizationConfig,
+    },
+    prelude::{
+        Backend,
+        Config,
+        Module,
+        Tensor,
+    },
+};
+
+use crate::models::resnet::{
+    downsample::{
+        ResNetDownsample,
+        ResNetDownsampleConfig,
+    },
+    util::{
+        scalar_to_array,
+        stride_div_output_resolution,
+    },
+};
 
 /// Bottleneck Policy.
 #[derive(Config, Debug)]
@@ -90,7 +128,8 @@ pub trait BottleneckBlockMeta {
     ///
     /// # Arguments
     ///
-    /// - `input_resolution`: ``[in_height=out_height*stride, in_width=out_width*stride]``.
+    /// - `input_resolution`: ``[in_height=out_height*stride,
+    ///   in_width=out_width*stride]``.
     ///
     /// # Returns
     ///
@@ -267,7 +306,10 @@ impl BottleneckBlockConfig {
                 .with_bias(false)
                 .with_stride(scalar_to_array(stride))
                 .with_dilation(scalar_to_array(first_dilation))
-                .with_padding(PaddingConfig2d::Explicit(first_dilation, first_dilation))
+                .with_padding({
+                    let d = first_dilation;
+                    PaddingConfig2d::Explicit(d, d, d, d)
+                })
                 .with_groups(self.cardinality()),
         );
 
@@ -405,16 +447,18 @@ impl<B: Backend> BottleneckBlock<B> {
     ///
     /// # Arguments
     ///
-    /// - `input`: ``[batch, in_planes, in_height=out_height*stride, in_width=out_width*stride]``.
+    /// - `input`: ``[batch, in_planes, in_height=out_height*stride,
+    ///   in_width=out_width*stride]``.
     ///
     /// # Returns
     ///
-    /// A ``[batch, out_planes=planes*expansion_factor, out_height, out_width]`` tensor;
+    /// A ``[batch, out_planes=planes*expansion_factor, out_height, out_width]``
+    /// tensor;
     pub fn forward(
         &self,
         input: Tensor<B, 4>,
     ) -> Tensor<B, 4> {
-        let [batch, in_height, out_height, in_width, out_width] = bimm_contracts::unpack_shape_contract!(
+        let [batch, in_height, out_height, in_width, out_width] = bunsen::contracts::unpack_shape_contract!(
             [
                 "batch",
                 "in_planes",
@@ -431,7 +475,7 @@ impl<B: Backend> BottleneckBlock<B> {
             None => input.clone(),
         };
 
-        bimm_contracts::define_shape_contract!(
+        bunsen::contracts::define_shape_contract!(
             OUT_CONTRACT,
             ["batch", "out_planes", "out_height", "out_width"],
         );
@@ -441,7 +485,7 @@ impl<B: Backend> BottleneckBlock<B> {
             ("out_height", out_height),
             ("out_width", out_width),
         ];
-        bimm_contracts::assert_shape_contract_periodically!(
+        bunsen::contracts::assert_shape_contract_periodically!(
             OUT_CONTRACT,
             &identity.dims(),
             &out_bindings
@@ -449,7 +493,7 @@ impl<B: Backend> BottleneckBlock<B> {
 
         let x = self.cna1.forward(input);
 
-        bimm_contracts::assert_shape_contract_periodically!(
+        bunsen::contracts::assert_shape_contract_periodically!(
             ["batch", "pinch_planes", "in_height", "in_width"],
             &x.dims(),
             &[
@@ -465,7 +509,7 @@ impl<B: Backend> BottleneckBlock<B> {
             None => x,
         });
 
-        bimm_contracts::assert_shape_contract_periodically!(
+        bunsen::contracts::assert_shape_contract_periodically!(
             ["batch", "width", "out_height", "out_width"],
             &x.dims(),
             &[
@@ -479,7 +523,7 @@ impl<B: Backend> BottleneckBlock<B> {
         // TODO: anti-aliasing
 
         self.cna3.map_forward(x, |x| {
-            bimm_contracts::assert_shape_contract_periodically!(
+            bunsen::contracts::assert_shape_contract_periodically!(
                 OUT_CONTRACT,
                 &x.dims(),
                 &out_bindings
@@ -529,10 +573,17 @@ impl<B: Backend> BottleneckBlock<B> {
 
 #[cfg(test)]
 mod tests {
+    use bunsen::{
+        blocks::images::drop::drop_block::DropBlockOptions,
+        contracts::assert_shape_contract,
+        support::testing::PerfTestBackend,
+    };
+    use burn::{
+        backend::Autodiff,
+        nn::activation::ActivationConfig,
+    };
+
     use super::*;
-    use bimm_contracts::assert_shape_contract;
-    use burn::backend::NdArray;
-    use burn::nn::activation::ActivationConfig;
 
     #[test]
     fn test_basic_block_config() {
@@ -563,7 +614,7 @@ mod tests {
 
     #[test]
     fn test_basic_block_meta() {
-        type B = NdArray<f32>;
+        type B = PerfTestBackend;
         let device = Default::default();
 
         let in_planes = 2;
@@ -580,9 +631,7 @@ mod tests {
 
     #[test]
     fn test_basic_block_forward_same_channels_no_downsample_autodiff() {
-        use burn::backend::{Autodiff, Wgpu};
-        type B = Autodiff<Wgpu>;
-
+        type B = Autodiff<PerfTestBackend>;
         let device = Default::default();
 
         let batch_size = 2;
@@ -611,9 +660,7 @@ mod tests {
 
     #[test]
     fn test_basic_block_forward_downsample_drop_block_drop_path_autodiff() {
-        use burn::backend::{Autodiff, Wgpu};
-        type B = Autodiff<Wgpu>;
-
+        type B = Autodiff<PerfTestBackend>;
         let device = Default::default();
 
         let batch_size = 2;

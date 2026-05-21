@@ -1,11 +1,28 @@
 //! # Patch Merging
-use crate::models::swin::v2::windowing::{window_partition, window_reverse};
-use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
-use burn::config::Config;
-use burn::module::Module;
-use burn::nn::{LayerNorm, LayerNormConfig, Linear, LinearConfig};
-use burn::prelude::{Backend, Tensor};
-use burn::tensor::BasicOps;
+use bunsen::contracts::{
+    assert_shape_contract_periodically,
+    unpack_shape_contract,
+};
+use burn::{
+    config::Config,
+    module::Module,
+    nn::{
+        LayerNorm,
+        LayerNormConfig,
+        Linear,
+        LinearConfig,
+    },
+    prelude::{
+        Backend,
+        Tensor,
+    },
+    tensor::BasicOps,
+};
+
+use crate::models::swin::v2::windowing::{
+    window_partition,
+    window_reverse,
+};
 
 /// Metadata for `PatchMerging`.
 pub trait PatchMergingMeta {
@@ -107,7 +124,8 @@ impl PatchMergingConfig {
 /// This module accepts ``[batch, height * width, channels]`` inputs, and then:
 /// - Collates interleaved patches of size ``[height/2, width/2]`` into
 ///   ``[batch, height/2 * width/2, 4 * channels]``.
-/// - Applies a linear layer to reduce the feature dimension to ``2 * channels``.
+/// - Applies a linear layer to reduce the feature dimension to ``2 *
+///   channels``.
 /// - Applies layer normalization.
 /// - Yields output of shape ``[batch, height/2 * width/2, 2 * channels]``.
 ///
@@ -185,8 +203,8 @@ impl<B: Backend> PatchMerging<B> {
 
 /// Collate patches from a tensor.
 ///
-/// This splits the input into 4 interleaved patches, each ``[height/2, width/2]``;
-/// and then concatenates them along the last dimension.
+/// This splits the input into 4 interleaved patches, each ``[height/2,
+/// width/2]``; and then concatenates them along the last dimension.
 ///
 /// # Arguments
 ///
@@ -277,11 +295,21 @@ where
 
 #[cfg(test)]
 mod tests {
+    use bunsen::{
+        blocks::images::patching::patch_embed::{
+            PatchEmbedConfig,
+            PatchEmbedMeta,
+        },
+        support::testing::PerfTestBackend,
+    };
+    use burn::{
+        prelude::Backend,
+        tensor::Distribution,
+    };
+
     use super::*;
-    use crate::layers::patching::patch_embed::{PatchEmbedConfig, PatchEmbedMeta};
-    use burn::backend::NdArray;
-    use burn::prelude::Backend;
-    use burn::tensor::Distribution;
+
+    type B = PerfTestBackend;
 
     #[test]
     fn test_collate_patches() {
@@ -293,7 +321,7 @@ mod tests {
         let device = Default::default();
 
         let distribution = Distribution::Normal(0., 1.);
-        let x = Tensor::<NdArray, 3>::random([b, h * w, c], distribution, &device);
+        let x = Tensor::<B, 3>::random([b, h * w, c], distribution, &device);
 
         let y = collate_patches(x.clone(), h, w);
         assert_eq!(&y.dims(), &[b, (h / 2) * (w / 2), 4 * c]);
@@ -317,7 +345,7 @@ mod tests {
         assert_eq!(config.output_height(), 6);
         assert_eq!(config.output_width(), 4);
 
-        let patch_merging = config.init::<NdArray>(&Default::default());
+        let patch_merging = config.init::<B>(&Default::default());
 
         assert_eq!(patch_merging.input_resolution(), [12, 8]);
         assert_eq!(patch_merging.d_input(), 3);
@@ -335,12 +363,12 @@ mod tests {
             d_input: 3,
         };
         let device = Default::default();
-        let _d = config.init::<NdArray>(&device);
+        let _d = config.init::<B>(&device);
     }
 
     #[test]
     fn test_patch_merging() {
-        impl_test_patch_merging::<NdArray>();
+        impl_test_patch_merging::<B>();
     }
 
     fn impl_test_patch_merging<B: Backend>() {
@@ -377,7 +405,7 @@ mod tests {
         assert_eq!(config.patches_height(), 3);
         assert_eq!(config.patches_width(), 2);
 
-        let patch_embed = config.init::<NdArray>(&Default::default());
+        let patch_embed = config.init::<B>(&Default::default());
 
         assert_eq!(patch_embed.input_resolution(), [12, 8]);
         assert_eq!(patch_embed.patch_size(), 4);
@@ -408,13 +436,13 @@ mod tests {
         {
             let config = PatchEmbedConfig::new([h, w], patch_size, d_input, d_output)
                 .with_enable_patch_norm(false);
-            let patch_embed = config.init::<NdArray>(&device);
+            let patch_embed = config.init::<B>(&device);
 
             let y = patch_embed.forward(x.clone());
             assert_eq!(&y.dims(), &[b, (h / 4) * (w / 4), d_output]);
 
             let z = patch_embed.projection.forward(x.clone());
-            let z: Tensor<NdArray, 3> = z.flatten(2, 3);
+            let z: Tensor<B, 3> = z.flatten(2, 3);
             let z = z.swap_dims(1, 2);
 
             y.into_data().assert_eq(&z.into_data(), true);
@@ -423,13 +451,13 @@ mod tests {
         // With Norm.
         {
             let config = PatchEmbedConfig::new([h, w], patch_size, d_input, d_output);
-            let patch_embed = config.init::<NdArray>(&device);
+            let patch_embed = config.init::<B>(&device);
 
             let y = patch_embed.forward(x.clone());
             assert_eq!(&y.dims(), &[b, (h / 4) * (w / 4), d_output]);
 
             let z = patch_embed.projection.forward(x.clone());
-            let z: Tensor<NdArray, 3> = z.flatten(2, 3);
+            let z: Tensor<B, 3> = z.flatten(2, 3);
             let z = z.swap_dims(1, 2);
             let z = patch_embed.norm.as_ref().unwrap().forward(z);
 

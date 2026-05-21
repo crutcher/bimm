@@ -1,44 +1,102 @@
 #![recursion_limit = "256"]
 extern crate core;
 
-use bimm::layers::drop::drop_block::{DropBlock2d, DropBlock2dConfig, DropBlockOptions};
-use bimm::models::swin::v2::swin_model::{LayerConfig, SwinTransformerV2, SwinTransformerV2Config};
-use bimm_firehose::burn::batcher::{
-    BatcherInputAdapter, BatcherOutputAdapter, FirehoseExecutorBatcher,
-};
-use bimm_firehose::burn::path_scanning;
-use bimm_firehose::core::operations::executor::SequentialBatchExecutor;
-use bimm_firehose::core::schema::ColumnSchema;
-use bimm_firehose::core::{
-    FirehoseRowBatch, FirehoseRowReader, FirehoseRowWriter, FirehoseTableSchema,
-};
-use bimm_firehose::ops::init_default_operator_environment;
-use bimm_firehose_image::augmentation::AugmentImageOperation;
-use bimm_firehose_image::augmentation::control::with_prob::WithProbStage;
-use bimm_firehose_image::augmentation::orientation::flip::HorizontalFlipStage;
-use bimm_firehose_image::burn_support::{ImageToTensorData, stack_tensor_data_column};
-use bimm_firehose_image::loader::{ImageLoader, ResizeSpec};
-use bimm_firehose_image::{ColorType, ImageShape};
-use burn::config::Config;
-use burn::data::dataloader::{DataLoaderBuilder, Dataset};
-use burn::data::dataset::transform::SamplerDataset;
-use burn::lr_scheduler::cosine::CosineAnnealingLrSchedulerConfig;
-use burn::module::Module;
-use burn::nn::loss::CrossEntropyLossConfig;
-use burn::optim::AdamWConfig;
-use burn::prelude::{Backend, Int, Tensor};
-use burn::record::CompactRecorder;
-use burn::tensor::backend::AutodiffBackend;
-use burn::train::metric::store::{Aggregate, Direction, Split};
-use burn::train::metric::{AccuracyMetric, LearningRateMetric, LossMetric, TopKAccuracyMetric};
-use burn::train::{
-    ClassificationOutput, Learner, MetricEarlyStoppingStrategy, StoppingCondition,
-    SupervisedTraining,
-};
-use burn::train::{InferenceStep, TrainOutput, TrainStep};
-use clap::Parser;
-use rand::{Rng, rng};
 use std::sync::Arc;
+
+use bimm::models::swin::v2::swin_model::{
+    LayerConfig,
+    SwinTransformerV2,
+    SwinTransformerV2Config,
+};
+use bimm_firehose::{
+    burn::{
+        batcher::{
+            BatcherInputAdapter,
+            BatcherOutputAdapter,
+            FirehoseExecutorBatcher,
+        },
+        path_scanning,
+    },
+    core::{
+        FirehoseRowBatch,
+        FirehoseRowReader,
+        FirehoseRowWriter,
+        FirehoseTableSchema,
+        operations::executor::SequentialBatchExecutor,
+        schema::ColumnSchema,
+    },
+    ops::init_default_operator_environment,
+};
+use bimm_firehose_image::{
+    ColorType,
+    ImageShape,
+    augmentation::{
+        AugmentImageOperation,
+        control::with_prob::WithProbStage,
+        orientation::flip::HorizontalFlipStage,
+    },
+    burn_support::{
+        ImageToTensorData,
+        stack_tensor_data_column,
+    },
+    loader::{
+        ImageLoader,
+        ResizeSpec,
+    },
+};
+use bunsen::blocks::images::drop::drop_block::{
+    DropBlock2d,
+    DropBlock2dConfig,
+    DropBlockOptions,
+};
+use burn::{
+    backend::Autodiff,
+    config::Config,
+    data::{
+        dataloader::{
+            DataLoaderBuilder,
+            Dataset,
+        },
+        dataset::transform::SamplerDataset,
+    },
+    lr_scheduler::cosine::CosineAnnealingLrSchedulerConfig,
+    module::Module,
+    nn::loss::CrossEntropyLossConfig,
+    optim::AdamWConfig,
+    prelude::{
+        Backend,
+        Int,
+        Tensor,
+    },
+    record::CompactRecorder,
+    tensor::backend::AutodiffBackend,
+    train::{
+        ClassificationOutput,
+        InferenceStep,
+        Learner,
+        MetricEarlyStoppingStrategy,
+        StoppingCondition,
+        SupervisedTraining,
+        TrainOutput,
+        TrainStep,
+        metric::{
+            AccuracyMetric,
+            LearningRateMetric,
+            LossMetric,
+            TopKAccuracyMetric,
+            store::{
+                Aggregate,
+                Direction,
+                Split,
+            },
+        },
+    },
+};
+use clap::Parser;
+use rand::{
+    Rng,
+    rng,
+};
 
 const PATH_COLUMN: &str = "path";
 const SEED_COLUMN: &str = "seed";
@@ -59,7 +117,7 @@ pub struct Args {
     batch_size: usize,
 
     /// Number of workers for data loading.
-    #[arg(long, default_value = "4")]
+    #[arg(long, default_value = "0")]
     num_workers: Option<usize>,
 
     /// Number of epochs to train the model.
@@ -120,14 +178,21 @@ pub struct TrainingConfig {
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    #[cfg(feature = "wgpu")]
-    return backend_main::<burn::backend::Autodiff<burn::backend::Wgpu>>(&args);
-
-    #[cfg(feature = "cuda")]
-    return backend_main::<burn::backend::Autodiff<burn::backend::Cuda>>(&args);
-
-    #[cfg(feature = "metal")]
-    return backend_main::<burn::backend::Autodiff<burn::backend::Metal>>(&args);
+    cfg_select! {
+        feature = "cuda" => {
+            type B = burn::backend::Cuda;
+        }
+        feature = "metal" => {
+            type B = burn::backend::Metal;
+        }
+        feature = "wgpu" => {
+            type B = burn::backend::Wgpu;
+        }
+        _ => {
+            type B = burn::backend::Flex;
+        }
+    }
+    backend_main::<Autodiff<B>>(&args)
 }
 
 /// Create the artifact directory for saving training artifacts.
@@ -177,8 +242,8 @@ pub fn backend_main<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
             ),
             swin: swin_config,
         },
-        AdamWConfig::new(), // .with_weight_decay(0.01)
-                            // .with_grad_clipping(Some(GradientClippingConfig::Norm(5.0))),
+        AdamWConfig::new(), /* .with_weight_decay(0.01)
+                             * .with_grad_clipping(Some(GradientClippingConfig::Norm(5.0))), */
     );
 
     let artifact_dir = args.artifact_dir.as_ref().unwrap().as_ref();
@@ -197,7 +262,8 @@ pub fn backend_main<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
             ColumnSchema::new::<u64>(SEED_COLUMN).with_description("instance rng seed"),
         ]);
 
-        // Load the image from the path, resize it to 32x32 pixels, and convert it to RGB8.
+        // Load the image from the path, resize it to 32x32 pixels, and convert it to
+        // RGB8.
         ImageLoader::default()
             .with_resize(ResizeSpec::new(ImageShape {
                 width: 32,

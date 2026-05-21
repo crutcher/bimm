@@ -1,10 +1,22 @@
-use anyhow::{Context, bail};
-use serde::Serialize;
-use serde::de::DeserializeOwned;
-use std::any::{Any, TypeId};
-use std::fmt::Debug;
+use std::{
+    any::{
+        Any,
+        TypeId,
+    },
+    fmt::Debug,
+};
 
-/// A wrapper type that can hold either a JSON value or a boxed value of any type.
+use anyhow::{
+    Context,
+    bail,
+};
+use serde::{
+    Serialize,
+    de::DeserializeOwned,
+};
+
+/// A wrapper type that can hold either a JSON value or a boxed value of any
+/// type.
 pub enum FirehoseValue {
     /// Holds a JSON value.
     Value(serde_json::Value),
@@ -87,7 +99,8 @@ impl FirehoseValue {
         FirehoseValue::Value(value)
     }
 
-    /// Creates a new `ValueBox::Boxed` by boxing an object that implements `Any` and `Send`.
+    /// Creates a new `ValueBox::Boxed` by boxing an object that implements
+    /// `Any` and `Send`.
     pub fn boxing<T>(obj: T) -> Self
     where
         T: Any + 'static + Send,
@@ -95,7 +108,8 @@ impl FirehoseValue {
         Self::from_box(Box::new(obj))
     }
 
-    /// Creates a new `ValueBox::Boxed` from a boxed object that implements `Any` and `Send`.
+    /// Creates a new `ValueBox::Boxed` from a boxed object that implements
+    /// `Any` and `Send`.
     pub fn from_box<T>(boxed: Box<T>) -> Self
     where
         T: Any + 'static + Send,
@@ -114,7 +128,8 @@ impl FirehoseValue {
         matches!(self, FirehoseValue::Boxed(_))
     }
 
-    /// Unwraps the `ValueBox` and returns a reference to the contained JSON value.
+    /// Unwraps the `ValueBox` and returns a reference to the contained JSON
+    /// value.
     pub fn unwrap_value(&self) -> &serde_json::Value {
         if let FirehoseValue::Value(value) = self {
             value
@@ -127,7 +142,8 @@ impl FirehoseValue {
     ///
     /// # Type Parameters
     ///
-    /// `T`: The type to deserialize the JSON value into. It must implement `DeserializeOwned`.
+    /// `T`: The type to deserialize the JSON value into. It must implement
+    /// `DeserializeOwned`.
     ///
     /// # Panics
     ///
@@ -154,7 +170,8 @@ impl FirehoseValue {
     ///
     /// # Type Parameters
     ///
-    /// `T`: The type to deserialize the JSON value into. It must implement `DeserializeOwned`.
+    /// `T`: The type to deserialize the JSON value into. It must implement
+    /// `DeserializeOwned`.
     ///
     /// # Panics
     ///
@@ -171,7 +188,8 @@ impl FirehoseValue {
         self.parse_as::<T>().unwrap()
     }
 
-    /// Unwraps the `ValueBox` and returns a reference to the contained boxed value.
+    /// Unwraps the `ValueBox` and returns a reference to the contained boxed
+    /// value.
     ///
     /// # Type Parameters
     ///
@@ -201,7 +219,8 @@ impl FirehoseValue {
         }
     }
 
-    /// Unwraps the `ValueBox` and returns a reference to the contained boxed value.
+    /// Unwraps the `ValueBox` and returns a reference to the contained boxed
+    /// value.
     ///
     /// # Type Parameters
     ///
@@ -209,7 +228,8 @@ impl FirehoseValue {
     ///
     /// # Panics
     ///
-    /// If the `ValueBox` does not contain a boxed value or if the downcast fails.
+    /// If the `ValueBox` does not contain a boxed value or if the downcast
+    /// fails.
     ///
     /// # Returns
     ///

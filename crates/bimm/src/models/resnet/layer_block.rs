@@ -11,22 +11,47 @@
 //! [`LayerBlock`] implements [`Module`], and provides
 //! [`LayerBlock::forward`].
 
-use super::bottleneck_block::BottleneckPolicyConfig;
-use super::residual_block::{
-    ResidualBlock, ResidualBlockContractConfig, ResidualBlockMeta, ResidualBlockStructureConfig,
+use alloc::{
+    format,
+    string::{
+        String,
+        ToString,
+    },
+    vec::Vec,
 };
-use crate::layers::drop::drop_block::DropBlockOptions;
+
+use bunsen::{
+    blocks::images::drop::drop_block::DropBlockOptions,
+    contracts::{
+        assert_shape_contract_periodically,
+        unpack_shape_contract,
+    },
+    support::validators::expect_probability,
+};
+use burn::{
+    config::Config,
+    nn::{
+        BatchNormConfig,
+        activation::ActivationConfig,
+        norm::NormalizationConfig,
+    },
+    prelude::{
+        Backend,
+        Module,
+        Tensor,
+    },
+};
+
+use super::{
+    bottleneck_block::BottleneckPolicyConfig,
+    residual_block::{
+        ResidualBlock,
+        ResidualBlockContractConfig,
+        ResidualBlockMeta,
+        ResidualBlockStructureConfig,
+    },
+};
 use crate::models::resnet::util::stride_div_output_resolution;
-use crate::utility::probability::expect_probability;
-use alloc::format;
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
-use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
-use burn::config::Config;
-use burn::nn::BatchNormConfig;
-use burn::nn::activation::ActivationConfig;
-use burn::nn::norm::NormalizationConfig;
-use burn::prelude::{Backend, Module, Tensor};
 
 /// Abstract [`LayerBlock`] Config.
 #[derive(Config, Debug)]
@@ -52,7 +77,8 @@ pub struct LayerBlockContractConfig {
     #[config(default = "false")]
     pub downsample_input: bool,
 
-    /// Select between [`super::basic_block::BasicBlock`] and [`super::bottleneck_block::BottleneckBlock`].
+    /// Select between [`super::basic_block::BasicBlock`] and
+    /// [`super::bottleneck_block::BottleneckBlock`].
     #[config(default = "None")]
     pub bottleneck_policy: Option<BottleneckPolicyConfig>,
 
@@ -142,7 +168,8 @@ pub trait LayerBlockMeta {
     ///
     /// # Arguments
     ///
-    /// - `input_resolution`: ``[in_height=out_height*stride, in_width=out_width*stride]``.
+    /// - `input_resolution`: ``[in_height=out_height*stride,
+    ///   in_width=out_width*stride]``.
     ///
     /// # Returns
     ///
@@ -401,11 +428,15 @@ impl<B: Backend> LayerBlock<B> {
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec;
+
+    use bunsen::{
+        contracts::assert_shape_contract,
+        support::testing::PerfTestBackend,
+    };
+
     use super::*;
     use crate::models::resnet::basic_block::BasicBlockConfig;
-    use alloc::vec;
-    use bimm_contracts::assert_shape_contract;
-    use burn::backend::NdArray;
 
     #[test]
     fn test_layer_block_config_build() {
@@ -438,7 +469,7 @@ mod tests {
 
     #[test]
     pub fn test_layer_block() {
-        type B = NdArray;
+        type B = PerfTestBackend;
         let device = Default::default();
 
         let a_planes = 16;

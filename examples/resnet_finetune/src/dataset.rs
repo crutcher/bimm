@@ -1,11 +1,30 @@
-use burn::data::dataset::vision::{ImageFolderDataset, ImageLoaderError};
-use burn::data::network::downloader;
+use std::{
+    collections::HashSet,
+    path::{
+        Path,
+        PathBuf,
+    },
+};
+
+use burn::data::{
+    dataset::vision::{
+        ImageFolderDataset,
+        ImageLoaderError,
+    },
+    network::downloader,
+};
 use flate2::bufread::GzDecoder;
-use rand::SeedableRng;
-use rand::prelude::{SliceRandom, StdRng};
-use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use rand::{
+    SeedableRng,
+    prelude::{
+        SliceRandom,
+        StdRng,
+    },
+};
+use serde::{
+    Deserialize,
+    Serialize,
+};
 use tar::Archive;
 
 /// Planets dataset sample mirror from [fastai](https://github.com/fastai/fastai/blob/master/fastai/data/external.py#L55).
@@ -35,10 +54,11 @@ pub const CLASSES: [&str; 17] = [
 /// A sample of the planets dataset from the Kaggle competition
 /// [Planet: Understanding the Amazon from Space](https://www.kaggle.com/c/planet-understanding-the-amazon-from-space).
 ///
-/// This version of the multi-label classification dataset contains 1,000 256x256 image patches
-/// with possibly multiple labels per patch. The labels can broadly be broken into three groups:
-/// atmospheric conditions, common land cover/land use phenomena, and rare land cover/land use
-/// phenomena. Each patch will have one and potentially more than one atmospheric label and zero
+/// This version of the multi-label classification dataset contains 1,000
+/// 256x256 image patches with possibly multiple labels per patch. The labels
+/// can broadly be broken into three groups: atmospheric conditions, common land
+/// cover/land use phenomena, and rare land cover/land use phenomena. Each patch
+/// will have one and potentially more than one atmospheric label and zero
 /// or more common and rare labels.
 ///
 /// The data is downloaded from the web from the [fastai mirror](https://github.com/fastai/fastai/blob/master/fastai/data/external.py#L55).
@@ -60,9 +80,10 @@ impl PlanetLoader for ImageFolderDataset {
     ///
     /// # Arguments
     ///
-    /// * `train_percentage` - Percentage of the training split. The remainder will be used for the validation split.
-    /// * `seed` - Controls the shuffling applied to the data before applying the split.
-    ///
+    /// * `train_percentage` - Percentage of the training split. The remainder
+    ///   will be used for the validation split.
+    /// * `seed` - Controls the shuffling applied to the data before applying
+    ///   the split.
     fn planet_train_val_split(
         train_percentage: u8,
         seed: u64,

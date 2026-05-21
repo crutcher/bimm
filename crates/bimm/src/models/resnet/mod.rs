@@ -8,9 +8,14 @@
 //! Examples of loading pretrained model:
 //!
 //! ```rust,no_run
-//! use burn::backend::NdArray;
-//! use bimm::cache::disk::DiskCacheConfig;
-//! use bimm::models::resnet::{PREFAB_RESNET_MAP, ResNet};
+//! use bimm::{
+//!     cache::DiskCacheConfig,
+//!     models::resnet::{
+//!         PREFAB_RESNET_MAP,
+//!         ResNet,
+//!     },
+//! };
+//! use burn::backend::Flex;
 //!
 //! let device = Default::default();
 //!
@@ -21,7 +26,7 @@
 //!     .fetch_weights(&DiskCacheConfig::default())
 //!     .expect("Failed to fetch weights");
 //!
-//! let model: ResNet<NdArray> = prefab
+//! let model: ResNet<Flex> = prefab
 //!     .to_config()
 //!     .to_structure()
 //!     .init(&device)
